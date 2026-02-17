@@ -65,12 +65,27 @@
   nav {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
 
     a {
       text-decoration: none;
-      font-weight: 500;
-      color: #353535;
+      font-weight: 600;
+      color: #4b4b4b;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: all .15s ease;
+
+      &:hover {
+        background: #f3f1ea;
+        color: #1f1f1f;
+      }
+
+      &.active {
+        background: #353535;
+        color: #fff;
+        border-color: #353535;
+      }
     }
   }
 

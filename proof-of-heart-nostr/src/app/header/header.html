@@ -18,10 +18,10 @@
   </a>
 
   <nav>
-    <a routerLink="/">Charities</a>
-    <a routerLink="/signup">For charities</a>
-    <a routerLink="/paper">Paper</a>
-    <a routerLink="/partner">Partner</a>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Charities</a>
+    <a routerLink="/signup" routerLinkActive="active">For charities</a>
+    <a routerLink="/paper" routerLinkActive="active">Paper</a>
+    <a routerLink="/partner" routerLinkActive="active">Partner</a>
     @if (connected) {
       <button class="connect-btn" (click)="connect()">{{ shortNpub }}</button>
     } @else {
