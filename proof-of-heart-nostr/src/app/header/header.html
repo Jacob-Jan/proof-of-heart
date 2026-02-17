@@ -1,16 +1,25 @@
-<header class="site-header">
-  <a routerLink="/" class="logo-link">
-    <img src="/assets/logo.png" alt="Proof of Heart" class="logo" />
+<div class="header">
+  <a class="left" routerLink="/">
+    <div class="logo">
+      <img class="logo-default" src="/assets/web-app-manifest-192x192.png" alt="logo">
+      <h1>Proof of Heart</h1>
+    </div>
+    <div class="socialmedia">
+      <a href="https://x.com/_ProofofHeart_" target="_blank" title="Follow us on X">𝕏</a>
+      <a href="https://t.me/+W3IcRBqPvjc4MWFk" target="_blank" title="Join us on Telegram">✈</a>
+      <a href="mailto:jacob-jan@proofofheart.org" title="Contact via email">✉</a>
+    </div>
   </a>
+
   <nav>
     <a routerLink="/">Charities</a>
+    <a routerLink="/signup">For charities</a>
     <a routerLink="/paper">Paper</a>
     <a routerLink="/partner">Partner</a>
     @if (connected) {
-      <a routerLink="/profile">My Profile</a>
-      <span class="npub-badge">{{ shortNpub }}</span>
+      <button class="connect-btn" (click)="connect()">{{ shortNpub }}</button>
     } @else {
       <button class="connect-btn" (click)="connect()">Connect Nostr</button>
     }
   </nav>
-</header>
+</div>
