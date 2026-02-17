@@ -81,12 +81,7 @@
       border: none;
       padding: 0 4px 3px;
 
-      .menu-icon {
-        width: 14px;
-        height: 14px;
-        display: block;
-      }
-
+      i { font-size: 14px; line-height: 1; }
       span { font-size: 13px; }
 
       &.active {
