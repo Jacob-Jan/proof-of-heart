@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { SimplePool } from 'nostr-tools/pool';
-import { finalizeEvent, getPublicKey, nip19 } from 'nostr-tools';
+import { nip19 } from 'nostr-tools';
 
 export interface CharityProfile {
   pubkey: string;
@@ -33,12 +33,21 @@ export interface CharityExtraFields {
   lightningAddress?: string;
 }
 
-const RELAYS = [
+const PROD_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://nostr.wine',
   'wss://relay.snort.social'
 ];
+
+const TEST_RELAYS = [
+  'wss://nos.lol',
+  'wss://relay.nostr.band',
+  'wss://relay.snort.social',
+  'wss://nostr.wine'
+];
+
+const RELAY_MODE_KEY = 'poh_relay_mode'; // auto | test | prod
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -53,6 +62,33 @@ export class NostrService {
     return typeof window !== 'undefined' && !!window.nostr;
   }
 
+  getRelayMode(): 'auto' | 'test' | 'prod' {
+    if (typeof window === 'undefined') return 'prod';
+    const saved = window.localStorage.getItem(RELAY_MODE_KEY);
+    if (saved === 'test' || saved === 'prod' || saved === 'auto') return saved;
+    return 'auto';
+  }
+
+  setRelayMode(mode: 'auto' | 'test' | 'prod') {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(RELAY_MODE_KEY, mode);
+  }
+
+  getActiveRelays(): string[] {
+    const mode = this.getRelayMode();
+    if (mode === 'test') return TEST_RELAYS;
+    if (mode === 'prod') return PROD_RELAYS;
+
+    // auto mode: localhost/dev -> test, everything else -> prod
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      const isLocal = host === 'localhost' || host === '127.0.0.1';
+      return isLocal ? TEST_RELAYS : PROD_RELAYS;
+    }
+
+    return PROD_RELAYS;
+  }
+
   async connectSigner(): Promise<{ pubkey: string; npub: string }> {
     if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
     const pubkey = await window.nostr.getPublicKey();
@@ -62,7 +98,7 @@ export class NostrService {
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
-    const pubkey = await window.nostr.getPublicKey();
+    const relays = this.getActiveRelays();
 
     const event = {
       kind: KIND_CHARITY_PROFILE,
@@ -72,12 +108,13 @@ export class NostrService {
     };
 
     const signed = await window.nostr.signEvent(event);
-    await Promise.any(this.pool.publish(RELAYS, signed as any));
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
   async publishRating(targetPubkey: string, rating: number, note = ''): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
+    const relays = this.getActiveRelays();
     const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
 
     const event = {
@@ -92,12 +129,13 @@ export class NostrService {
     };
 
     const signed = await window.nostr.signEvent(event);
-    await Promise.any(this.pool.publish(RELAYS, signed as any));
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
   async publishReport(targetPubkey: string, reason: 'spam' | 'impersonation' | 'scam', note = ''): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
+    const relays = this.getActiveRelays();
 
     const event = {
       kind: KIND_REPORT,
@@ -107,12 +145,14 @@ export class NostrService {
     };
 
     const signed = await window.nostr.signEvent(event);
-    await Promise.any(this.pool.publish(RELAYS, signed as any));
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
-    const profileEvents = await this.pool.querySync(RELAYS, {
+    const relays = this.getActiveRelays();
+
+    const profileEvents = await this.pool.querySync(relays, {
       kinds: [0],
       limit
     });
@@ -121,23 +161,23 @@ export class NostrService {
     if (!pubkeys.length) return [];
 
     const [charityEvents, reports, ratings, followers] = await Promise.all([
-      this.pool.querySync(RELAYS, {
+      this.pool.querySync(relays, {
         kinds: [KIND_CHARITY_PROFILE],
         '#d': ['proofofheart-charity-profile-v1'],
         authors: pubkeys,
         limit: limit * 2
       }),
-      this.pool.querySync(RELAYS, {
+      this.pool.querySync(relays, {
         kinds: [KIND_REPORT],
         '#p': pubkeys,
         limit: limit * 10
       }),
-      this.pool.querySync(RELAYS, {
+      this.pool.querySync(relays, {
         kinds: [KIND_CHARITY_RATING],
         '#p': pubkeys,
         limit: limit * 10
       }),
-      this.pool.querySync(RELAYS, {
+      this.pool.querySync(relays, {
         kinds: [3],
         '#p': pubkeys,
         limit: limit * 50
