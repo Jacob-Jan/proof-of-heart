@@ -8,31 +8,25 @@
   <section>
     <h2>Abstract</h2>
     <p>
-      Proof of Heart is evolving into a Nostr-native charity platform. Instead of a traditional account + database backend,
-      charities connect with a Nostr signer, publish profile data as events, and receive donations directly through their own
-      lightning/zap endpoints. The platform indexes public data, improves discovery, and applies transparent community moderation.
-      No custody. No private key collection. Don’t trust, verify.
+      Proof of Heart is a Nostr-native charity platform. Charities connect with a Nostr signer,
+      publish profile data as events, and receive donations directly through their own
+      lightning/zap endpoints. The platform indexes public data, improves discovery, and applies
+      transparent community moderation. No custody. No private key collection. Don’t trust, verify.
     </p>
   </section>
 
   <section>
-    <h2>1. Why this change</h2>
-    <p>
-      The original model still depended on centralized onboarding and server-side profile state. That creates avoidable
-      trust assumptions and operational overhead.
-    </p>
-    <p>
-      Nostr gives us a better base layer for identity and social reputation:
-    </p>
+    <h2>1. Platform principles</h2>
     <ul>
       <li>Charity identity is anchored to a public key (npub).</li>
       <li>Profile metadata is portable and relay-based.</li>
       <li>Community signals (followers, reports, ratings) are open and auditable.</li>
+      <li>Donations are direct, non-custodial, and charity-controlled.</li>
     </ul>
   </section>
 
   <section>
-    <h2>2. Product direction</h2>
+    <h2>2. Product model</h2>
     <ul>
       <li><strong>Nostr connect for charities:</strong> sign in with a NIP-07 signer (extension/connector), never share private key.</li>
       <li><strong>Base profile from Nostr metadata:</strong> re-use standard profile data immediately.</li>
@@ -43,7 +37,7 @@
   </section>
 
   <section>
-    <h2>3. Event model (current implementation)</h2>
+    <h2>3. Event model</h2>
     <ul>
       <li><strong>kind 0:</strong> standard Nostr profile metadata (name, picture, about, lud16/lud06, etc.).</li>
       <li><strong>kind 30078:</strong> Proof of Heart charity profile extension (mission, country, category, donation message, optional lightning override).</li>
@@ -51,9 +45,6 @@
       <li><strong>kind 1984 (NIP-56):</strong> reports/flags for moderation signals.</li>
       <li><strong>kind 3:</strong> follow graph used for social proof (follower count estimation).</li>
     </ul>
-    <p>
-      These choices keep compatibility with existing Nostr conventions while enabling charity-specific UX.
-    </p>
   </section>
 
   <section>
@@ -65,7 +56,7 @@
       <li>Reports are counted by unique reporter pubkeys.</li>
       <li>Charities can be soft-hidden when report threshold is reached.</li>
       <li>Thresholds are configurable (e.g., 1 for strict mode, 3 for balanced mode).</li>
-      <li>Hidden status should be explainable in UI ("hidden due to X flags").</li>
+      <li>Hidden status is explainable in UI ("hidden due to X flags").</li>
     </ul>
   </section>
 
@@ -80,7 +71,7 @@
   </section>
 
   <section>
-    <h2>6. Near-term roadmap</h2>
+    <h2>6. Roadmap</h2>
     <ul>
       <li>Improve static/SEO pages for the Nostr-native model.</li>
       <li>Refine follower counting and relay coverage strategy.</li>
@@ -93,9 +84,8 @@
   <section>
     <h2>Conclusion</h2>
     <p>
-      Proof of Heart is moving from a traditional charity platform into a Nostr-native public good: open identities,
-      open reputation, and direct Bitcoin donations. The goal stays the same—help donors support legitimate charities
-      with minimal trust and maximal transparency.
+      Proof of Heart provides open identities, open reputation, and direct Bitcoin donations for charities.
+      The goal is to help donors support legitimate charities with minimal trust and maximal transparency.
     </p>
   </section>
 </div>
