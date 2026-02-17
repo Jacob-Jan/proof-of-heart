@@ -1,0 +1,24 @@
+<main class="seo-page seo-partner">
+  <header><h1>Partner with Proof of Heart</h1><p>Help users donate bitcoin to real-world charities by linking to Proof of Heart.</p></header>
+  <section class="embed-options">
+    <h2>Embed options</h2>
+    <div class="embed-grid">
+      <article class="embed-card">
+        <h3>Option 1: Dark badge</h3>
+        <div class="embed-code-header">
+          <span class="label">Embed code</span>
+          <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeDark, 0)">{{ copied[0] ? 'Copied!' : 'Copy' }}</button>
+        </div>
+        <textarea readonly class="embed-code-textarea">{{ embedCodeDark }}</textarea>
+      </article>
+      <article class="embed-card">
+        <h3>Option 2: Light badge</h3>
+        <div class="embed-code-header">
+          <span class="label">Embed code</span>
+          <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeLight, 1)">{{ copied[1] ? 'Copied!' : 'Copy' }}</button>
+        </div>
+        <textarea readonly class="embed-code-textarea">{{ embedCodeLight }}</textarea>
+      </article>
+    </div>
+  </section>
+</main>

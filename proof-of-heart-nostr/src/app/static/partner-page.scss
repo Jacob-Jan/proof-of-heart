@@ -1,0 +1,6 @@
+.embed-grid { display:grid; gap:1.5rem; }
+@media (min-width:768px){ .embed-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+.embed-card { border-radius:1rem; border:1px solid #e5e7eb; background-color:#fff; padding:1.25rem; }
+.embed-code-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; }
+.copy-button { border-radius:999px; border:1px solid #d1d5db; background-color:#f9fafb; padding:.25rem .6rem; }
+.embed-code-textarea { width:100%; font-family:monospace; font-size:13px; padding:12px; border-radius:8px; border:1px solid #d1d5db; min-height:160px; }
