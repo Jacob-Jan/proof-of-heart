@@ -62,40 +62,32 @@
     }
   }
 
-  nav {
-    display: flex;
+  .menu {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     align-items: center;
+    justify-items: center;
     gap: 10px;
 
-    a {
+    .menuitem {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
       text-decoration: none;
-      font-weight: 600;
-      color: #4b4b4b;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      transition: all .15s ease;
+      color: inherit;
+      background: none;
+      border: none;
+      padding: 0 4px 3px;
 
-      &:hover {
-        background: #f3f1ea;
-        color: #1f1f1f;
-      }
+      i { font-size: 14px; }
+      span { font-size: 13px; }
 
       &.active {
-        background: #353535;
-        color: #fff;
-        border-color: #353535;
+        border-bottom: 3px solid #1f1f1f;
       }
     }
-  }
-
-  .connect-btn {
-    background: #353535;
-    color: #fff;
-    font-weight: 600;
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: none;
   }
 
   @media (min-width: 1024px) {
@@ -105,7 +97,7 @@
 
   @media (max-width: 1023px) {
     position: static;
-    nav a { display: none; }
+    .menu { display: none; }
     .left .logo h1 { font-size: 22px; }
   }
 }

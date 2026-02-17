@@ -17,15 +17,22 @@
     </div>
   </a>
 
-  <nav>
-    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Charities</a>
-    <a routerLink="/signup" routerLinkActive="active">For charities</a>
-    <a routerLink="/paper" routerLinkActive="active">Paper</a>
-    <a routerLink="/partner" routerLinkActive="active">Partner</a>
-    @if (connected) {
-      <button class="connect-btn" (click)="connect()">{{ shortNpub }}</button>
-    } @else {
-      <button class="connect-btn" (click)="connect()">Connect Nostr</button>
-    }
+  <nav class="menu">
+    <a routerLink="/" class="menuitem" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      <i class="fa-solid fa-heart"></i>
+      <span>Donate</span>
+    </a>
+    <a routerLink="/paper" class="menuitem" routerLinkActive="active">
+      <i class="fa-solid fa-file-lines"></i>
+      <span>Paper</span>
+    </a>
+    <a routerLink="/signup" class="menuitem" routerLinkActive="active">
+      <i class="fa-solid fa-right-to-bracket"></i>
+      <span>For charities</span>
+    </a>
+    <a routerLink="/partner" class="menuitem" routerLinkActive="active">
+      <i class="fa-solid fa-handshake"></i>
+      <span>Partner</span>
+    </a>
   </nav>
 </div>
