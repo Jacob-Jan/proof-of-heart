@@ -1,0 +1,4 @@
+.editor { max-width: 800px; padding: 20px; }
+form { display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #ddd; border-radius:16px; padding:16px; }
+textarea { min-height:100px; border-radius:12px; }
+button { width: fit-content; margin-top:8px; background:#353535; color:white; }

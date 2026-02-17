@@ -1,0 +1,14 @@
+<header class="site-header">
+  <a routerLink="/" class="logo-link">
+    <img src="/assets/logo.png" alt="Proof of Heart" class="logo" />
+  </a>
+  <nav>
+    <a routerLink="/">Charities</a>
+    @if (connected) {
+      <a routerLink="/profile">My Profile</a>
+      <span class="npub-badge">{{ shortNpub }}</span>
+    } @else {
+      <button class="connect-btn" (click)="connect()">Connect Nostr</button>
+    }
+  </nav>
+</header>

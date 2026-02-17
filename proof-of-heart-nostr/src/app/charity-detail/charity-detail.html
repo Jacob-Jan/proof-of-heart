@@ -1,0 +1,48 @@
+@if (loading) {
+  <p>Loading charity…</p>
+} @else if (!charity) {
+  <p>Charity not found.</p>
+} @else {
+  <section class="detail">
+    <h1>{{ charity.name }}</h1>
+    <p>{{ charity.about }}</p>
+    <p><strong>npub:</strong> {{ charity.npub }}</p>
+    <p><strong>Followers:</strong> {{ charity.followers }} | <strong>Flags:</strong> {{ charity.flags }}</p>
+
+    <h2>Charity Profile</h2>
+    <ul>
+      <li><strong>Mission:</strong> {{ charity.charity.mission || '—' }}</li>
+      <li><strong>Country:</strong> {{ charity.charity.country || '—' }}</li>
+      <li><strong>Category:</strong> {{ charity.charity.category || '—' }}</li>
+      <li><strong>Donation message:</strong> {{ charity.charity.donationMessage || '—' }}</li>
+      <li><strong>Lightning:</strong> {{ charity.charity.lightningAddress || charity.lud16 || '—' }}</li>
+    </ul>
+
+    <h2>Donate</h2>
+    <p>Send directly through your Lightning wallet/zap client to: <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong></p>
+
+    <div class="forms">
+      <form (ngSubmit)="rate()">
+        <h3>Rate this charity</h3>
+        <label>Rating (1-5)</label>
+        <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
+        <label>Note (optional)</label>
+        <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
+        <button type="submit">Publish rating</button>
+      </form>
+
+      <form (ngSubmit)="report()">
+        <h3>Flag this charity</h3>
+        <label>Reason</label>
+        <select [(ngModel)]="reportReason" name="reportReason">
+          <option value="scam">Scam</option>
+          <option value="spam">Spam</option>
+          <option value="impersonation">Impersonation</option>
+        </select>
+        <label>Details</label>
+        <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
+        <button type="submit">Publish flag</button>
+      </form>
+    </div>
+  </section>
+}

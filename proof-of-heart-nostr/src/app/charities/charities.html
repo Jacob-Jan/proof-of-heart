@@ -1,0 +1,40 @@
+<section class="page">
+  <div class="toolbar">
+    <h1>Charities on Nostr</h1>
+    <div class="controls">
+      <button (click)="reload()">Refresh</button>
+      <label><input type="checkbox" [(ngModel)]="showHidden" /> Show hidden</label>
+    </div>
+  </div>
+
+  @if (loading) {
+    <p>Loading charities from relays…</p>
+  } @else if (!visibleCharities.length) {
+    <p>No charity profiles found yet.</p>
+  } @else {
+    <div class="grid">
+      @for (charity of visibleCharities; track charity.pubkey) {
+        <article class="card" [class.hidden-card]="charity.hidden">
+          <img [src]="charity.picture || '/assets/logo-contrast.png'" alt="charity" />
+          <div class="content">
+            <h2>{{ charity.name }}</h2>
+            <p>{{ charity.about || 'No description yet.' }}</p>
+
+            <ul>
+              <li><strong>Followers:</strong> {{ charity.followers }}</li>
+              <li><strong>Rating:</strong> {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '—' }} ({{ charity.ratingCount }})</li>
+              <li><strong>Flags:</strong> {{ charity.flags }}</li>
+              <li><strong>Lightning:</strong> {{ charity.charity.lightningAddress || charity.lud16 || '—' }}</li>
+            </ul>
+
+            @if (charity.hidden) {
+              <p class="warn">Hidden due to moderation threshold.</p>
+            }
+
+            <a [routerLink]="['/charity', charity.pubkey]">Open charity</a>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>
