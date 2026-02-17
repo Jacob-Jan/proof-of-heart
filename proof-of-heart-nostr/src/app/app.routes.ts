@@ -3,7 +3,6 @@ import { CharitiesComponent } from './charities/charities';
 import { CharityDetailComponent } from './charity-detail/charity-detail';
 import { ProfileEditorComponent } from './profile-editor/profile-editor';
 import { PaperPageComponent } from './static/paper-page';
-import { AboutPageComponent } from './static/about-page';
 import { PartnerPageComponent } from './static/partner-page';
 import { SeoCharitiesPageComponent, SeoDonationsPageComponent, SeoProofPageComponent } from './static/seo-pages';
 
@@ -14,7 +13,6 @@ export const routes: Routes = [
   { path: 'signup', component: ProfileEditorComponent },
 
   { path: 'paper', component: PaperPageComponent },
-  { path: 'aboutus', component: AboutPageComponent },
   { path: 'bitcoin-charities', component: SeoCharitiesPageComponent },
   { path: 'bitcoin-donations', component: SeoDonationsPageComponent },
   { path: 'proof-of-heart', component: SeoProofPageComponent },
