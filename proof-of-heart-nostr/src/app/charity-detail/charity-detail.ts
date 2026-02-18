@@ -30,6 +30,9 @@ export class CharityDetailComponent implements OnInit {
   donating = false;
   donationStatus = '';
   lastInvoice = '';
+  showQrModal = false;
+  qrDataUrl = '';
+  readonly isLikelyMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   async ngOnInit() {
     const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
@@ -124,8 +127,12 @@ export class CharityDetailComponent implements OnInit {
     try {
       const invoice = await this.createZapInvoice(lightningAddress, sats);
       this.lastInvoice = invoice;
+      await this.generateQr(invoice);
       this.donationStatus = 'Invoice created. Opening your wallet…';
       window.location.href = `lightning:${invoice}`;
+      if (!this.isLikelyMobile) {
+        this.showQrModal = true;
+      }
     } catch (e: any) {
       this.donationStatus = e?.message || 'Could not create invoice.';
     } finally {
@@ -140,6 +147,27 @@ export class CharityDetailComponent implements OnInit {
       this.donationStatus = 'Invoice copied to clipboard.';
     } catch {
       this.donationStatus = 'Could not copy invoice from browser context.';
+    }
+  }
+
+  openQrModal() {
+    if (!this.lastInvoice) return;
+    this.showQrModal = true;
+  }
+
+  closeQrModal() {
+    this.showQrModal = false;
+  }
+
+  private async generateQr(invoice: string) {
+    try {
+      const QRCode = await import('qrcode');
+      this.qrDataUrl = await QRCode.toDataURL(`lightning:${invoice}`, {
+        width: 320,
+        margin: 1
+      });
+    } catch {
+      this.qrDataUrl = '';
     }
   }
 

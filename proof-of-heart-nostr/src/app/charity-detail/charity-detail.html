@@ -93,7 +93,10 @@
             @if (lastInvoice) {
               <div class="invoice-box">
                 <small>{{ lastInvoice.slice(0, 40) }}…</small>
-                <button type="button" (click)="copyInvoice()">Copy invoice</button>
+                <div class="invoice-actions">
+                  <button type="button" (click)="openQrModal()">Show QR</button>
+                  <button type="button" (click)="copyInvoice()">Copy invoice</button>
+                </div>
               </div>
             }
           </div>
@@ -125,4 +128,22 @@
       </div>
     </div>
   </section>
+
+  @if (showQrModal) {
+    <div class="qr-overlay" (click)="closeQrModal()">
+      <div class="qr-modal" (click)="$event.stopPropagation()">
+        <h3>Scan to pay</h3>
+        @if (qrDataUrl) {
+          <img [src]="qrDataUrl" alt="Lightning invoice QR" />
+        } @else {
+          <p>QR preview unavailable in this browser. Use copy invoice.</p>
+        }
+        <p class="qr-help">If your wallet did not open, scan this QR from your phone wallet.</p>
+        <div class="qr-actions">
+          <button type="button" (click)="copyInvoice()">Copy invoice</button>
+          <button type="button" (click)="closeQrModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
 }
