@@ -237,7 +237,7 @@ export class NostrService {
         '#p': pubkeys,
         limit: limit * 10
       }),
-      this.pool.querySync(appRelays, {
+      this.pool.querySync(kind0Relays, {
         kinds: [3],
         '#p': pubkeys,
         limit: limit * 50
