@@ -12,9 +12,11 @@
   }
 
   .confirm-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
     margin: 16px 0 18px;
+  }
+
+  button[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }

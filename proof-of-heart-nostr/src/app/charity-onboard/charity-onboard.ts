@@ -3,12 +3,13 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { NostrService } from '../nostr.service';
 
 @Component({
   selector: 'app-charity-onboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatCheckboxModule],
   templateUrl: './charity-onboard.html',
   styleUrl: './charity-onboard.scss'
 })
