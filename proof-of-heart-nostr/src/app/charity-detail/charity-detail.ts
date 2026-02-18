@@ -1,10 +1,11 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DOCUMENT, Inject, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-charity-detail',
@@ -13,13 +14,18 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   templateUrl: './charity-detail.html',
   styleUrl: './charity-detail.scss'
 })
-export class CharityDetailComponent implements OnInit {
+export class CharityDetailComponent implements OnInit, OnDestroy {
   private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
   }
   private route = inject(ActivatedRoute);
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
+  private title = inject(Title);
+  private meta = inject(Meta);
+  private jsonLdScriptElement?: HTMLScriptElement;
+
+  constructor(@Inject(DOCUMENT) private doc: Document) {}
   charity?: CharityProfile;
   loading = true;
   rating = 5;
@@ -75,8 +81,23 @@ export class CharityDetailComponent implements OnInit {
 
     this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
 
+    if (this.charity) {
+      this.updateSeo(this.charity);
+    } else {
+      this.title.setTitle('Charity not found | Proof of Heart');
+      this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
+      this.setCanonical('https://proofofheart.org/');
+    }
+
     await this.loadBtcUsdRate();
     this.loading = false;
+  }
+
+  ngOnDestroy(): void {
+    if (this.jsonLdScriptElement) {
+      this.doc.head.removeChild(this.jsonLdScriptElement);
+      this.jsonLdScriptElement = undefined;
+    }
   }
 
   async rate() {
@@ -248,6 +269,71 @@ export class CharityDetailComponent implements OnInit {
     const lnurlInvoice = await lnurlInvoiceRes.json();
     if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
     return lnurlInvoice.pr;
+  }
+
+  private updateSeo(charity: CharityProfile) {
+    const title = `${charity.name} | Donate with Bitcoin on Proof of Heart`;
+    const description = (charity.about || charity.charity.mission || `Donate to ${charity.name} with lightning or zaps.`)
+      .slice(0, 155);
+    const canonical = `https://proofofheart.org/charities/${charity.npub}`;
+    const image = charity.picture || 'https://proofofheart.org/assets/logo.png';
+
+    this.title.setTitle(title);
+    this.meta.updateTag({ name: 'description', content: description });
+
+    this.meta.updateTag({ property: 'og:type', content: 'website' });
+    this.meta.updateTag({ property: 'og:title', content: title });
+    this.meta.updateTag({ property: 'og:description', content: description });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
+    this.meta.updateTag({ property: 'og:image', content: image });
+
+    this.meta.updateTag({ name: 'twitter:title', content: title });
+    this.meta.updateTag({ name: 'twitter:description', content: description });
+    this.meta.updateTag({ name: 'twitter:image', content: image });
+
+    this.setCanonical(canonical);
+    this.setJsonLdForCharity(charity, canonical);
+  }
+
+  private setCanonical(url: string) {
+    let link: HTMLLinkElement | null = this.doc.head.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = this.doc.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      this.doc.head.appendChild(link);
+    }
+    link.setAttribute('href', url);
+  }
+
+  private setJsonLdForCharity(charity: CharityProfile, canonical: string) {
+    if (this.jsonLdScriptElement) {
+      this.doc.head.removeChild(this.jsonLdScriptElement);
+      this.jsonLdScriptElement = undefined;
+    }
+
+    const jsonLdObject: any = {
+      '@context': 'https://schema.org',
+      '@type': 'NGO',
+      name: charity.name,
+      url: canonical,
+      description: charity.about || charity.charity.mission || '',
+      image: charity.picture || undefined,
+      sameAs: [charity.website].filter(Boolean),
+      potentialAction: {
+        '@type': 'DonateAction',
+        target: canonical,
+        recipient: {
+          '@type': 'NGO',
+          name: charity.name
+        }
+      }
+    };
+
+    const script = this.doc.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify(jsonLdObject);
+    this.doc.head.appendChild(script);
+    this.jsonLdScriptElement = script;
   }
 
   private async loadBtcUsdRate() {
