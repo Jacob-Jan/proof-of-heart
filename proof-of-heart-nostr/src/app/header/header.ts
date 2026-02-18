@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { NostrService } from '../nostr.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-header',
@@ -13,6 +14,7 @@ import { NostrService } from '../nostr.service';
 export class HeaderComponent {
   private nostr = inject(NostrService);
   private router = inject(Router);
+  private snack = inject(MatSnackBar);
   connected = false;
   npub = '';
 
@@ -33,8 +35,9 @@ export class HeaderComponent {
       const { npub } = await this.nostr.connectSigner();
       this.npub = npub;
       this.connected = true;
+      this.snack.open('Nostr signer connected', 'Close', { duration: 2500 });
     } catch (e: any) {
-      alert(e.message || 'Failed to connect Nostr signer');
+      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
     }
   }
 
@@ -45,9 +48,10 @@ export class HeaderComponent {
       this.npub = npub;
       this.connected = true;
       await this.nostr.ensureCharityProfile(pubkey);
+      this.snack.open('Connected. Opening your public charity profile…', 'Close', { duration: 2800 });
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      alert(e.message || 'Failed to connect Nostr signer');
+      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
     }
   }
 

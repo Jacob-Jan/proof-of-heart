@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CharityProfile, NostrService } from '../nostr.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-charities',
@@ -15,6 +16,7 @@ import { CharityProfile, NostrService } from '../nostr.service';
 export class CharitiesComponent implements OnInit {
   private nostr = inject(NostrService);
   private router = inject(Router);
+  private snack = inject(MatSnackBar);
 
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
@@ -36,7 +38,7 @@ export class CharitiesComponent implements OnInit {
       this.applyFilters();
     } catch (e) {
       console.error(e);
-      alert('Failed to load charities from relays.');
+      this.snack.open('Failed to load charities from relays.', 'Close', { duration: 4500 });
     } finally {
       this.loading = false;
     }
@@ -75,7 +77,7 @@ export class CharitiesComponent implements OnInit {
       await this.nostr.ensureCharityProfile(pubkey);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      alert(e.message || 'Failed to connect Nostr signer');
+      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
     }
   }
 

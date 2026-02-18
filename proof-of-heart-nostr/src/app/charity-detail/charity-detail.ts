@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-charity-detail',
@@ -15,6 +16,7 @@ import { nip19 } from 'nostr-tools';
 export class CharityDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private nostr = inject(NostrService);
+  private snack = inject(MatSnackBar);
   charity?: CharityProfile;
   loading = true;
   rating = 5;
@@ -76,14 +78,22 @@ export class CharityDetailComponent implements OnInit {
 
   async rate() {
     if (!this.charity) return;
-    await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
-    alert('Rating published to Nostr.');
+    try {
+      await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
+      this.snack.open('Rating published to Nostr.', 'Close', { duration: 3000 });
+    } catch (e: any) {
+      this.snack.open(e?.message || 'Failed to publish rating.', 'Close', { duration: 4000 });
+    }
   }
 
   async report() {
     if (!this.charity) return;
-    await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
-    alert('Report published to Nostr.');
+    try {
+      await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
+      this.snack.open('Flag published to Nostr.', 'Close', { duration: 3000 });
+    } catch (e: any) {
+      this.snack.open(e?.message || 'Failed to publish flag.', 'Close', { duration: 4000 });
+    }
   }
 
   toggleDonationMode() {
@@ -119,13 +129,13 @@ export class CharityDetailComponent implements OnInit {
 
     const sats = this.donationSats;
     if (!sats || sats <= 0) {
-      alert('Enter a valid donation amount.');
+      this.snack.open('Enter a valid donation amount.', 'Close', { duration: 3000 });
       return;
     }
 
     const lightningAddress = this.donationAddress;
     if (!lightningAddress.includes('@')) {
-      alert('No valid lightning address found for this charity.');
+      this.snack.open('No valid lightning address found for this charity.', 'Close', { duration: 3500 });
       return;
     }
 
@@ -137,12 +147,14 @@ export class CharityDetailComponent implements OnInit {
       this.lastInvoice = invoice;
       await this.generateQr(invoice);
       this.donationStatus = 'Invoice created. Opening your wallet…';
+      this.snack.open('Invoice ready. Trying to open your wallet…', 'Close', { duration: 3000 });
       window.location.href = `lightning:${invoice}`;
       if (!this.isLikelyMobile) {
         this.showQrModal = true;
       }
     } catch (e: any) {
       this.donationStatus = e?.message || 'Could not create invoice.';
+      this.snack.open(this.donationStatus, 'Close', { duration: 4500 });
     } finally {
       this.donating = false;
     }
@@ -153,8 +165,10 @@ export class CharityDetailComponent implements OnInit {
     try {
       await navigator.clipboard.writeText(this.lastInvoice);
       this.donationStatus = 'Invoice copied to clipboard.';
+      this.snack.open('Invoice copied to clipboard.', 'Close', { duration: 2500 });
     } catch {
       this.donationStatus = 'Could not copy invoice from browser context.';
+      this.snack.open(this.donationStatus, 'Close', { duration: 3500 });
     }
   }
 
