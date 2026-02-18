@@ -7,44 +7,30 @@
     <div class="top">
       <div class="left">
         <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
-        <h1>{{ charity.name }}</h1>
-      </div>
-      <div class="right">
-        <ul>
+        <div class="title-wrap">
+          <h1>{{ charity.name }}</h1>
           @if (charity.website) {
-            <li>
-              <i class="fa-solid fa-globe"></i>
-              <a target="_blank" [href]="charity.website">{{ charity.website }}</a>
-            </li>
+            <a class="website" target="_blank" [href]="charity.website">{{ charity.website }}</a>
           }
-          <li>
-            <i class="fa-solid fa-folder"></i>
-            {{ charity.charity.category || 'Uncategorized' }}
-          </li>
-          @if (charity.charity.country) {
-            <li>
-              <i class="fa-solid fa-location-dot"></i>
-              {{ charity.charity.country }}
-            </li>
-          }
-          <li>
-            <i class="fa-solid fa-users"></i>
-            {{ charity.followers }} followers
-          </li>
-          <li>
-            <i class="fa-solid fa-star"></i>
-            {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)
-          </li>
-          <li>
-            <i class="fa-solid fa-bolt"></i>
-            {{ charity.zappedSats | number }} sats zapped
-          </li>
-          <li>
-            <i class="fa-solid fa-flag"></i>
-            {{ charity.flags }} flags
-          </li>
-        </ul>
+        </div>
       </div>
+
+      @if (canEdit) {
+        <div class="top-actions">
+          <a routerLink="/charity/profile"><button mat-stroked-button type="button">Edit charity profile</button></a>
+        </div>
+      }
+    </div>
+
+    <div class="stats-row">
+      <span class="stat-chip">{{ charity.charity.category || 'Uncategorized' }}</span>
+      @if (charity.charity.country) {
+        <span class="stat-chip">{{ charity.charity.country }}</span>
+      }
+      <span class="stat-chip">{{ charity.followers }} followers</span>
+      <span class="stat-chip">{{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)</span>
+      <span class="stat-chip">{{ charity.zappedSats | number }} sats zapped</span>
+      <span class="stat-chip">{{ charity.flags }} flags</span>
     </div>
 
     <div class="middle">
@@ -54,15 +40,8 @@
           {{ charity.about || charity.charity.mission || 'No charity description yet.' }}
         </div>
 
-        @if (canEdit) {
-          <p class="edit-wrap">
-            <a routerLink="/charity/profile"><button type="button">Edit charity profile</button></a>
-          </p>
-        }
-
         <div class="meta-block">
-          <p><strong>Npub:</strong> {{ charity.npub }}</p>
-          <p><strong>Nostr URI:</strong> {{ nostrProfileUri }}</p>
+          <p><strong>Nostr profile:</strong> {{ nostrProfileUri }}</p>
           <div class="profile-links">
             <button type="button" (click)="copyNostrProfileUri()">Copy nostr link</button>
             <a [href]="primalProfileUrl" target="_blank" rel="noopener noreferrer">Open on Primal</a>
