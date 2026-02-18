@@ -17,6 +17,10 @@
     </div>
   </a>
 
+  @if (isLocalhost) {
+    <div class="relay-badge">{{ relayBadgeLabel }}</div>
+  }
+
   <nav class="menu">
     <a routerLink="/" class="menuitem" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
       <i class="fa-solid fa-heart"></i>

@@ -15,6 +15,18 @@ export class HeaderComponent {
   connected = false;
   npub = '';
 
+  isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  get relayBadgeLabel() {
+    const mode = this.nostr.getRelayMode();
+    const active = this.nostr.getActiveRelays();
+
+    if (mode === 'test') return `Relay: TEST (${active[0] ?? 'n/a'})`;
+    if (mode === 'prod') return `Relay: PROD (${active[0] ?? 'n/a'})`;
+
+    return `Relay: AUTO (${active[0] ?? 'n/a'})`;
+  }
+
   async connect() {
     try {
       const { npub } = await this.nostr.connectSigner();
