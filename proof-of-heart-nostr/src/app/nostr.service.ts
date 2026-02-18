@@ -41,10 +41,7 @@ const PROD_RELAYS = [
 ];
 
 const TEST_RELAYS = [
-  'wss://nos.lol',
-  'wss://relay.nostr.band',
-  'wss://relay.snort.social',
-  'wss://nostr.wine'
+  'ws://127.0.0.1:7777'
 ];
 
 const RELAY_MODE_KEY = 'poh_relay_mode'; // auto | test | prod
