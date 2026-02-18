@@ -46,17 +46,24 @@
       align-items: center;
       gap: 8px;
       font-weight: 600;
+      min-height: 42px;
+
+      .mdc-button__label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
     }
 
     .primary {
-      background: var(--mat-primary);
+      background: #8a5100;
       color: #fff;
     }
 
     .secondary {
       background: transparent;
-      color: var(--mat-primary);
-      border-color: rgba(var(--mat-primary-rgb), 0.25);
+      color: #8a5100;
+      border-color: #8a5100;
     }
   }
 }

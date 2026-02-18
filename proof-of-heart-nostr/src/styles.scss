@@ -32,7 +32,7 @@ input, select, textarea {
   color: #353535;
 }
 
-button {
+button:not(.mdc-button) {
   border: none;
   border-radius: 999px;
   padding: 10px 16px;

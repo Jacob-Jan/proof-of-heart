@@ -3,13 +3,14 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonModule } from '@angular/material/button';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-charities',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MatProgressSpinnerModule],
+  imports: [CommonModule, RouterModule, FormsModule, MatProgressSpinnerModule, MatButtonModule],
   templateUrl: './charities.html',
   styleUrl: './charities.scss'
 })
