@@ -1,0 +1,65 @@
+<section class="admin">
+  <h1>Admin Insights</h1>
+
+  @if (checkingAccess) {
+    <p>Checking signer access…</p>
+  } @else if (!isAuthorized) {
+    <div class="locked">
+      <p>This page is restricted to the owner npub.</p>
+      @if (connectedNpub) {
+        <p><strong>Connected:</strong> {{ connectedNpub }}</p>
+      }
+      <button type="button" (click)="connectAndUnlock()">Connect owner signer</button>
+    </div>
+  } @else {
+    <div class="topbar">
+      <p><strong>Signed in as:</strong> {{ connectedNpub }}</p>
+      <button type="button" (click)="reload()" [disabled]="loading">{{ loading ? 'Refreshing…' : 'Refresh insights' }}</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><span>Total charities</span><strong>{{ totalCharities }}</strong></div>
+      <div class="kpi"><span>Visible charities</span><strong>{{ visibleCharities }}</strong></div>
+      <div class="kpi"><span>Hidden/filtered</span><strong>{{ hiddenCharities }}</strong></div>
+      <div class="kpi"><span>Total followers</span><strong>{{ totalFollowers | number }}</strong></div>
+      <div class="kpi"><span>Total flags</span><strong>{{ totalFlags | number }}</strong></div>
+      <div class="kpi"><span>Total ratings</span><strong>{{ totalRatings | number }}</strong></div>
+      <div class="kpi"><span>Total zapped sats</span><strong>{{ totalZappedSats | number }}</strong></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Top by zaps</h3>
+        <ul>
+          @for (c of topByZaps; track c.pubkey) {
+            <li><a [routerLink]="['/charities', c.npub]">{{ c.name }}</a> — {{ c.zappedSats | number }} sats</li>
+          } @empty {
+            <li>No data.</li>
+          }
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Top by followers</h3>
+        <ul>
+          @for (c of topByFollowers; track c.pubkey) {
+            <li><a [routerLink]="['/charities', c.npub]">{{ c.name }}</a> — {{ c.followers | number }} followers</li>
+          } @empty {
+            <li>No data.</li>
+          }
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Most flagged</h3>
+        <ul>
+          @for (c of flaggedCharities; track c.pubkey) {
+            <li><a [routerLink]="['/charities', c.npub]">{{ c.name }}</a> — {{ c.flags | number }} flags</li>
+          } @empty {
+            <li>No flagged charities.</li>
+          }
+        </ul>
+      </div>
+    </div>
+  }
+</section>
