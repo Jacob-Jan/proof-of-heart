@@ -23,8 +23,14 @@
         </label>
       </p>
 
-      <label>Charity name (fallback if kind-0 name is missing)</label>
-      <input [(ngModel)]="model.charityName" name="charityName" placeholder="Your charity name" />
+      <label>Charity name (from kind 0)</label>
+      <input [value]="kind0Name || 'No kind-0 name found yet'" readonly />
+
+      <label>Short description (kind 0, overridable)</label>
+      <textarea [(ngModel)]="model.shortDescription" name="shortDescription" rows="3" placeholder="Short summary shown under your name"></textarea>
+
+      <label>Description (long)</label>
+      <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Long description shown in the More about section"></textarea>
 
       <label>Mission</label>
       <textarea [(ngModel)]="model.mission" name="mission" rows="4"></textarea>

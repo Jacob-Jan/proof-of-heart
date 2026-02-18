@@ -20,8 +20,13 @@ export class ProfileEditorComponent implements OnInit {
   private snack = inject(MatSnackBar);
 
   model: CharityExtraFields = {
+    shortDescription: '',
+    description: '',
     isVisible: true
   };
+
+  kind0Name = '';
+  kind0About = '';
 
   private existingModel: CharityExtraFields = {};
   loadingExisting = false;
@@ -39,11 +44,28 @@ export class ProfileEditorComponent implements OnInit {
     try {
       const { pubkey, npub } = await this.nostr.connectSigner();
       this.ownNpub = npub;
-      const existing = await this.nostr.loadOwnCharityProfile(pubkey);
+
+      const [existing, kind0] = await Promise.all([
+        this.nostr.loadOwnCharityProfile(pubkey),
+        this.nostr.loadKind0Profile(pubkey)
+      ]);
+
+      this.kind0Name = (
+        kind0?.['display_name'] ||
+        kind0?.['displayName'] ||
+        kind0?.['name'] ||
+        kind0?.['username'] ||
+        ''
+      ).trim();
+      this.kind0About = (kind0?.['about'] || '').trim();
+
       if (existing) {
         this.existingModel = existing;
         this.model = { ...existing };
       }
+
+      if (!this.model.shortDescription) this.model.shortDescription = this.kind0About;
+      if (!this.model.description) this.model.description = '';
       if (this.model.isVisible === undefined) this.model.isVisible = true;
     } catch {
       this.needsSignerForLoad = true;

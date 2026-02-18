@@ -9,6 +9,9 @@
         <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
         <div class="title-wrap">
           <h1>{{ charity.name }}</h1>
+          @if (charity.charity.shortDescription || charity.about) {
+            <p class="short-description">{{ charity.charity.shortDescription || charity.about }}</p>
+          }
           @if (charity.website) {
             <a class="website" target="_blank" [href]="charity.website">{{ charity.website }}</a>
           }
@@ -37,7 +40,7 @@
       <div class="left">
         <h3>More about {{ charity.name }}</h3>
         <div class="description">
-          {{ charity.about || charity.charity.mission || 'No charity description yet.' }}
+          {{ charity.charity.description || charity.charity.mission || 'No charity description yet.' }}
         </div>
 
         <div class="meta-block">

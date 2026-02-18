@@ -18,6 +18,8 @@ export interface CharityProfile {
   ratingCount: number;
   zappedSats: number;
   charity: {
+    shortDescription?: string;
+    description?: string;
     mission?: string;
     country?: string;
     category?: string;
@@ -28,7 +30,8 @@ export interface CharityProfile {
 }
 
 export interface CharityExtraFields {
-  charityName?: string;
+  shortDescription?: string;
+  description?: string;
   mission?: string;
   country?: string;
   category?: string;
@@ -122,6 +125,31 @@ export class NostrService {
     return { pubkey, npub };
   }
 
+  async loadKind0Profile(pubkey: string): Promise<Record<string, any>> {
+    const relays = this.getKind0ReadRelays();
+    const events = await this.pool.querySync(relays, {
+      kinds: [0],
+      authors: [pubkey],
+      limit: 20
+    });
+
+    if (!events.length) return {};
+
+    const sorted = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0));
+    const merged: Record<string, any> = {};
+
+    for (const ev of sorted as any[]) {
+      const data = this.safeJson(ev.content || '{}');
+      for (const key of ['name', 'display_name', 'displayName', 'username', 'about', 'picture', 'website', 'lud16', 'lud06']) {
+        if ((merged[key] === undefined || merged[key] === null || merged[key] === '') && data[key] !== undefined && data[key] !== null && data[key] !== '') {
+          merged[key] = data[key];
+        }
+      }
+    }
+
+    return merged;
+  }
+
   async getCurrentPubkey(): Promise<string> {
     try {
       if (window.nostr) {
@@ -209,7 +237,8 @@ export class NostrService {
     if (existing.length > 0) return;
 
     await this.publishCharityProfile({
-      charityName: '',
+      shortDescription: '',
+      description: '',
       mission: '',
       country: '',
       category: '',
@@ -376,8 +405,7 @@ export class NostrService {
         metadata?.display_name,
         metadata?.displayName,
         metadata?.name,
-        metadata?.username,
-        extra?.charityName
+        metadata?.username
       ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
 
       charities.push({
@@ -396,6 +424,8 @@ export class NostrService {
         ratingCount: rating.count,
         zappedSats: zapMap.get(pubkey) || 0,
         charity: {
+          shortDescription: extra?.shortDescription,
+          description: extra?.description,
           mission: extra?.mission,
           country: extra?.country,
           category: extra?.category,

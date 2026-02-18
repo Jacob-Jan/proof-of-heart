@@ -4,7 +4,7 @@
   .top {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 20px;
 
     .left {
@@ -13,52 +13,79 @@
       grid-gap: 20px;
       align-items: center;
 
-      h1 {
-        margin: 0;
-      }
-
       img {
         max-width: 150px;
         border-radius: 10px;
       }
-    }
 
-    .right {
-      ul {
-        list-style: none;
-        line-height: 1.6;
-        padding: 0;
-        margin: 0;
-
-        li {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+      .title-wrap {
+        h1 {
+          margin: 0;
         }
 
-        a {
+        .short-description {
+          margin: 8px 0 0;
+          color: #4a4a4a;
+          line-height: 1.45;
+        }
+
+        .website {
+          display: inline-block;
+          margin-top: 10px;
           word-break: break-all;
         }
       }
     }
 
+    .top-actions {
+      button {
+        min-height: 40px;
+        border-radius: 999px;
+        padding: 0 16px;
+      }
+    }
+
     @media (max-width: 700px) {
       flex-direction: column;
+      align-items: stretch;
 
       .left {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 20px;
+        text-align: center;
       }
+
+      .top-actions {
+        display: flex;
+        justify-content: center;
+      }
+    }
+  }
+
+  .stats-row {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .stat-chip {
+      border: 1px solid #ddd;
+      background: #fff;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 14px;
+      color: #444;
     }
   }
 
   .middle {
     display: flex;
     justify-content: space-between;
-    gap: 80px;
-    margin-top: 40px;
+    align-items: flex-start;
+    gap: 56px;
+    margin-top: 20px;
 
     .left {
       flex: 1;
@@ -98,13 +125,17 @@
     }
 
     .right {
+      align-self: flex-start;
+      position: sticky;
+      top: 84px;
+
       .donate {
         display: flex;
         align-items: stretch;
         justify-content: center;
         flex-direction: column;
         gap: 16px;
-        margin-top: 10px;
+        margin-top: 0;
         padding: 24px;
         max-width: 430px;
         border: 1px solid #e8e8e8;
@@ -255,6 +286,11 @@
       flex-direction: column;
       gap: 20px;
       margin-top: 20px;
+
+      .right {
+        position: static;
+        top: auto;
+      }
 
       .right .donate {
         margin: 0 auto;
