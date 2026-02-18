@@ -1,20 +1,37 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+
+:root {
+  --mat-primary: #8a5100;
+  --mat-primary-rgb: 138, 81, 0;
+}
+
 body {
   margin: 0;
   font-family: 'Lato', sans-serif;
   background-color: #F0EFE9;
   color: #353535;
 }
+
 a { color: #353535; }
-h1,h2,h3,h4,h5,h6 { font-family: 'Inter', sans-serif; font-weight: 500; }
+
+h1,h2,h3,h4,h5,h6 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
 input, select, textarea {
   border-radius: 40px;
-  padding: 12px 18px;
+  padding: 15px 30px;
   background-color: #fbf9f3;
   border: 1px solid rgb(150,150,150);
   color: #353535;
 }
+
+*::placeholder {
+  color: #353535;
+}
+
 button {
   border: none;
   border-radius: 999px;
@@ -28,19 +45,25 @@ button {
   --mat-mdc-snack-bar-button-color: #fff;
 }
 
-.mat-mdc-snack-bar-container.toast-success {
-  --mdc-snackbar-container-color: #1f7a44;
+.mat-mdc-snack-bar-container .mdc-snackbar__surface {
+  background: #1d4ed8 !important;
+  backdrop-filter: none;
+  opacity: 1 !important;
 }
 
-.mat-mdc-snack-bar-container.toast-error {
-  --mdc-snackbar-container-color: #b42318;
+.mat-mdc-snack-bar-container.toast-success .mdc-snackbar__surface {
+  background: #1f7a44 !important;
 }
 
-.mat-mdc-snack-bar-container.toast-info {
-  --mdc-snackbar-container-color: #1d4ed8;
+.mat-mdc-snack-bar-container.toast-error .mdc-snackbar__surface {
+  background: #b42318 !important;
 }
 
-/* Ensure Font Awesome 7 webfonts resolve from /assets */
+.mat-mdc-snack-bar-container.toast-info .mdc-snackbar__surface {
+  background: #1d4ed8 !important;
+}
+
+/* Ensure Font Awesome webfonts resolve from /assets */
 @font-face {
   font-family: "Font Awesome 7 Free";
   font-style: normal;
