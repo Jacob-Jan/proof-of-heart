@@ -1,4 +1,37 @@
-.site-footer {
-  text-align: center; padding: 20px; font-size: 0.85rem; color: #888;
-  border-top: 1px solid #ddd; background: #fff;
+.footer {
+  border-top: 1px solid #353535;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #666666;
+  margin-bottom: 0;
+  background: #fcfcfc;
+
+  .footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    a {
+      color: #444;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: color 0.2s ease, background 0.2s ease;
+
+      &:hover {
+        color: #000;
+        background: rgba(0, 0, 0, 0.06);
+      }
+    }
+  }
+
+  .footer-copy {
+    margin: 0;
+    color: #777;
+    font-size: 13px;
+  }
 }
