@@ -274,10 +274,18 @@ export class NostrService {
       const flags = flagMap.get(pubkey)?.size ?? 0;
       const rating = ratingMap.get(pubkey) ?? { total: 0, count: 0 };
 
+      const resolvedName = [
+        metadata?.name,
+        metadata?.display_name,
+        metadata?.displayName,
+        metadata?.username,
+        extra?.charityName
+      ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
+
       charities.push({
         pubkey,
         npub: nip19.npubEncode(pubkey),
-        name: metadata?.name || metadata?.display_name || extra?.charityName || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
+        name: resolvedName?.trim() || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
         about: metadata?.about || '',
         picture: metadata?.picture,
         website: metadata?.website,
