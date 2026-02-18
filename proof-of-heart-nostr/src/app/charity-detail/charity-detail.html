@@ -66,6 +66,22 @@
             <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong>
           </p>
 
+          <div class="amount-box">
+            <div class="amount-row">
+              <input
+                type="number"
+                min="1"
+                [(ngModel)]="donationInput"
+                name="donationInput"
+                [placeholder]="donationMode === 'sats' ? 'Amount in sats' : 'Amount in USD'" />
+              <span class="unit">{{ donationMode === 'sats' ? 'sats' : 'USD' }}</span>
+              <button type="button" class="switch-btn" (click)="toggleDonationMode()" title="Switch sats/USD">
+                <i class="fa-solid fa-right-left"></i>
+              </button>
+            </div>
+            <p class="converted">{{ convertedHint }}</p>
+          </div>
+
           <div class="forms">
             <form (ngSubmit)="rate()">
               <h3>Rate this charity</h3>

@@ -24,6 +24,10 @@ export class CharityDetailComponent implements OnInit {
   visitorPubkey = '';
   canEdit = false;
 
+  donationMode: 'sats' | 'usd' = 'sats';
+  donationInput = 1000;
+  btcUsdRate = 0;
+
   async ngOnInit() {
     const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
@@ -51,6 +55,8 @@ export class CharityDetailComponent implements OnInit {
     }
 
     this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
+
+    await this.loadBtcUsdRate();
     this.loading = false;
   }
 
@@ -64,5 +70,35 @@ export class CharityDetailComponent implements OnInit {
     if (!this.charity) return;
     await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
     alert('Report published to Nostr.');
+  }
+
+  toggleDonationMode() {
+    this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
+  }
+
+  get convertedHint(): string {
+    if (!this.btcUsdRate || !this.donationInput || this.donationInput <= 0) {
+      return this.donationMode === 'sats' ? '≈ $0.00' : '≈ 0 sats';
+    }
+
+    if (this.donationMode === 'sats') {
+      const btc = this.donationInput / 100_000_000;
+      const usd = btc * this.btcUsdRate;
+      return `≈ $${usd.toFixed(2)}`;
+    }
+
+    const btc = this.donationInput / this.btcUsdRate;
+    const sats = Math.round(btc * 100_000_000);
+    return `≈ ${sats.toLocaleString()} sats`;
+  }
+
+  private async loadBtcUsdRate() {
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+      const data = await res.json();
+      this.btcUsdRate = Number(data?.bitcoin?.usd) || 0;
+    } catch {
+      this.btcUsdRate = 0;
+    }
   }
 }
