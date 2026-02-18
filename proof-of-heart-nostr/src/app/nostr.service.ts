@@ -111,6 +111,27 @@ export class NostrService {
     return signed.id;
   }
 
+  async ensureCharityProfile(pubkey: string): Promise<void> {
+    const relays = this.getActiveRelays();
+    const existing = await this.pool.querySync(relays, {
+      kinds: [KIND_CHARITY_PROFILE],
+      authors: [pubkey],
+      '#d': ['proofofheart-charity-profile-v1'],
+      limit: 1
+    });
+
+    if (existing.length > 0) return;
+
+    await this.publishCharityProfile({
+      mission: '',
+      country: '',
+      category: '',
+      donationMessage: '',
+      lightningAddress: '',
+      isVisible: true
+    });
+  }
+
   async publishRating(targetPubkey: string, rating: number, note = ''): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getActiveRelays();

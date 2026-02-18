@@ -71,7 +71,8 @@ export class CharitiesComponent implements OnInit {
 
   async goForCharities() {
     try {
-      const { npub } = await this.nostr.connectSigner();
+      const { pubkey, npub } = await this.nostr.connectSigner();
+      await this.nostr.ensureCharityProfile(pubkey);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
       alert(e.message || 'Failed to connect Nostr signer');
