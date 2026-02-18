@@ -50,6 +50,7 @@ const TEST_RELAYS = [
 
 const RELAY_MODE_KEY = 'poh_relay_mode'; // auto | test | prod
 const LAST_PUBKEY_KEY = 'poh_last_pubkey';
+const ONBOARDED_PUBKEYS_KEY = 'poh_onboarded_pubkeys';
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -139,6 +140,30 @@ export class NostrService {
     }
 
     return '';
+  }
+
+  hasLocalOnboarding(pubkey: string): boolean {
+    if (typeof window === 'undefined' || !pubkey) return false;
+    try {
+      const raw = window.localStorage.getItem(ONBOARDED_PUBKEYS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) && arr.includes(pubkey);
+    } catch {
+      return false;
+    }
+  }
+
+  markLocalOnboarding(pubkey: string): void {
+    if (typeof window === 'undefined' || !pubkey) return;
+    try {
+      const raw = window.localStorage.getItem(ONBOARDED_PUBKEYS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const next = Array.isArray(arr) ? arr.filter((v: any) => typeof v === 'string') : [];
+      if (!next.includes(pubkey)) next.push(pubkey);
+      window.localStorage.setItem(ONBOARDED_PUBKEYS_KEY, JSON.stringify(next));
+    } catch {
+      window.localStorage.setItem(ONBOARDED_PUBKEYS_KEY, JSON.stringify([pubkey]));
+    }
   }
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {

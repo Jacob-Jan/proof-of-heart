@@ -34,6 +34,7 @@ export class CharityOnboardComponent {
     this.loading = true;
     try {
       const { pubkey, npub } = await this.nostr.connectSigner();
+      this.nostr.markLocalOnboarding(pubkey);
       await this.nostr.ensureCharityProfile(pubkey);
       this.toast('Connected. Opening your public charity profile…', 'success', 2600);
       await this.router.navigate(['/charities', npub]);

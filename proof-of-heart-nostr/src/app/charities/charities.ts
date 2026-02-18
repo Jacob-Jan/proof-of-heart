@@ -78,8 +78,14 @@ export class CharitiesComponent implements OnInit {
   async goForCharities() {
     try {
       const { pubkey, npub } = await this.nostr.connectSigner();
-      await this.nostr.ensureCharityProfile(pubkey);
-      await this.router.navigate(['/charities', npub]);
+
+      if (this.nostr.hasLocalOnboarding(pubkey)) {
+        await this.nostr.ensureCharityProfile(pubkey);
+        await this.router.navigate(['/charities', npub]);
+        return;
+      }
+
+      await this.router.navigate(['/charity/onboard']);
     } catch (e: any) {
       this.toast(e?.message || 'Connect your Nostr signer to continue.', 'info', 3500);
       await this.router.navigate(['/charity/onboard']);
