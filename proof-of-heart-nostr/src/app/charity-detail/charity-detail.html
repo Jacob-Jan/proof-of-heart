@@ -32,6 +32,10 @@
             {{ charity.followers }} followers
           </li>
           <li>
+            <i class="fa-solid fa-bolt"></i>
+            {{ charity.zappedSats | number }} sats zapped
+          </li>
+          <li>
             <i class="fa-solid fa-flag"></i>
             {{ charity.flags }} flags
           </li>
@@ -80,6 +84,18 @@
               </button>
             </div>
             <p class="converted">{{ convertedHint }}</p>
+            <button type="button" class="donate-btn" (click)="donate()" [disabled]="donating">
+              {{ donating ? 'Creating invoice…' : 'Zap / Donate now' }}
+            </button>
+            @if (donationStatus) {
+              <p class="donation-status">{{ donationStatus }}</p>
+            }
+            @if (lastInvoice) {
+              <div class="invoice-box">
+                <small>{{ lastInvoice.slice(0, 40) }}…</small>
+                <button type="button" (click)="copyInvoice()">Copy invoice</button>
+              </div>
+            }
           </div>
 
           <div class="forms">

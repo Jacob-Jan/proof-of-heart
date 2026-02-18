@@ -27,6 +27,9 @@ export class CharityDetailComponent implements OnInit {
   donationMode: 'sats' | 'usd' = 'sats';
   donationInput = 1000;
   btcUsdRate = 0;
+  donating = false;
+  donationStatus = '';
+  lastInvoice = '';
 
   async ngOnInit() {
     const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
@@ -76,6 +79,14 @@ export class CharityDetailComponent implements OnInit {
     this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
+  get donationSats(): number {
+    if (!this.donationInput || this.donationInput <= 0) return 0;
+    if (this.donationMode === 'sats') return Math.round(this.donationInput);
+    if (!this.btcUsdRate || this.btcUsdRate <= 0) return 0;
+    const btc = this.donationInput / this.btcUsdRate;
+    return Math.round(btc * 100_000_000);
+  }
+
   get convertedHint(): string {
     if (!this.btcUsdRate || !this.donationInput || this.donationInput <= 0) {
       return this.donationMode === 'sats' ? '≈ $0.00' : '≈ 0 sats';
@@ -90,6 +101,100 @@ export class CharityDetailComponent implements OnInit {
     const btc = this.donationInput / this.btcUsdRate;
     const sats = Math.round(btc * 100_000_000);
     return `≈ ${sats.toLocaleString()} sats`;
+  }
+
+  async donate() {
+    if (!this.charity) return;
+
+    const sats = this.donationSats;
+    if (!sats || sats <= 0) {
+      alert('Enter a valid donation amount.');
+      return;
+    }
+
+    const lightningAddress = (this.charity.charity.lightningAddress || this.charity.lud16 || '').trim();
+    if (!lightningAddress.includes('@')) {
+      alert('No valid lightning address found for this charity.');
+      return;
+    }
+
+    this.donating = true;
+    this.donationStatus = '';
+
+    try {
+      const invoice = await this.createZapInvoice(lightningAddress, sats);
+      this.lastInvoice = invoice;
+      this.donationStatus = 'Invoice created. Opening your wallet…';
+      window.location.href = `lightning:${invoice}`;
+    } catch (e: any) {
+      this.donationStatus = e?.message || 'Could not create invoice.';
+    } finally {
+      this.donating = false;
+    }
+  }
+
+  async copyInvoice() {
+    if (!this.lastInvoice) return;
+    try {
+      await navigator.clipboard.writeText(this.lastInvoice);
+      this.donationStatus = 'Invoice copied to clipboard.';
+    } catch {
+      this.donationStatus = 'Could not copy invoice from browser context.';
+    }
+  }
+
+  private async createZapInvoice(lightningAddress: string, sats: number): Promise<string> {
+    const [name, domain] = lightningAddress.split('@');
+    if (!name || !domain) throw new Error('Invalid lightning address format.');
+
+    const lnurlp = `https://${domain}/.well-known/lnurlp/${name}`;
+    const payParamsRes = await fetch(lnurlp);
+    const payParams = await payParamsRes.json();
+
+    if (!payParams?.callback) {
+      throw new Error('Lightning address does not expose a valid LNURL callback.');
+    }
+
+    const amountMsat = sats * 1000;
+    if (amountMsat < Number(payParams.minSendable || 0) || amountMsat > Number(payParams.maxSendable || Number.MAX_SAFE_INTEGER)) {
+      throw new Error('Amount is outside allowed range for this lightning address.');
+    }
+
+    let donorPubkey = this.visitorPubkey;
+    if (!donorPubkey && window.nostr) {
+      donorPubkey = await window.nostr.getPublicKey();
+      this.visitorPubkey = donorPubkey;
+    }
+
+    const relays = this.nostr.getActiveRelays();
+    const zapRequest = {
+      kind: 9734,
+      created_at: Math.floor(Date.now() / 1000),
+      content: '',
+      tags: [
+        ['relays', ...relays],
+        ['amount', String(amountMsat)],
+        ['p', this.charity!.pubkey]
+      ]
+    } as any;
+
+    if (donorPubkey && window.nostr) {
+      const signedZap = await window.nostr.signEvent(zapRequest);
+      const callbackUrl = new URL(payParams.callback);
+      callbackUrl.searchParams.set('amount', String(amountMsat));
+      callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
+
+      const zapInvoiceRes = await fetch(callbackUrl.toString());
+      const zapInvoice = await zapInvoiceRes.json();
+      if (zapInvoice?.pr) return zapInvoice.pr;
+    }
+
+    const callbackUrl = new URL(payParams.callback);
+    callbackUrl.searchParams.set('amount', String(amountMsat));
+    const lnurlInvoiceRes = await fetch(callbackUrl.toString());
+    const lnurlInvoice = await lnurlInvoiceRes.json();
+    if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
+    return lnurlInvoice.pr;
   }
 
   private async loadBtcUsdRate() {

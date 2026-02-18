@@ -16,6 +16,7 @@ export interface CharityProfile {
   hidden: boolean;
   ratingAvg: number;
   ratingCount: number;
+  zappedSats: number;
   charity: {
     mission?: string;
     country?: string;
@@ -180,7 +181,7 @@ export class NostrService {
     const pubkeys = [...new Set(profileEvents.map((e: any) => e.pubkey))];
     if (!pubkeys.length) return [];
 
-    const [charityEvents, reports, ratings, followers] = await Promise.all([
+    const [charityEvents, reports, ratings, followers, zapReceipts] = await Promise.all([
       this.pool.querySync(relays, {
         kinds: [KIND_CHARITY_PROFILE],
         '#d': ['proofofheart-charity-profile-v1'],
@@ -201,6 +202,11 @@ export class NostrService {
         kinds: [3],
         '#p': pubkeys,
         limit: limit * 50
+      }),
+      this.pool.querySync(relays, {
+        kinds: [9735],
+        '#p': pubkeys,
+        limit: limit * 100
       })
     ]);
 
@@ -244,6 +250,15 @@ export class NostrService {
       ratingMap.set(p, current);
     }
 
+    const zapMap = new Map<string, number>();
+    for (const ev of zapReceipts as any[]) {
+      const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
+      const amountMsat = Number(ev.tags.find((t: string[]) => t[0] === 'amount')?.[1] || 0);
+      if (!p || Number.isNaN(amountMsat) || amountMsat <= 0) continue;
+      const sats = Math.floor(amountMsat / 1000);
+      zapMap.set(p, (zapMap.get(p) || 0) + sats);
+    }
+
     const charities: CharityProfile[] = [];
 
     for (const [pubkey, metaEvent] of latestMeta.entries()) {
@@ -269,6 +284,7 @@ export class NostrService {
         hidden: flags >= FLAG_HIDE_THRESHOLD,
         ratingAvg: rating.count ? rating.total / rating.count : 0,
         ratingCount: rating.count,
+        zappedSats: zapMap.get(pubkey) || 0,
         charity: {
           mission: extra?.mission,
           country: extra?.country,
