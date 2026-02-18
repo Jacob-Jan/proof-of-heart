@@ -1,17 +1,110 @@
-.editor { max-width: 800px; padding: 20px; }
-form { display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #ddd; border-radius:16px; padding:16px; }
-textarea { min-height:100px; border-radius:12px; }
-button { width: fit-content; margin-top:8px; background:#353535; color:white; }
+.mat-card {
+  max-width: 40rem;
+  margin: 40px auto;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+
+  .status-chip {
+    padding: 5px 10px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid #555;
+    background-color: #fbf9f3;
+
+    &.hidden {
+      color: #990000;
+      border-bottom: 1px solid #990000;
+    }
+
+    &.public {
+      color: #004500;
+      border-bottom: 1px solid #004500;
+    }
+
+    .statusdot {
+      transform: scale(0.7);
+    }
+  }
+
+  .account-card {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+    border-radius: 12px;
+
+    @media (max-width: 767px) {
+      padding: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .appear-in-register {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .account-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .account-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    textarea {
+      min-height: 100px;
+      border-radius: 12px;
+      resize: none;
+    }
+
+    .charity-section-background {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 8px;
+      background-color: #f2f1eb;
+    }
+  }
+}
+
 .row-checkbox {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 6px;
 }
+
 .row-checkbox input[type='checkbox'] {
   width: 18px;
   height: 18px;
 }
+
 .confirm {
   font-weight: 600;
+}
+
+button {
+  width: fit-content;
+  margin-top: 8px;
+  background: #353535;
+  color: white;
 }

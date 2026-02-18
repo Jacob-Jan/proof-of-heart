@@ -1,33 +1,46 @@
-<section class="editor">
-  <h1>Charity Nostr Profile</h1>
-  <p>Connect your Nostr signer, then publish your Proof of Heart charity profile (kind 30078).</p>
+<section class="mat-card">
+  <div [ngClass]="model.isVisible !== false ? 'public' : 'hidden'" class="status-chip">
+    <i class="fa-solid fa-circle fa-2xs statusdot"></i>
+    {{ model.isVisible !== false ? 'Public' : 'Hidden' }}
+  </div>
 
-  <form (ngSubmit)="save()">
-    <label>Mission</label>
-    <textarea [(ngModel)]="model.mission" name="mission"></textarea>
+  <div class="account-card">
+    <h1>Charity Nostr Profile</h1>
+    <p class="subtitle">Connect your Nostr signer, then publish your Proof of Heart charity profile.</p>
 
-    <label>Country</label>
-    <input [(ngModel)]="model.country" name="country" />
+    <form (ngSubmit)="save()" class="account-form">
+      <p class="appear-in-register">
+        <label class="row-checkbox">
+          <input type="checkbox" [(ngModel)]="model.isVisible" name="isVisible" />
+          Appear in register
+        </label>
+      </p>
 
-    <label>Category</label>
-    <input [(ngModel)]="model.category" name="category" placeholder="e.g. food aid" />
+      <label>Mission</label>
+      <textarea [(ngModel)]="model.mission" name="mission" rows="4"></textarea>
 
-    <label>Donation message</label>
-    <textarea [(ngModel)]="model.donationMessage" name="donationMessage"></textarea>
+      <label>Country</label>
+      <input [(ngModel)]="model.country" name="country" />
 
-    <label>Lightning address (optional override)</label>
-    <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
+      <label>Category</label>
+      <input [(ngModel)]="model.category" name="category" placeholder="e.g. food aid" />
 
-    <label class="row-checkbox">
-      <input type="checkbox" [(ngModel)]="model.isVisible" name="isVisible" />
-      Show this charity publicly on Proof of Heart
-    </label>
+      <label>Donation message</label>
+      <textarea [(ngModel)]="model.donationMessage" name="donationMessage" rows="4"></textarea>
 
-    <label class="row-checkbox confirm">
-      <input type="checkbox" [(ngModel)]="charityConfirmation" name="charityConfirmation" />
-      I confirm this npub is controlled by a charity and should be listed as one.
-    </label>
+      <label>Lightning address (optional override)</label>
+      <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
 
-    <button type="submit">Publish charity profile</button>
-  </form>
+      <div class="charity-section-background">
+        <label class="row-checkbox confirm">
+          <input type="checkbox" [(ngModel)]="charityConfirmation" name="charityConfirmation" />
+          I confirm this npub is controlled by a charity and should be listed as one.
+        </label>
+      </div>
+
+      <div class="account-buttons">
+        <button type="submit">Publish charity profile</button>
+      </div>
+    </form>
+  </div>
 </section>
