@@ -87,13 +87,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
-    try {
-      if (window.nostr) {
-        this.visitorPubkey = await window.nostr.getPublicKey();
-      }
-    } catch {
-      this.visitorPubkey = '';
-    }
+    this.visitorPubkey = await this.nostr.getCurrentPubkey();
 
     await this.refreshCharity();
     await this.loadBtcUsdRate();

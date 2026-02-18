@@ -81,7 +81,8 @@ export class CharitiesComponent implements OnInit {
       await this.nostr.ensureCharityProfile(pubkey);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      this.toast(e.message || 'Failed to connect Nostr signer', 'error', 4000);
+      this.toast(e?.message || 'Connect your Nostr signer to continue.', 'info', 3500);
+      await this.router.navigate(['/charity/onboard']);
     }
   }
 

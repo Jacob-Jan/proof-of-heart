@@ -49,6 +49,7 @@ const TEST_RELAYS = [
 ];
 
 const RELAY_MODE_KEY = 'poh_relay_mode'; // auto | test | prod
+const LAST_PUBKEY_KEY = 'poh_last_pubkey';
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -113,8 +114,31 @@ export class NostrService {
   async connectSigner(): Promise<{ pubkey: string; npub: string }> {
     if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
     const pubkey = await window.nostr.getPublicKey();
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(LAST_PUBKEY_KEY, pubkey);
+    }
     const npub = nip19.npubEncode(pubkey);
     return { pubkey, npub };
+  }
+
+  async getCurrentPubkey(): Promise<string> {
+    try {
+      if (window.nostr) {
+        const pubkey = await window.nostr.getPublicKey();
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(LAST_PUBKEY_KEY, pubkey);
+        }
+        return pubkey;
+      }
+    } catch {
+      // fall back to cached pubkey
+    }
+
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem(LAST_PUBKEY_KEY) || '';
+    }
+
+    return '';
   }
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
