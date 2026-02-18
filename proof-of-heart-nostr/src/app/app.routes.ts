@@ -11,7 +11,7 @@ export const routes: Routes = [
   { path: 'charity/:pubkey', component: CharityDetailComponent },
   { path: 'charities/:pubkey', component: CharityDetailComponent },
   { path: 'profile', component: ProfileEditorComponent },
-  { path: 'signup', component: ProfileEditorComponent },
+  { path: 'charity/profile', component: ProfileEditorComponent },
 
   { path: 'paper', component: PaperPageComponent },
   { path: 'bitcoin-charities', component: SeoCharitiesPageComponent },
