@@ -1,6 +1,6 @@
 <section class="editor">
-  <h1>My Charity Profile (Nostr)</h1>
-  <p>This publishes an app-specific Nostr event kind (30078) for your charity fields.</p>
+  <h1>Charity Nostr Profile</h1>
+  <p>Connect your Nostr signer, then publish your Proof of Heart charity profile (kind 30078).</p>
 
   <form (ngSubmit)="save()">
     <label>Mission</label>
@@ -17,6 +17,16 @@
 
     <label>Lightning address (optional override)</label>
     <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
+
+    <label class="row-checkbox">
+      <input type="checkbox" [(ngModel)]="model.isVisible" name="isVisible" />
+      Show this charity publicly on Proof of Heart
+    </label>
+
+    <label class="row-checkbox confirm">
+      <input type="checkbox" [(ngModel)]="charityConfirmation" name="charityConfirmation" />
+      I confirm this npub is controlled by a charity and should be listed as one.
+    </label>
 
     <button type="submit">Publish charity profile</button>
   </form>

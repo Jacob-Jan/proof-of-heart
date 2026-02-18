@@ -39,4 +39,8 @@
       <span>Partner</span>
     </a>
   </nav>
+
+  <button class="connect-btn" (click)="connect()">
+    {{ connected ? ('Connected: ' + shortNpub) : 'Connect Nostr' }}
+  </button>
 </div>

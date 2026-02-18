@@ -22,6 +22,7 @@ export interface CharityProfile {
     category?: string;
     donationMessage?: string;
     lightningAddress?: string;
+    isVisible?: boolean;
   };
 }
 
@@ -31,6 +32,7 @@ export interface CharityExtraFields {
   category?: string;
   donationMessage?: string;
   lightningAddress?: string;
+  isVisible?: boolean;
 }
 
 const PROD_RELAYS = [
@@ -251,7 +253,8 @@ export class NostrService {
           country: extra?.country,
           category: extra?.category,
           donationMessage: extra?.donationMessage,
-          lightningAddress: extra?.lightningAddress
+          lightningAddress: extra?.lightningAddress,
+          isVisible: extra?.isVisible ?? true
         }
       });
     }

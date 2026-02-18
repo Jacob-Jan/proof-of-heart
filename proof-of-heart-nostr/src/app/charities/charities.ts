@@ -34,6 +34,7 @@ export class CharitiesComponent implements OnInit {
   }
 
   get visibleCharities() {
-    return this.showHidden ? this.charities : this.charities.filter(c => !c.hidden);
+    const listed = this.charities.filter(c => c.charity.isVisible !== false);
+    return this.showHidden ? listed : listed.filter(c => !c.hidden);
   }
 }

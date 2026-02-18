@@ -18,10 +18,18 @@ export class ProfileEditorComponent {
     country: '',
     category: '',
     donationMessage: '',
-    lightningAddress: ''
+    lightningAddress: '',
+    isVisible: true
   };
 
+  charityConfirmation = false;
+
   async save() {
+    if (!this.charityConfirmation) {
+      alert('Please confirm this npub represents a charity before publishing.');
+      return;
+    }
+
     try {
       const id = await this.nostr.publishCharityProfile(this.model);
       alert(`Published charity profile event: ${id}`);
