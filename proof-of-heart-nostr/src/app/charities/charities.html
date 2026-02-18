@@ -1,40 +1,79 @@
-<section class="page">
-  <div class="toolbar">
-    <h1>Charities on Nostr</h1>
-    <div class="controls">
-      <button (click)="reload()">Refresh</button>
-      <label><input type="checkbox" [(ngModel)]="showHidden" /> Show hidden</label>
+<div class="banner">
+  <span>Nostr-native, nonprofit, always direct</span>
+  <h1>Donate to Charities on Nostr</h1>
+  <h2>Discover verified npubs and support via lightning or zaps</h2>
+  <div class="buttons">
+    <button class="primary" routerLink="/charity/profile">
+      Add your charity
+      <i class="fa-solid fa-arrow-right"></i>
+    </button>
+    <button class="secondary" routerLink="/paper">
+      Our mission
+    </button>
+  </div>
+</div>
+
+<div class="filterbar">
+  <div class="row">
+    <input class="search" placeholder="Search charities, npubs, mission..." [(ngModel)]="filter_name" (input)="search(filter_name)">
+    <div class="morefilters" (click)="showAdvanced = !showAdvanced" [ngClass]="{'active': showAdvanced}">
+      <div class="label">Advanced</div>
+      <i class="fa-solid fa-chevron-down"></i>
     </div>
   </div>
+  <div class="row" *ngIf="showAdvanced">
+    <label class="sr-only" for="category">Filter on category</label>
+    <select id="category" class="select" [(ngModel)]="filter_category" (change)="filter()">
+      <option value="">All Categories</option>
+      <option *ngFor="let cat of categories" [ngValue]="cat">{{ cat }}</option>
+    </select>
 
-  @if (loading) {
-    <p>Loading charities from relays…</p>
-  } @else if (!visibleCharities.length) {
-    <p>No charity profiles found yet.</p>
-  } @else {
-    <div class="grid">
-      @for (charity of visibleCharities; track charity.pubkey) {
-        <article class="card" [class.hidden-card]="charity.hidden">
-          <img [src]="charity.picture || '/assets/logo-contrast.png'" alt="charity" />
-          <div class="content">
-            <h2>{{ charity.name }}</h2>
-            <p>{{ charity.about || 'No description yet.' }}</p>
+    <label class="sr-only" for="country">Filter on country</label>
+    <select id="country" class="select" [(ngModel)]="filter_country" (change)="filter()">
+      <option value="">All Countries</option>
+      <option *ngFor="let country of countries" [ngValue]="country">{{ country }}</option>
+    </select>
+  </div>
+</div>
 
-            <ul>
-              <li><strong>Followers:</strong> {{ charity.followers }}</li>
-              <li><strong>Rating:</strong> {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '—' }} ({{ charity.ratingCount }})</li>
-              <li><strong>Flags:</strong> {{ charity.flags }}</li>
-              <li><strong>Lightning:</strong> {{ charity.charity.lightningAddress || charity.lud16 || '—' }}</li>
-            </ul>
+<div class="loading-wrap" *ngIf="loading">
+  <mat-spinner diameter="42"></mat-spinner>
+  <span>Searching relays for charity profiles...</span>
+</div>
 
-            @if (charity.hidden) {
-              <p class="warn">Hidden due to moderation threshold.</p>
-            }
-
-            <a [routerLink]="['/charities', charity.npub]">Open charity</a>
-          </div>
-        </article>
-      }
+<div class="charities" *ngIf="!loading">
+  @for (charity of charities; track charity.pubkey) {
+    <div class="charity">
+      <div class="top">
+        <img [src]="charity.picture || '/assets/logo-contrast.png'" alt="">
+        <div class="spacer"></div>
+        <div class="title">
+          <h2>{{ charity.name }}</h2>
+          <span class="charity-meta" *ngIf="charity.charity.category">
+            <i class="fa-solid fa-folder"></i>
+            {{ charity.charity.category }}
+          </span>
+          <span class="charity-meta" *ngIf="charity.charity.country">
+            <i class="fa-solid fa-location-dot"></i>
+            {{ charity.charity.country }}
+          </span>
+          <span class="charity-meta">
+            <i class="fa-solid fa-users"></i>
+            {{ charity.followers }} followers
+          </span>
+        </div>
+      </div>
+      <div class="middle">
+        <p>{{ charity.about || charity.charity.mission || 'No charity description yet.' }}</p>
+      </div>
+      <div class="bottom">
+        <a [routerLink]="['/charities', charity.npub]" class="primary action-link">
+          <i class="fa-brands fa-bitcoin"></i>
+          Open profile
+        </a>
+      </div>
     </div>
+  } @empty {
+    <span>No charities found</span>
   }
-</section>
+</div>
