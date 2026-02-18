@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
+import { nip19 } from 'nostr-tools';
 
 @Component({
   selector: 'app-charity-detail',
@@ -24,9 +25,22 @@ export class CharityDetailComponent implements OnInit {
   canEdit = false;
 
   async ngOnInit() {
-    const pubkey = this.route.snapshot.paramMap.get('pubkey');
+    const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
+
+    let resolvedPubkey = idParam;
+    if (idParam.startsWith('npub1')) {
+      try {
+        const decoded = nip19.decode(idParam);
+        if (decoded.type === 'npub') {
+          resolvedPubkey = decoded.data;
+        }
+      } catch {
+        resolvedPubkey = idParam;
+      }
+    }
+
     const all = await this.nostr.loadCharities(200);
-    this.charity = all.find(c => c.pubkey === pubkey);
+    this.charity = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
 
     try {
       if (window.nostr) {
