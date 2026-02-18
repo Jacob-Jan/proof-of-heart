@@ -14,6 +14,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   styleUrl: './charities.scss'
 })
 export class CharitiesComponent implements OnInit {
+  private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
+    this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
+  }
   private nostr = inject(NostrService);
   private router = inject(Router);
   private snack = inject(MatSnackBar);
@@ -38,7 +41,7 @@ export class CharitiesComponent implements OnInit {
       this.applyFilters();
     } catch (e) {
       console.error(e);
-      this.snack.open('Failed to load charities from relays.', 'Close', { duration: 4500 });
+      this.toast('Failed to load charities from relays.', 'error', 4500);
     } finally {
       this.loading = false;
     }
@@ -77,7 +80,7 @@ export class CharitiesComponent implements OnInit {
       await this.nostr.ensureCharityProfile(pubkey);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
+      this.toast(e.message || 'Failed to connect Nostr signer', 'error', 4000);
     }
   }
 

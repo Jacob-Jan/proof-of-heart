@@ -12,6 +12,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   styleUrl: './profile-editor.scss'
 })
 export class ProfileEditorComponent {
+  private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
+    this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
+  }
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
 
@@ -28,15 +31,15 @@ export class ProfileEditorComponent {
 
   async save() {
     if (!this.charityConfirmation) {
-      this.snack.open('Please confirm this npub represents a charity before publishing.', 'Close', { duration: 3500 });
+      this.toast('Please confirm this npub represents a charity before publishing.', 'error', 3500);
       return;
     }
 
     try {
       const id = await this.nostr.publishCharityProfile(this.model);
-      this.snack.open(`Published charity profile event: ${id.slice(0, 10)}…`, 'Close', { duration: 4500 });
+      this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
-      this.snack.open(e.message || 'Failed to publish charity profile', 'Close', { duration: 4500 });
+      this.toast(e.message || 'Failed to publish charity profile', 'error', 4500);
     }
   }
 }

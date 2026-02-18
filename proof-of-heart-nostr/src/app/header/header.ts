@@ -12,6 +12,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   styleUrl: './header.scss'
 })
 export class HeaderComponent {
+  private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3000) {
+    this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
+  }
   private nostr = inject(NostrService);
   private router = inject(Router);
   private snack = inject(MatSnackBar);
@@ -35,9 +38,9 @@ export class HeaderComponent {
       const { npub } = await this.nostr.connectSigner();
       this.npub = npub;
       this.connected = true;
-      this.snack.open('Nostr signer connected', 'Close', { duration: 2500 });
+      this.toast('Nostr signer connected', 'success', 2500);
     } catch (e: any) {
-      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
+      this.toast(e.message || 'Failed to connect Nostr signer', 'error', 4000);
     }
   }
 
@@ -48,10 +51,10 @@ export class HeaderComponent {
       this.npub = npub;
       this.connected = true;
       await this.nostr.ensureCharityProfile(pubkey);
-      this.snack.open('Connected. Opening your public charity profile…', 'Close', { duration: 2800 });
+      this.toast('Connected. Opening your public charity profile…', 'success', 2800);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      this.snack.open(e.message || 'Failed to connect Nostr signer', 'Close', { duration: 4000 });
+      this.toast(e.message || 'Failed to connect Nostr signer', 'error', 4000);
     }
   }
 

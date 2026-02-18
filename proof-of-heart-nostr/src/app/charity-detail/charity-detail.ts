@@ -14,6 +14,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   styleUrl: './charity-detail.scss'
 })
 export class CharityDetailComponent implements OnInit {
+  private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
+    this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
+  }
   private route = inject(ActivatedRoute);
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
@@ -80,9 +83,9 @@ export class CharityDetailComponent implements OnInit {
     if (!this.charity) return;
     try {
       await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
-      this.snack.open('Rating published to Nostr.', 'Close', { duration: 3000 });
+      this.toast('Rating published to Nostr.', 'success', 3000);
     } catch (e: any) {
-      this.snack.open(e?.message || 'Failed to publish rating.', 'Close', { duration: 4000 });
+      this.toast(e?.message || 'Failed to publish rating.', 'error', 4000);
     }
   }
 
@@ -90,9 +93,9 @@ export class CharityDetailComponent implements OnInit {
     if (!this.charity) return;
     try {
       await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
-      this.snack.open('Flag published to Nostr.', 'Close', { duration: 3000 });
+      this.toast('Flag published to Nostr.', 'success', 3000);
     } catch (e: any) {
-      this.snack.open(e?.message || 'Failed to publish flag.', 'Close', { duration: 4000 });
+      this.toast(e?.message || 'Failed to publish flag.', 'error', 4000);
     }
   }
 
@@ -129,13 +132,13 @@ export class CharityDetailComponent implements OnInit {
 
     const sats = this.donationSats;
     if (!sats || sats <= 0) {
-      this.snack.open('Enter a valid donation amount.', 'Close', { duration: 3000 });
+      this.toast('Enter a valid donation amount.', 'error', 3000);
       return;
     }
 
     const lightningAddress = this.donationAddress;
     if (!lightningAddress.includes('@')) {
-      this.snack.open('No valid lightning address found for this charity.', 'Close', { duration: 3500 });
+      this.toast('No valid lightning address found for this charity.', 'error', 3500);
       return;
     }
 
@@ -147,14 +150,14 @@ export class CharityDetailComponent implements OnInit {
       this.lastInvoice = invoice;
       await this.generateQr(invoice);
       this.donationStatus = 'Invoice created. Opening your wallet…';
-      this.snack.open('Invoice ready. Trying to open your wallet…', 'Close', { duration: 3000 });
+      this.toast('Invoice ready. Trying to open your wallet…', 'info', 3000);
       window.location.href = `lightning:${invoice}`;
       if (!this.isLikelyMobile) {
         this.showQrModal = true;
       }
     } catch (e: any) {
       this.donationStatus = e?.message || 'Could not create invoice.';
-      this.snack.open(this.donationStatus, 'Close', { duration: 4500 });
+      this.toast(this.donationStatus, 'error', 4500);
     } finally {
       this.donating = false;
     }
@@ -165,10 +168,10 @@ export class CharityDetailComponent implements OnInit {
     try {
       await navigator.clipboard.writeText(this.lastInvoice);
       this.donationStatus = 'Invoice copied to clipboard.';
-      this.snack.open('Invoice copied to clipboard.', 'Close', { duration: 2500 });
+      this.toast('Invoice copied to clipboard.', 'success', 2500);
     } catch {
       this.donationStatus = 'Could not copy invoice from browser context.';
-      this.snack.open(this.donationStatus, 'Close', { duration: 3500 });
+      this.toast(this.donationStatus, 'error', 3500);
     }
   }
 

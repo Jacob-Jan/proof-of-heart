@@ -22,6 +22,24 @@ button {
   cursor: pointer;
 }
 
+/* Toast styles */
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-supporting-text-color: #fff;
+  --mat-mdc-snack-bar-button-color: #fff;
+}
+
+.mat-mdc-snack-bar-container.toast-success {
+  --mdc-snackbar-container-color: #1f7a44;
+}
+
+.mat-mdc-snack-bar-container.toast-error {
+  --mdc-snackbar-container-color: #b42318;
+}
+
+.mat-mdc-snack-bar-container.toast-info {
+  --mdc-snackbar-container-color: #1d4ed8;
+}
+
 /* Ensure Font Awesome 7 webfonts resolve from /assets */
 @font-face {
   font-family: "Font Awesome 7 Free";
