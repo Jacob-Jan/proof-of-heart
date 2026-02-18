@@ -215,10 +215,27 @@ export class NostrService {
       })
     ]);
 
-    const latestMeta = new Map<string, any>();
-    for (const ev of profileEvents) {
-      const prev = latestMeta.get((ev as any).pubkey);
-      if (!prev || (ev as any).created_at > prev.created_at) latestMeta.set((ev as any).pubkey, ev);
+    const metadataByPubkey = new Map<string, any>();
+    const profileEventsByPubkey = new Map<string, any[]>();
+    for (const ev of profileEvents as any[]) {
+      const key = ev.pubkey;
+      const arr = profileEventsByPubkey.get(key) ?? [];
+      arr.push(ev);
+      profileEventsByPubkey.set(key, arr);
+    }
+
+    for (const [pubkey, events] of profileEventsByPubkey.entries()) {
+      const sorted = [...events].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      const merged: any = {};
+      for (const ev of sorted) {
+        const data = this.safeJson(ev.content || '{}');
+        for (const key of ['name', 'display_name', 'displayName', 'username', 'about', 'picture', 'website', 'lud16', 'lud06']) {
+          if ((merged[key] === undefined || merged[key] === null || merged[key] === '') && data[key] !== undefined && data[key] !== null && data[key] !== '') {
+            merged[key] = data[key];
+          }
+        }
+      }
+      metadataByPubkey.set(pubkey, merged);
     }
 
     const latestCharity = new Map<string, any>();
@@ -267,9 +284,7 @@ export class NostrService {
     const charities: CharityProfile[] = [];
 
     for (const [pubkey, charityEvent] of latestCharity.entries()) {
-      const metaEvent = latestMeta.get(pubkey);
-
-      const metadata = this.safeJson(metaEvent?.content || '{}');
+      const metadata = metadataByPubkey.get(pubkey) || {};
       const extra = this.safeJson(charityEvent.content) as CharityExtraFields;
       const flags = flagMap.get(pubkey)?.size ?? 0;
       const rating = ratingMap.get(pubkey) ?? { total: 0, count: 0 };
