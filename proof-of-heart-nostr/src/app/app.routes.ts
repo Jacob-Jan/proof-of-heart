@@ -8,7 +8,6 @@ import { SeoCharitiesPageComponent, SeoDonationsPageComponent, SeoProofPageCompo
 
 export const routes: Routes = [
   { path: '', component: CharitiesComponent, title: 'Donate to Charities on Nostr | Proof of Heart' },
-  { path: 'charity/:pubkey', redirectTo: 'charities/:pubkey', pathMatch: 'full' },
   { path: 'charities/:pubkey', component: CharityDetailComponent, title: 'Charity Profile | Proof of Heart' },
   { path: 'profile', component: ProfileEditorComponent, title: 'Edit Charity Profile | Proof of Heart' },
   { path: 'charity/profile', component: ProfileEditorComponent, title: 'Edit Charity Profile | Proof of Heart' },
