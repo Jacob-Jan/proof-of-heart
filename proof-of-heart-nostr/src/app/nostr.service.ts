@@ -324,9 +324,9 @@ export class NostrService {
       const rating = ratingMap.get(pubkey) ?? { total: 0, count: 0 };
 
       const resolvedName = [
-        metadata?.name,
         metadata?.display_name,
         metadata?.displayName,
+        metadata?.name,
         metadata?.username,
         extra?.charityName
       ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
