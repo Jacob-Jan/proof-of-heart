@@ -75,19 +75,39 @@ export class NostrService {
     window.localStorage.setItem(RELAY_MODE_KEY, mode);
   }
 
+  private isLocalhostRuntime(): boolean {
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  /**
+   * App relay selection (kind 30078/30079 etc.)
+   */
   getActiveRelays(): string[] {
     const mode = this.getRelayMode();
     if (mode === 'test') return TEST_RELAYS;
     if (mode === 'prod') return PROD_RELAYS;
 
     // auto mode: localhost/dev -> test, everything else -> prod
-    if (typeof window !== 'undefined') {
-      const host = window.location.hostname;
-      const isLocal = host === 'localhost' || host === '127.0.0.1';
-      return isLocal ? TEST_RELAYS : PROD_RELAYS;
-    }
+    return this.isLocalhostRuntime() ? TEST_RELAYS : PROD_RELAYS;
+  }
 
-    return PROD_RELAYS;
+  /**
+   * Safety guard: on localhost we never publish to production relays.
+   */
+  private getWriteRelays(): string[] {
+    if (this.isLocalhostRuntime()) return TEST_RELAYS;
+    return this.getActiveRelays();
+  }
+
+  /**
+   * kind:0 metadata source: on localhost we still read from prod relays
+   * so names/pictures/about resolve from real profiles.
+   */
+  private getKind0ReadRelays(): string[] {
+    if (this.isLocalhostRuntime()) return PROD_RELAYS;
+    return this.getActiveRelays();
   }
 
   async connectSigner(): Promise<{ pubkey: string; npub: string }> {
@@ -99,7 +119,7 @@ export class NostrService {
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
-    const relays = this.getActiveRelays();
+    const relays = this.getWriteRelays();
 
     const event = {
       kind: KIND_CHARITY_PROFILE,
@@ -152,7 +172,7 @@ export class NostrService {
 
   async publishRating(targetPubkey: string, rating: number, note = ''): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
-    const relays = this.getActiveRelays();
+    const relays = this.getWriteRelays();
     const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
 
     const event = {
@@ -173,7 +193,7 @@ export class NostrService {
 
   async publishReport(targetPubkey: string, reason: 'spam' | 'impersonation' | 'scam', note = ''): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
-    const relays = this.getActiveRelays();
+    const relays = this.getWriteRelays();
 
     const event = {
       kind: KIND_REPORT,
@@ -188,14 +208,15 @@ export class NostrService {
   }
 
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
-    const relays = this.getActiveRelays();
+    const appRelays = this.getActiveRelays();
+    const kind0Relays = this.getKind0ReadRelays();
 
-    const profileEvents = await this.pool.querySync(relays, {
+    const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
       limit: limit * 2
     });
 
-    const charityEvents = await this.pool.querySync(relays, {
+    const charityEvents = await this.pool.querySync(appRelays, {
       kinds: [KIND_CHARITY_PROFILE],
       '#d': ['proofofheart-charity-profile-v1'],
       limit: limit * 4
@@ -208,22 +229,22 @@ export class NostrService {
     if (!pubkeys.length) return [];
 
     const [reports, ratings, followers, zapReceipts] = await Promise.all([
-      this.pool.querySync(relays, {
+      this.pool.querySync(appRelays, {
         kinds: [KIND_REPORT],
         '#p': pubkeys,
         limit: limit * 10
       }),
-      this.pool.querySync(relays, {
+      this.pool.querySync(appRelays, {
         kinds: [KIND_CHARITY_RATING],
         '#p': pubkeys,
         limit: limit * 10
       }),
-      this.pool.querySync(relays, {
+      this.pool.querySync(appRelays, {
         kinds: [3],
         '#p': pubkeys,
         limit: limit * 50
       }),
-      this.pool.querySync(relays, {
+      this.pool.querySync(appRelays, {
         kinds: [9735],
         '#p': pubkeys,
         limit: limit * 100
