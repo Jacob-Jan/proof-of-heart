@@ -41,26 +41,31 @@ button:not(.mdc-button) {
 
 /* Toast styles */
 .mat-mdc-snack-bar-container {
-  --mdc-snackbar-supporting-text-color: #fff;
-  --mat-mdc-snack-bar-button-color: #fff;
+  --toast-color: #1d4ed8;
+  --mdc-snackbar-supporting-text-color: var(--toast-color);
+  --mat-mdc-snack-bar-button-color: var(--toast-color);
 }
 
 .mat-mdc-snack-bar-container .mdc-snackbar__surface {
-  background: #1d4ed8 !important;
+  background: #F0EFE9 !important;
+  color: var(--toast-color) !important;
+  border: 1px solid color-mix(in srgb, var(--toast-color) 35%, transparent);
+  border-radius: 16px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
   backdrop-filter: none;
   opacity: 1 !important;
 }
 
-.mat-mdc-snack-bar-container.toast-success .mdc-snackbar__surface {
-  background: #1f7a44 !important;
+.mat-mdc-snack-bar-container.toast-success {
+  --toast-color: #1f7a44;
 }
 
-.mat-mdc-snack-bar-container.toast-error .mdc-snackbar__surface {
-  background: #b42318 !important;
+.mat-mdc-snack-bar-container.toast-error {
+  --toast-color: #b42318;
 }
 
-.mat-mdc-snack-bar-container.toast-info .mdc-snackbar__surface {
-  background: #1d4ed8 !important;
+.mat-mdc-snack-bar-container.toast-info {
+  --toast-color: #1d4ed8;
 }
 
 /* Ensure Font Awesome webfonts resolve from /assets */
