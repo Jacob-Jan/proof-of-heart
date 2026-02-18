@@ -1,13 +1,14 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { CharityExtraFields, NostrService } from '../nostr.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-profile-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
@@ -25,6 +26,7 @@ export class ProfileEditorComponent implements OnInit {
   private existingModel: CharityExtraFields = {};
   loadingExisting = false;
   needsSignerForLoad = false;
+  ownNpub: string | null = null;
 
   async ngOnInit() {
     await this.loadExisting();
@@ -35,7 +37,8 @@ export class ProfileEditorComponent implements OnInit {
     this.needsSignerForLoad = false;
 
     try {
-      const { pubkey } = await this.nostr.connectSigner();
+      const { pubkey, npub } = await this.nostr.connectSigner();
+      this.ownNpub = npub;
       const existing = await this.nostr.loadOwnCharityProfile(pubkey);
       if (existing) {
         this.existingModel = existing;

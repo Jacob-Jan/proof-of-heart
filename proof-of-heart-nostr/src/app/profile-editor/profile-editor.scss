@@ -107,4 +107,14 @@ button {
   margin-top: 8px;
   background: #353535;
   color: white;
+
+  &.secondary {
+    background: #F0EFE9;
+    color: #353535;
+    border: 1px solid #cfc8b8;
+  }
+}
+
+.account-buttons a {
+  text-decoration: none;
 }
