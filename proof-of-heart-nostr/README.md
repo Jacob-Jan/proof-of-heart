@@ -1,59 +1,76 @@
-# ProofOfHeartNostr
+# Proof of Heart (Nostr)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.0.0.
+Proof of Heart is a Nostr-native charity discovery and donation platform.
 
-## Development server
+It helps donors discover charities through open social proof (followers, ratings, reports, zap totals) and donate directly via Lightning/zaps — without custodial flow or platform-held funds.
 
-To start a local development server, run:
+## What this app does
 
-```bash
-ng serve
-```
+- Charity onboarding with Nostr signer (NIP-07)
+- Public charity profiles from Nostr data
+- Charity extension data via app-specific events
+- Community moderation signals (ratings + flags)
+- Social proof signals (followers + zapped sats)
+- Direct donation/zap flow from Lightning addresses
+- Desktop QR fallback for wallet payments
+- SEO pages and metadata for discovery
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Nostr event model
 
-## Code scaffolding
+- `kind 0`: base profile metadata (name, picture, about, website, lud16/lud06)
+- `kind 30078`: charity profile extension (mission, category, country, visibility, donation message)
+- `kind 30079`: charity rating events
+- `kind 1984`: report/flag events
+- `kind 3`: follow graph (follower estimation)
+- `kind 9735`: zap receipts (zapped sats aggregation)
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Tech stack
 
-```bash
-ng generate component component-name
-```
+- Angular 20 (standalone components)
+- `nostr-tools`
+- Angular Material
+- Font Awesome
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Routes (main)
 
-```bash
-ng generate --help
-```
+- `/` — charity discovery
+- `/charities/:npub` — public charity profile
+- `/charity/onboard` — charity onboarding confirmation + connect
+- `/charity/profile` — charity profile editor
+- `/admin` — owner-gated insights dashboard
 
-## Building
+## Local development
 
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+Install dependencies:
 
 ```bash
-ng e2e
+npm install
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Run dev server:
 
-## Additional Resources
+```bash
+npm run start
+```
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Open: `http://localhost:4200`
+
+## Local relay (dev)
+
+A local relay workflow is included via PowerShell scripts:
+
+- `scripts/start-local-relay.ps1`
+- `scripts/stop-local-relay.ps1`
+
+When running on localhost, relay mode can use local test relay (`ws://127.0.0.1:7777`) depending on app relay mode.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Notes
+
+- This repository describes the current Nostr-based Proof of Heart app.
+- Donations are direct and non-custodial: the app does not custody user funds.
