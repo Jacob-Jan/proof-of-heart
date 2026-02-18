@@ -70,6 +70,23 @@ When running on localhost, relay mode can use local test relay (`ws://127.0.0.1:
 npm run build
 ```
 
+Build now generates sitemaps first (deploy-time refresh):
+
+- `public/sitemap.xml` (sitemap index)
+- `public/sitemap-static.xml` (fixed pages)
+- `public/sitemap-charities.xml` (dynamic charity pages from kind `30078`)
+
+You can also generate only sitemaps:
+
+```bash
+npm run sitemap:generate
+```
+
+Optional env vars:
+
+- `SITE_URL` (default: `https://proofofheart.org`)
+- `SITEMAP_RELAYS` (comma-separated relay URLs)
+
 ## Notes
 
 - This repository describes the current Nostr-based Proof of Heart app.
