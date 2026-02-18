@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CharityProfile, NostrService } from '../nostr.service';
@@ -14,6 +14,7 @@ import { CharityProfile, NostrService } from '../nostr.service';
 })
 export class CharitiesComponent implements OnInit {
   private nostr = inject(NostrService);
+  private router = inject(Router);
 
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
@@ -66,6 +67,15 @@ export class CharitiesComponent implements OnInit {
 
   filter() {
     this.applyFilters();
+  }
+
+  async goForCharities() {
+    try {
+      const { npub } = await this.nostr.connectSigner();
+      await this.router.navigate(['/charities', npub]);
+    } catch (e: any) {
+      alert(e.message || 'Failed to connect Nostr signer');
+    }
   }
 
   private applyFilters() {

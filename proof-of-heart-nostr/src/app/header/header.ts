@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { NostrService } from '../nostr.service';
 
 @Component({
@@ -12,6 +12,7 @@ import { NostrService } from '../nostr.service';
 })
 export class HeaderComponent {
   private nostr = inject(NostrService);
+  private router = inject(Router);
   connected = false;
   npub = '';
 
@@ -32,6 +33,18 @@ export class HeaderComponent {
       const { npub } = await this.nostr.connectSigner();
       this.npub = npub;
       this.connected = true;
+    } catch (e: any) {
+      alert(e.message || 'Failed to connect Nostr signer');
+    }
+  }
+
+  async goForCharities(event?: Event) {
+    event?.preventDefault();
+    try {
+      const { npub } = await this.nostr.connectSigner();
+      this.npub = npub;
+      this.connected = true;
+      await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
       alert(e.message || 'Failed to connect Nostr signer');
     }
