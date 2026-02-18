@@ -211,22 +211,20 @@ export class NostrService {
     const appRelays = this.getActiveRelays();
     const kind0Relays = this.getKind0ReadRelays();
 
-    const profileEvents = await this.pool.querySync(kind0Relays, {
-      kinds: [0],
-      limit: limit * 2
-    });
-
     const charityEvents = await this.pool.querySync(appRelays, {
       kinds: [KIND_CHARITY_PROFILE],
       '#d': ['proofofheart-charity-profile-v1'],
       limit: limit * 4
     });
 
-    const pubkeys = [...new Set([
-      ...profileEvents.map((e: any) => e.pubkey),
-      ...charityEvents.map((e: any) => e.pubkey)
-    ])];
+    const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
     if (!pubkeys.length) return [];
+
+    const profileEvents = await this.pool.querySync(kind0Relays, {
+      kinds: [0],
+      authors: pubkeys,
+      limit: Math.max(limit * 4, pubkeys.length * 4)
+    });
 
     const [reports, ratings, followers, zapReceipts] = await Promise.all([
       this.pool.querySync(appRelays, {
