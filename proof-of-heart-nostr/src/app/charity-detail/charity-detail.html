@@ -1,54 +1,96 @@
 @if (loading) {
-  <p>Loading charity…</p>
+  <div class="loadingcharity">Loading charity…</div>
 } @else if (!charity) {
-  <p>Charity not found.</p>
+  <div class="loadingcharity">Charity not found.</div>
 } @else {
-  <section class="detail">
-    <h1>{{ charity.name }}</h1>
-    <p>{{ charity.about }}</p>
-    <p><strong>npub:</strong> {{ charity.npub }}</p>
-    <p><strong>Followers:</strong> {{ charity.followers }} | <strong>Flags:</strong> {{ charity.flags }}</p>
+  <section class="charity">
+    <div class="top">
+      <div class="left">
+        <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
+        <h1>{{ charity.name }}</h1>
+      </div>
+      <div class="right">
+        <ul>
+          @if (charity.website) {
+            <li>
+              <i class="fa-solid fa-globe"></i>
+              <a target="_blank" [href]="charity.website">{{ charity.website }}</a>
+            </li>
+          }
+          <li>
+            <i class="fa-solid fa-folder"></i>
+            {{ charity.charity.category || 'Uncategorized' }}
+          </li>
+          @if (charity.charity.country) {
+            <li>
+              <i class="fa-solid fa-location-dot"></i>
+              {{ charity.charity.country }}
+            </li>
+          }
+          <li>
+            <i class="fa-solid fa-users"></i>
+            {{ charity.followers }} followers
+          </li>
+          <li>
+            <i class="fa-solid fa-flag"></i>
+            {{ charity.flags }} flags
+          </li>
+        </ul>
+      </div>
+    </div>
 
-    <h2>Charity Profile</h2>
-    <ul>
-      <li><strong>Mission:</strong> {{ charity.charity.mission || '—' }}</li>
-      <li><strong>Country:</strong> {{ charity.charity.country || '—' }}</li>
-      <li><strong>Category:</strong> {{ charity.charity.category || '—' }}</li>
-      <li><strong>Donation message:</strong> {{ charity.charity.donationMessage || '—' }}</li>
-      <li><strong>Lightning:</strong> {{ charity.charity.lightningAddress || charity.lud16 || '—' }}</li>
-    </ul>
+    <div class="middle">
+      <div class="left">
+        <h3>More about {{ charity.name }}</h3>
+        <div class="description">
+          {{ charity.about || charity.charity.mission || 'No charity description yet.' }}
+        </div>
 
-    @if (canEdit) {
-      <p>
-        <a routerLink="/charity/profile"><button type="button">Edit charity profile</button></a>
-      </p>
-    }
+        @if (canEdit) {
+          <p class="edit-wrap">
+            <a routerLink="/charity/profile"><button type="button">Edit charity profile</button></a>
+          </p>
+        }
 
-    <h2>Donate</h2>
-    <p>Send directly through your Lightning wallet/zap client to: <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong></p>
+        <div class="meta-block">
+          <p><strong>Npub:</strong> {{ charity.npub }}</p>
+          <p><strong>Donation message:</strong> {{ charity.charity.donationMessage || '—' }}</p>
+        </div>
+      </div>
 
-    <div class="forms">
-      <form (ngSubmit)="rate()">
-        <h3>Rate this charity</h3>
-        <label>Rating (1-5)</label>
-        <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
-        <label>Note (optional)</label>
-        <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
-        <button type="submit">Publish rating</button>
-      </form>
+      <div class="right">
+        <div class="donate">
+          <h2>Donate</h2>
+          <p class="donation-text">
+            Send directly with lightning/zap to:
+            <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong>
+          </p>
 
-      <form (ngSubmit)="report()">
-        <h3>Flag this charity</h3>
-        <label>Reason</label>
-        <select [(ngModel)]="reportReason" name="reportReason">
-          <option value="scam">Scam</option>
-          <option value="spam">Spam</option>
-          <option value="impersonation">Impersonation</option>
-        </select>
-        <label>Details</label>
-        <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
-        <button type="submit">Publish flag</button>
-      </form>
+          <div class="forms">
+            <form (ngSubmit)="rate()">
+              <h3>Rate this charity</h3>
+              <label>Rating (1-5)</label>
+              <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
+              <label>Note (optional)</label>
+              <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
+              <button type="submit">Publish rating</button>
+            </form>
+
+            <form (ngSubmit)="report()">
+              <h3>Flag this charity</h3>
+              <label>Reason</label>
+              <select [(ngModel)]="reportReason" name="reportReason">
+                <option value="scam">Scam</option>
+                <option value="spam">Spam</option>
+                <option value="impersonation">Impersonation</option>
+              </select>
+              <label>Details</label>
+              <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
+              <button type="submit">Publish flag</button>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 }
