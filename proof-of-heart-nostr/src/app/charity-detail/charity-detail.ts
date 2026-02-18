@@ -34,6 +34,14 @@ export class CharityDetailComponent implements OnInit {
   qrDataUrl = '';
   readonly isLikelyMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
+  get donationAddress(): string {
+    return (this.charity?.charity.lightningAddress || this.charity?.lud16 || '').trim();
+  }
+
+  get canDonate(): boolean {
+    return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
+  }
+
   async ngOnInit() {
     const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
@@ -115,7 +123,7 @@ export class CharityDetailComponent implements OnInit {
       return;
     }
 
-    const lightningAddress = (this.charity.charity.lightningAddress || this.charity.lud16 || '').trim();
+    const lightningAddress = this.donationAddress;
     if (!lightningAddress.includes('@')) {
       alert('No valid lightning address found for this charity.');
       return;

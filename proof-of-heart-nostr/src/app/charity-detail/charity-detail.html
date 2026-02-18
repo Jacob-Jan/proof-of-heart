@@ -33,7 +33,7 @@
           </li>
           <li>
             <i class="fa-solid fa-bolt"></i>
-            {{ charity.zappedSats | number }} sats zapped
+            {{ charity.zappedSats | number }} sats zapped (queried relays)
           </li>
           <li>
             <i class="fa-solid fa-flag"></i>
@@ -67,7 +67,7 @@
           <h2>Donate</h2>
           <p class="donation-text">
             Send directly with lightning/zap to:
-            <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong>
+            <strong>{{ donationAddress || 'No address' }}</strong>
           </p>
 
           <div class="amount-box">
@@ -84,9 +84,10 @@
               </button>
             </div>
             <p class="converted">{{ convertedHint }}</p>
-            <button type="button" class="donate-btn" (click)="donate()" [disabled]="donating">
+            <button type="button" class="donate-btn" (click)="donate()" [disabled]="!canDonate">
               {{ donating ? 'Creating invoice…' : 'Zap / Donate now' }}
             </button>
+            <p class="donation-help">If no wallet opens on desktop, use <strong>Show QR</strong> and scan with your phone wallet.</p>
             @if (donationStatus) {
               <p class="donation-status">{{ donationStatus }}</p>
             }
