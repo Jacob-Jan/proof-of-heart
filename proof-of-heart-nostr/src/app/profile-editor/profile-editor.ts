@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CharityExtraFields, NostrService } from '../nostr.service';
+import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
@@ -32,6 +33,8 @@ export class ProfileEditorComponent implements OnInit {
   loadingExisting = false;
   needsSignerForLoad = false;
   ownNpub: string | null = null;
+  readonly categories = CHARITY_CATEGORIES;
+  readonly countries = COUNTRIES;
 
   async ngOnInit() {
     await this.loadExisting();

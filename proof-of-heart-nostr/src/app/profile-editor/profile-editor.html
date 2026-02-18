@@ -33,10 +33,20 @@
       <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Long description shown in the More about section"></textarea>
 
       <label>Country</label>
-      <input [(ngModel)]="model.country" name="country" />
+      <select [(ngModel)]="model.country" name="country">
+        <option value="">Select country</option>
+        @for (country of countries; track country) {
+          <option [value]="country">{{ country }}</option>
+        }
+      </select>
 
       <label>Category</label>
-      <input [(ngModel)]="model.category" name="category" placeholder="e.g. food aid" />
+      <select [(ngModel)]="model.category" name="category">
+        <option value="">Select category</option>
+        @for (category of categories; track category) {
+          <option [value]="category">{{ category }}</option>
+        }
+      </select>
 
       <label>Lightning address (optional override)</label>
       <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
