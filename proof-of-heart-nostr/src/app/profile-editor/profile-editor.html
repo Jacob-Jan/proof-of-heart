@@ -8,6 +8,13 @@
     <h1>Charity Nostr Profile</h1>
     <p class="subtitle">Connect your Nostr signer, then publish your Proof of Heart charity profile.</p>
 
+    @if (loadingExisting) {
+      <p class="subtitle">Loading existing profile data…</p>
+    } @else if (needsSignerForLoad) {
+      <p class="subtitle">Could not load existing profile data yet. Connect your signer and try again.</p>
+      <button type="button" (click)="loadExisting()">Connect signer & load profile</button>
+    }
+
     <form (ngSubmit)="save()" class="account-form">
       <p class="appear-in-register">
         <label class="row-checkbox">

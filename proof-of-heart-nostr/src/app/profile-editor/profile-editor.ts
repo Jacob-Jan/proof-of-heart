@@ -23,11 +23,19 @@ export class ProfileEditorComponent implements OnInit {
   };
 
   private existingModel: CharityExtraFields = {};
+  loadingExisting = false;
+  needsSignerForLoad = false;
 
   async ngOnInit() {
+    await this.loadExisting();
+  }
+
+  async loadExisting() {
+    this.loadingExisting = true;
+    this.needsSignerForLoad = false;
+
     try {
-      if (!window.nostr) return;
-      const pubkey = await window.nostr.getPublicKey();
+      const { pubkey } = await this.nostr.connectSigner();
       const existing = await this.nostr.loadOwnCharityProfile(pubkey);
       if (existing) {
         this.existingModel = existing;
@@ -35,7 +43,9 @@ export class ProfileEditorComponent implements OnInit {
       }
       if (this.model.isVisible === undefined) this.model.isVisible = true;
     } catch {
-      // ignore: user can still publish manually
+      this.needsSignerForLoad = true;
+    } finally {
+      this.loadingExisting = false;
     }
   }
 
