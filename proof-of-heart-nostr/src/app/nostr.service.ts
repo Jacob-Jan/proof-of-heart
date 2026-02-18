@@ -175,19 +175,22 @@ export class NostrService {
 
     const profileEvents = await this.pool.querySync(relays, {
       kinds: [0],
-      limit
+      limit: limit * 2
     });
 
-    const pubkeys = [...new Set(profileEvents.map((e: any) => e.pubkey))];
+    const charityEvents = await this.pool.querySync(relays, {
+      kinds: [KIND_CHARITY_PROFILE],
+      '#d': ['proofofheart-charity-profile-v1'],
+      limit: limit * 4
+    });
+
+    const pubkeys = [...new Set([
+      ...profileEvents.map((e: any) => e.pubkey),
+      ...charityEvents.map((e: any) => e.pubkey)
+    ])];
     if (!pubkeys.length) return [];
 
-    const [charityEvents, reports, ratings, followers, zapReceipts] = await Promise.all([
-      this.pool.querySync(relays, {
-        kinds: [KIND_CHARITY_PROFILE],
-        '#d': ['proofofheart-charity-profile-v1'],
-        authors: pubkeys,
-        limit: limit * 2
-      }),
+    const [reports, ratings, followers, zapReceipts] = await Promise.all([
       this.pool.querySync(relays, {
         kinds: [KIND_REPORT],
         '#p': pubkeys,
@@ -261,11 +264,10 @@ export class NostrService {
 
     const charities: CharityProfile[] = [];
 
-    for (const [pubkey, metaEvent] of latestMeta.entries()) {
-      const charityEvent = latestCharity.get(pubkey);
-      if (!charityEvent) continue;
+    for (const [pubkey, charityEvent] of latestCharity.entries()) {
+      const metaEvent = latestMeta.get(pubkey);
 
-      const metadata = this.safeJson(metaEvent.content);
+      const metadata = this.safeJson(metaEvent?.content || '{}');
       const extra = this.safeJson(charityEvent.content) as CharityExtraFields;
       const flags = flagMap.get(pubkey)?.size ?? 0;
       const rating = ratingMap.get(pubkey) ?? { total: 0, count: 0 };
@@ -273,7 +275,7 @@ export class NostrService {
       charities.push({
         pubkey,
         npub: nip19.npubEncode(pubkey),
-        name: metadata?.name || metadata?.display_name || 'Unnamed charity',
+        name: metadata?.name || metadata?.display_name || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
         about: metadata?.about || '',
         picture: metadata?.picture,
         website: metadata?.website,
