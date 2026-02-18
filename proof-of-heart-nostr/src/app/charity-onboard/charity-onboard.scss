@@ -1,0 +1,20 @@
+.charity-onboard {
+  max-width: 620px;
+  margin: 30px auto;
+  padding: 22px;
+  border: 3px solid #fcfcfc;
+  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2);
+  border-radius: 24px;
+  background: #fff;
+
+  h1 {
+    margin-top: 0;
+  }
+
+  .confirm-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0 18px;
+  }
+}

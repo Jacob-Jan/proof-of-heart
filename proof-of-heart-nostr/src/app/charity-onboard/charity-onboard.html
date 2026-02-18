@@ -1,0 +1,13 @@
+<section class="charity-onboard">
+  <h1>For charities</h1>
+  <p>Before continuing, confirm this Nostr identity belongs to a charity organization.</p>
+
+  <label class="confirm-row">
+    <input type="checkbox" [(ngModel)]="charityConfirmed" />
+    <span>This npub belongs to a charity.</span>
+  </label>
+
+  <button type="button" (click)="continueToProfile()" [disabled]="loading">
+    {{ loading ? 'Connecting…' : 'Open public profile page' }}
+  </button>
+</section>
