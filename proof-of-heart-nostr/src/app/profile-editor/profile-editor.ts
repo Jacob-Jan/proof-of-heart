@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CharityExtraFields, NostrService } from '../nostr.service';
@@ -11,7 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
-export class ProfileEditorComponent {
+export class ProfileEditorComponent implements OnInit {
   private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
   }
@@ -19,17 +19,37 @@ export class ProfileEditorComponent {
   private snack = inject(MatSnackBar);
 
   model: CharityExtraFields = {
-    charityName: '',
-    mission: '',
-    country: '',
-    category: '',
-    lightningAddress: '',
     isVisible: true
   };
 
+  private existingModel: CharityExtraFields = {};
+
+  async ngOnInit() {
+    try {
+      if (!window.nostr) return;
+      const pubkey = await window.nostr.getPublicKey();
+      const existing = await this.nostr.loadOwnCharityProfile(pubkey);
+      if (existing) {
+        this.existingModel = existing;
+        this.model = { ...existing };
+      }
+      if (this.model.isVisible === undefined) this.model.isVisible = true;
+    } catch {
+      // ignore: user can still publish manually
+    }
+  }
+
   async save() {
     try {
-      const id = await this.nostr.publishCharityProfile(this.model);
+      const payload: CharityExtraFields = {
+        ...this.existingModel,
+        ...this.model,
+        isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
+      };
+
+      const id = await this.nostr.publishCharityProfile(payload);
+      this.existingModel = { ...payload };
+      this.model = { ...payload };
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
       this.toast(e.message || 'Failed to publish charity profile', 'error', 4500);

@@ -113,6 +113,21 @@ export class NostrService {
     return signed.id;
   }
 
+  async loadOwnCharityProfile(pubkey: string): Promise<CharityExtraFields | null> {
+    const relays = this.getActiveRelays();
+    const events = await this.pool.querySync(relays, {
+      kinds: [KIND_CHARITY_PROFILE],
+      authors: [pubkey],
+      '#d': ['proofofheart-charity-profile-v1'],
+      limit: 20
+    });
+
+    if (!events.length) return null;
+
+    const latest = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0))[0] as any;
+    return this.safeJson(latest.content || '{}') as CharityExtraFields;
+  }
+
   async ensureCharityProfile(pubkey: string): Promise<void> {
     const relays = this.getActiveRelays();
     const existing = await this.pool.querySync(relays, {
