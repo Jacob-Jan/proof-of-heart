@@ -16,6 +16,9 @@
         </label>
       </p>
 
+      <label>Charity name (fallback if kind-0 name is missing)</label>
+      <input [(ngModel)]="model.charityName" name="charityName" placeholder="Your charity name" />
+
       <label>Mission</label>
       <textarea [(ngModel)]="model.mission" name="mission" rows="4"></textarea>
 
@@ -24,9 +27,6 @@
 
       <label>Category</label>
       <input [(ngModel)]="model.category" name="category" placeholder="e.g. food aid" />
-
-      <label>Donation message</label>
-      <textarea [(ngModel)]="model.donationMessage" name="donationMessage" rows="4"></textarea>
 
       <label>Lightning address (optional override)</label>
       <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />

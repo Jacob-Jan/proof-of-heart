@@ -28,6 +28,7 @@ export interface CharityProfile {
 }
 
 export interface CharityExtraFields {
+  charityName?: string;
   mission?: string;
   country?: string;
   category?: string;
@@ -124,6 +125,7 @@ export class NostrService {
     if (existing.length > 0) return;
 
     await this.publishCharityProfile({
+      charityName: '',
       mission: '',
       country: '',
       category: '',
@@ -275,7 +277,7 @@ export class NostrService {
       charities.push({
         pubkey,
         npub: nip19.npubEncode(pubkey),
-        name: metadata?.name || metadata?.display_name || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
+        name: metadata?.name || metadata?.display_name || extra?.charityName || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
         about: metadata?.about || '',
         picture: metadata?.picture,
         website: metadata?.website,

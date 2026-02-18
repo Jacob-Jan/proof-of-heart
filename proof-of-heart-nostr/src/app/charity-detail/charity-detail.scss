@@ -209,40 +209,23 @@
           }
         }
 
-        .forms {
+        .actions-row {
           display: flex;
-          flex-direction: column;
-          gap: 14px;
+          gap: 10px;
 
-          form {
-            display: flex;
-            flex-direction: column;
+          .icon-action {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             gap: 8px;
-            background: #fff;
+            min-height: 42px;
+            border-radius: 10px;
             border: 1px solid #ddd;
-            border-radius: 16px;
-            padding: 14px;
+            background: #fff;
 
-            h3 {
-              margin: 0 0 2px;
-              font-size: 1.02rem;
-            }
-
-            input,
-            select,
-            textarea,
-            button {
-              min-height: 38px;
-              border-radius: 10px;
-            }
-
-            textarea {
-              min-height: 86px;
-              resize: vertical;
-            }
-
-            button {
-              font-weight: 600;
+            i {
+              color: #8a5100;
             }
           }
         }
@@ -285,6 +268,52 @@
 .loadingcharity {
   margin-top: 100px;
   text-align: center;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+  padding: 16px;
+
+  .dialog-card {
+    background: #fff;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    h3 {
+      margin: 0 0 4px;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      min-height: 38px;
+      border-radius: 10px;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+  }
 }
 
 .qr-overlay {

@@ -32,6 +32,10 @@
             {{ charity.followers }} followers
           </li>
           <li>
+            <i class="fa-solid fa-star"></i>
+            {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)
+          </li>
+          <li>
             <i class="fa-solid fa-bolt"></i>
             {{ charity.zappedSats | number }} sats zapped (queried relays)
           </li>
@@ -58,7 +62,6 @@
 
         <div class="meta-block">
           <p><strong>Npub:</strong> {{ charity.npub }}</p>
-          <p><strong>Donation message:</strong> {{ charity.charity.donationMessage || '—' }}</p>
         </div>
       </div>
 
@@ -102,33 +105,56 @@
             }
           </div>
 
-          <div class="forms">
-            <form (ngSubmit)="rate()">
-              <h3>Rate this charity</h3>
-              <label>Rating (1-5)</label>
-              <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
-              <label>Note (optional)</label>
-              <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
-              <button type="submit">Publish rating</button>
-            </form>
-
-            <form (ngSubmit)="report()">
-              <h3>Flag this charity</h3>
-              <label>Reason</label>
-              <select [(ngModel)]="reportReason" name="reportReason">
-                <option value="scam">Scam</option>
-                <option value="spam">Spam</option>
-                <option value="impersonation">Impersonation</option>
-              </select>
-              <label>Details</label>
-              <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
-              <button type="submit">Publish flag</button>
-            </form>
+          <div class="actions-row">
+            <button type="button" class="icon-action" (click)="openRateDialog()" title="Rate charity">
+              <i class="fa-solid fa-star"></i>
+              <span>Rate</span>
+            </button>
+            <button type="button" class="icon-action" (click)="openFlagDialog()" title="Flag charity">
+              <i class="fa-solid fa-flag"></i>
+              <span>Flag</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
   </section>
+
+  @if (showRateDialog) {
+    <div class="dialog-overlay" (click)="closeRateDialog()">
+      <div class="dialog-card" (click)="$event.stopPropagation()">
+        <h3>Rate this charity</h3>
+        <label>Rating (1-5)</label>
+        <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
+        <label>Note (optional)</label>
+        <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
+        <div class="dialog-actions">
+          <button type="button" (click)="closeRateDialog()">Cancel</button>
+          <button type="button" (click)="rate()">Publish rating</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showFlagDialog) {
+    <div class="dialog-overlay" (click)="closeFlagDialog()">
+      <div class="dialog-card" (click)="$event.stopPropagation()">
+        <h3>Flag this charity</h3>
+        <label>Reason</label>
+        <select [(ngModel)]="reportReason" name="reportReason">
+          <option value="scam">Scam</option>
+          <option value="spam">Spam</option>
+          <option value="impersonation">Impersonation</option>
+        </select>
+        <label>Details</label>
+        <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
+        <div class="dialog-actions">
+          <button type="button" (click)="closeFlagDialog()">Cancel</button>
+          <button type="button" (click)="report()">Publish flag</button>
+        </div>
+      </div>
+    </div>
+  }
 
   @if (showQrModal) {
     <div class="qr-overlay" (click)="closeQrModal()">

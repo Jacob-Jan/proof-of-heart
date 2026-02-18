@@ -19,10 +19,10 @@ export class ProfileEditorComponent {
   private snack = inject(MatSnackBar);
 
   model: CharityExtraFields = {
+    charityName: '',
     mission: '',
     country: '',
     category: '',
-    donationMessage: '',
     lightningAddress: '',
     isVisible: true
   };

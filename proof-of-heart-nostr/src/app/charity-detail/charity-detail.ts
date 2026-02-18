@@ -18,6 +18,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
   }
+
   private route = inject(ActivatedRoute);
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
@@ -26,12 +27,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private jsonLdScriptElement?: HTMLScriptElement;
 
   constructor(@Inject(DOCUMENT) private doc: Document) {}
+
   charity?: CharityProfile;
   loading = true;
+  currentIdParam = '';
+
   rating = 5;
   ratingNote = '';
   reportReason: 'spam' | 'impersonation' | 'scam' = 'scam';
   reportNote = '';
+  showRateDialog = false;
+  showFlagDialog = false;
+
   visitorPubkey = '';
   canEdit = false;
 
@@ -51,77 +58,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   get canDonate(): boolean {
     return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
-  }
-
-  async ngOnInit() {
-    const idParam = this.route.snapshot.paramMap.get('pubkey') || '';
-
-    let resolvedPubkey = idParam;
-    if (idParam.startsWith('npub1')) {
-      try {
-        const decoded = nip19.decode(idParam);
-        if (decoded.type === 'npub') {
-          resolvedPubkey = decoded.data;
-        }
-      } catch {
-        resolvedPubkey = idParam;
-      }
-    }
-
-    const all = await this.nostr.loadCharities(200);
-    this.charity = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
-
-    try {
-      if (window.nostr) {
-        this.visitorPubkey = await window.nostr.getPublicKey();
-      }
-    } catch {
-      this.visitorPubkey = '';
-    }
-
-    this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
-
-    if (this.charity) {
-      this.updateSeo(this.charity);
-    } else {
-      this.title.setTitle('Charity not found | Proof of Heart');
-      this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
-      this.setCanonical('https://proofofheart.org/');
-    }
-
-    await this.loadBtcUsdRate();
-    this.loading = false;
-  }
-
-  ngOnDestroy(): void {
-    if (this.jsonLdScriptElement) {
-      this.doc.head.removeChild(this.jsonLdScriptElement);
-      this.jsonLdScriptElement = undefined;
-    }
-  }
-
-  async rate() {
-    if (!this.charity) return;
-    try {
-      await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
-      this.toast('Rating published to Nostr.', 'success', 3000);
-    } catch (e: any) {
-      this.toast(e?.message || 'Failed to publish rating.', 'error', 4000);
-    }
-  }
-
-  async report() {
-    if (!this.charity) return;
-    try {
-      await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
-      this.toast('Flag published to Nostr.', 'success', 3000);
-    } catch (e: any) {
-      this.toast(e?.message || 'Failed to publish flag.', 'error', 4000);
-    }
-  }
-
-  toggleDonationMode() {
-    this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
   get donationSats(): number {
@@ -146,6 +82,105 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const btc = this.donationInput / this.btcUsdRate;
     const sats = Math.round(btc * 100_000_000);
     return `≈ ${sats.toLocaleString()} sats`;
+  }
+
+  async ngOnInit() {
+    this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
+
+    try {
+      if (window.nostr) {
+        this.visitorPubkey = await window.nostr.getPublicKey();
+      }
+    } catch {
+      this.visitorPubkey = '';
+    }
+
+    await this.refreshCharity();
+    await this.loadBtcUsdRate();
+    this.loading = false;
+  }
+
+  ngOnDestroy(): void {
+    if (this.jsonLdScriptElement) {
+      this.doc.head.removeChild(this.jsonLdScriptElement);
+      this.jsonLdScriptElement = undefined;
+    }
+  }
+
+  async refreshCharity() {
+    const idParam = this.currentIdParam;
+
+    let resolvedPubkey = idParam;
+    if (idParam.startsWith('npub1')) {
+      try {
+        const decoded = nip19.decode(idParam);
+        if (decoded.type === 'npub') {
+          resolvedPubkey = decoded.data;
+        }
+      } catch {
+        resolvedPubkey = idParam;
+      }
+    }
+
+    const all = await this.nostr.loadCharities(300);
+    this.charity = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
+    this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
+
+    if (this.charity) {
+      this.updateSeo(this.charity);
+    } else {
+      this.title.setTitle('Charity not found | Proof of Heart');
+      this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
+      this.setCanonical('https://proofofheart.org/');
+    }
+  }
+
+  openRateDialog() {
+    this.rating = 5;
+    this.ratingNote = '';
+    this.showRateDialog = true;
+  }
+
+  closeRateDialog() {
+    this.showRateDialog = false;
+  }
+
+  openFlagDialog() {
+    this.reportReason = 'scam';
+    this.reportNote = '';
+    this.showFlagDialog = true;
+  }
+
+  closeFlagDialog() {
+    this.showFlagDialog = false;
+  }
+
+  async rate() {
+    if (!this.charity) return;
+    try {
+      await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
+      this.toast('Rating published to Nostr.', 'success', 3000);
+      this.closeRateDialog();
+      await this.refreshCharity();
+    } catch (e: any) {
+      this.toast(e?.message || 'Failed to publish rating.', 'error', 4000);
+    }
+  }
+
+  async report() {
+    if (!this.charity) return;
+    try {
+      await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
+      this.toast('Flag published to Nostr.', 'success', 3000);
+      this.closeFlagDialog();
+      await this.refreshCharity();
+    } catch (e: any) {
+      this.toast(e?.message || 'Failed to publish flag.', 'error', 4000);
+    }
+  }
+
+  toggleDonationMode() {
+    this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
   async donate() {
@@ -176,6 +211,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (!this.isLikelyMobile) {
         this.showQrModal = true;
       }
+      setTimeout(() => this.refreshCharity(), 4000);
     } catch (e: any) {
       this.donationStatus = e?.message || 'Could not create invoice.';
       this.toast(this.donationStatus, 'error', 4500);
