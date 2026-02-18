@@ -27,14 +27,7 @@ export class ProfileEditorComponent {
     isVisible: true
   };
 
-  charityConfirmation = false;
-
   async save() {
-    if (!this.charityConfirmation) {
-      this.toast('Please confirm this npub represents a charity before publishing.', 'error', 3500);
-      return;
-    }
-
     try {
       const id = await this.nostr.publishCharityProfile(this.model);
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
