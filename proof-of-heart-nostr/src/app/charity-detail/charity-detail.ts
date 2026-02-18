@@ -226,6 +226,31 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  get nostrProfileUri(): string {
+    if (!this.charity?.npub) return '';
+    return `nostr:${this.charity.npub}`;
+  }
+
+  get primalProfileUrl(): string {
+    if (!this.charity?.npub) return '';
+    return `https://primal.net/p/${this.charity.npub}`;
+  }
+
+  get njumpProfileUrl(): string {
+    if (!this.charity?.npub) return '';
+    return `https://njump.me/${this.charity.npub}`;
+  }
+
+  async copyNostrProfileUri() {
+    if (!this.nostrProfileUri) return;
+    try {
+      await navigator.clipboard.writeText(this.nostrProfileUri);
+      this.toast('Copied nostr profile link.', 'success', 2400);
+    } catch {
+      this.toast('Could not copy profile link.', 'error', 3000);
+    }
+  }
+
   openQrModal() {
     if (!this.lastInvoice) return;
     this.showQrModal = true;

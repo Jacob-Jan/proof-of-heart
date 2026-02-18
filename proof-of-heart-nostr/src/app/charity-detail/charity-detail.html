@@ -37,7 +37,7 @@
           </li>
           <li>
             <i class="fa-solid fa-bolt"></i>
-            {{ charity.zappedSats | number }} sats zapped (queried relays)
+            {{ charity.zappedSats | number }} sats zapped
           </li>
           <li>
             <i class="fa-solid fa-flag"></i>
@@ -62,6 +62,12 @@
 
         <div class="meta-block">
           <p><strong>Npub:</strong> {{ charity.npub }}</p>
+          <p><strong>Nostr URI:</strong> {{ nostrProfileUri }}</p>
+          <div class="profile-links">
+            <button type="button" (click)="copyNostrProfileUri()">Copy nostr link</button>
+            <a [href]="primalProfileUrl" target="_blank" rel="noopener noreferrer">Open on Primal</a>
+            <a [href]="njumpProfileUrl" target="_blank" rel="noopener noreferrer">Open on njump</a>
+          </div>
         </div>
       </div>
 
