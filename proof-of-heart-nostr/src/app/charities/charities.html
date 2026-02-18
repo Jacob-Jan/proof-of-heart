@@ -64,7 +64,7 @@
         </div>
       </div>
       <div class="middle">
-        <p>{{ charity.about || charity.charity.mission || 'No charity description yet.' }}</p>
+        <p>{{ charity.charity.shortDescription || charity.charity.description || charity.about || 'No charity description yet.' }}</p>
       </div>
       <div class="bottom">
         <a [routerLink]="['/charities', charity.npub]" class="primary action-link">
@@ -77,3 +77,4 @@
     <span>No charities found</span>
   }
 </div>
+

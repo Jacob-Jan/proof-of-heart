@@ -20,7 +20,6 @@ export interface CharityProfile {
   charity: {
     shortDescription?: string;
     description?: string;
-    mission?: string;
     country?: string;
     category?: string;
     donationMessage?: string;
@@ -32,7 +31,6 @@ export interface CharityProfile {
 export interface CharityExtraFields {
   shortDescription?: string;
   description?: string;
-  mission?: string;
   country?: string;
   category?: string;
   donationMessage?: string;
@@ -239,7 +237,6 @@ export class NostrService {
     await this.publishCharityProfile({
       shortDescription: '',
       description: '',
-      mission: '',
       country: '',
       category: '',
       donationMessage: '',
@@ -426,7 +423,6 @@ export class NostrService {
         charity: {
           shortDescription: extra?.shortDescription,
           description: extra?.description,
-          mission: extra?.mission,
           country: extra?.country,
           category: extra?.category,
           donationMessage: extra?.donationMessage,
@@ -451,3 +447,5 @@ export class NostrService {
     }
   }
 }
+
+

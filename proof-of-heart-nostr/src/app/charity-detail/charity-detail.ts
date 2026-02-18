@@ -329,7 +329,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private updateSeo(charity: CharityProfile) {
     const title = `${charity.name} | Donate with Bitcoin on Proof of Heart`;
-    const description = (charity.charity.shortDescription || charity.about || charity.charity.mission || `Donate to ${charity.name} with lightning or zaps.`)
+    const description = (charity.charity.shortDescription || charity.about || `Donate to ${charity.name} with lightning or zaps.`)
       .slice(0, 155);
     const canonical = `https://proofofheart.org/charities/${charity.npub}`;
     const image = charity.picture || 'https://proofofheart.org/assets/logo.png';
@@ -372,7 +372,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       '@type': 'NGO',
       name: charity.name,
       url: canonical,
-      description: charity.charity.description || charity.charity.shortDescription || charity.about || charity.charity.mission || '',
+      description: charity.charity.description || charity.charity.shortDescription || charity.about || '',
       image: charity.picture || undefined,
       sameAs: [charity.website].filter(Boolean),
       potentialAction: {
@@ -402,3 +402,4 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 }
+
