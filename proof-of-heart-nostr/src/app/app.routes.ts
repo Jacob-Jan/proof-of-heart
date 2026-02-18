@@ -9,6 +9,7 @@ import { SeoCharitiesPageComponent, SeoDonationsPageComponent, SeoProofPageCompo
 export const routes: Routes = [
   { path: '', component: CharitiesComponent },
   { path: 'charity/:pubkey', component: CharityDetailComponent },
+  { path: 'charities/:pubkey', component: CharityDetailComponent },
   { path: 'profile', component: ProfileEditorComponent },
   { path: 'signup', component: ProfileEditorComponent },
 

@@ -1,13 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './charity-detail.html',
   styleUrl: './charity-detail.scss'
 })
@@ -20,11 +20,23 @@ export class CharityDetailComponent implements OnInit {
   ratingNote = '';
   reportReason: 'spam' | 'impersonation' | 'scam' = 'scam';
   reportNote = '';
+  visitorPubkey = '';
+  canEdit = false;
 
   async ngOnInit() {
     const pubkey = this.route.snapshot.paramMap.get('pubkey');
     const all = await this.nostr.loadCharities(200);
     this.charity = all.find(c => c.pubkey === pubkey);
+
+    try {
+      if (window.nostr) {
+        this.visitorPubkey = await window.nostr.getPublicKey();
+      }
+    } catch {
+      this.visitorPubkey = '';
+    }
+
+    this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
     this.loading = false;
   }
 

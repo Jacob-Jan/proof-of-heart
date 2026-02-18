@@ -18,6 +18,12 @@
       <li><strong>Lightning:</strong> {{ charity.charity.lightningAddress || charity.lud16 || '—' }}</li>
     </ul>
 
+    @if (canEdit) {
+      <p>
+        <a routerLink="/signup"><button type="button">Edit charity profile</button></a>
+      </p>
+    }
+
     <h2>Donate</h2>
     <p>Send directly through your Lightning wallet/zap client to: <strong>{{ charity.charity.lightningAddress || charity.lud16 || 'No address' }}</strong></p>
 
