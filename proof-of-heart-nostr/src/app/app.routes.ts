@@ -14,6 +14,7 @@ export const routes: Routes = [
   { path: 'profile', component: ProfileEditorComponent, title: 'Edit Charity Profile | Proof of Heart' },
   { path: 'charity/profile', component: ProfileEditorComponent, title: 'Edit Charity Profile | Proof of Heart' },
   { path: 'charity/onboard', component: CharityOnboardComponent, title: 'For charities | Proof of Heart' },
+  { path: 'onboard', component: CharityOnboardComponent, title: 'For charities | Proof of Heart' },
 
   { path: 'paper', component: PaperPageComponent, title: 'Proof of Heart Paper' },
   { path: 'bitcoin-charities', component: SeoCharitiesPageComponent, title: 'Bitcoin Charities | Proof of Heart' },

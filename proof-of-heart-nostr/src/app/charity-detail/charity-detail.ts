@@ -41,6 +41,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   showFlagDialog = false;
 
   visitorPubkey = '';
+  signerConnected = false;
+  localCharitySignedIn = false;
   canEdit = false;
 
   donationMode: 'sats' | 'usd' = 'sats';
@@ -89,6 +91,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
     this.visitorPubkey = await this.nostr.getCurrentPubkey();
+    this.signerConnected = await this.nostr.hasSigner();
+    this.localCharitySignedIn = this.signerConnected && this.nostr.hasLocalOnboarding(this.visitorPubkey);
 
     await this.refreshCharity();
     await this.loadBtcUsdRate();
@@ -119,7 +123,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     const all = await this.nostr.loadCharities(300);
     this.charity = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
-    this.canEdit = !!this.charity && !!this.visitorPubkey && this.charity.pubkey === this.visitorPubkey;
+    this.canEdit = !!this.charity
+      && !!this.visitorPubkey
+      && this.localCharitySignedIn
+      && this.charity.pubkey === this.visitorPubkey;
 
     if (this.charity) {
       this.updateSeo(this.charity);

@@ -39,6 +39,12 @@ export class ProfileEditorComponent implements OnInit {
   readonly countries = COUNTRIES;
 
   async ngOnInit() {
+    const hasSigner = await this.nostr.hasSigner();
+    if (!hasSigner) {
+      await this.router.navigate(['/onboard']);
+      return;
+    }
+
     await this.loadExisting();
   }
 
@@ -51,7 +57,7 @@ export class ProfileEditorComponent implements OnInit {
 
       if (!this.nostr.hasLocalOnboarding(pubkey)) {
         this.toast('This charity account is disconnected on this device. Connect again from onboarding.', 'info', 4500);
-        await this.router.navigate(['/charity/onboard']);
+        await this.router.navigate(['/onboard']);
         return;
       }
 
@@ -113,6 +119,6 @@ export class ProfileEditorComponent implements OnInit {
     const pubkey = await this.nostr.getCurrentPubkey();
     this.nostr.disconnectCurrentSession(pubkey);
     this.toast('Disconnected. You can connect a different signer anytime.', 'info', 3500);
-    await this.router.navigate(['/charity/onboard']);
+    await this.router.navigate(['/onboard']);
   }
 }
