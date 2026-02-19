@@ -53,7 +53,7 @@
         <i class="fa-solid fa-bolt"></i>
         {{ charity.zappedSats | number }} sats zapped
       </span>
-      <span class="stat-chip">
+      <span class="stat-chip" [class.warning-chip]="charity.flags > 0">
         <i class="fa-solid fa-flag"></i>
         {{ charity.flags }} flags
       </span>
@@ -67,7 +67,7 @@
         </div>
 
         <div class="meta-block">
-          <p><strong>Nostr profile:</strong> {{ nostrProfileUri }}</p>
+          <p><strong>Nostr profile:</strong> <span [title]="nostrProfileUri">{{ nostrProfileUriShort }}</span></p>
           <div class="profile-links">
             <button type="button" (click)="copyNostrProfileUri()">Copy nostr link</button>
             <a [href]="primalProfileUrl" target="_blank" rel="noopener noreferrer">Open on Primal</a>

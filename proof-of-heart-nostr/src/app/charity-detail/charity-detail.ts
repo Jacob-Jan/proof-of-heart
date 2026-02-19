@@ -274,6 +274,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return `nostr:${this.charity.npub}`;
   }
 
+  get nostrProfileUriShort(): string {
+    const uri = this.nostrProfileUri;
+    if (!uri) return '';
+    if (uri.length <= 28) return uri;
+    return `${uri.slice(0, 16)}…${uri.slice(-8)}`;
+  }
+
   get primalProfileUrl(): string {
     if (!this.charity?.npub) return '';
     return `https://primal.net/p/${this.charity.npub}`;

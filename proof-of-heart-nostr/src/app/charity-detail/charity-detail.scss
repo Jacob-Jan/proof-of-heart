@@ -92,6 +92,16 @@
         color: #9a6b2d;
         font-size: 12px;
       }
+
+      &.warning-chip {
+        border-color: #f3d9a5;
+        background: #fff7ea;
+        color: #8d4e00;
+
+        i {
+          color: #d97706;
+        }
+      }
     }
   }
 
@@ -303,8 +313,13 @@
       margin-top: 20px;
 
       .right {
+        order: -1;
         position: static;
         top: auto;
+      }
+
+      .left {
+        order: 1;
       }
 
       .right .donate {
