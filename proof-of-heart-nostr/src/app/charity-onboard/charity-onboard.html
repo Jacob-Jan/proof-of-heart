@@ -8,7 +8,7 @@
     <mat-checkbox [(ngModel)]="charityConfirmed">This npub belongs to a charity.</mat-checkbox>
   </div>
 
-  <button type="button" (click)="continueToProfile()" [disabled]="loading || !charityConfirmed">
+  <button mat-flat-button type="button" (click)="continueToProfile()" [disabled]="loading || !charityConfirmed">
     {{ loading ? 'Connecting…' : 'Connect Nostr' }}
   </button>
 </section>

@@ -9,7 +9,7 @@
       @if (connectedNpub) {
         <p><strong>Connected:</strong> {{ connectedNpub }}</p>
       }
-      <button type="button" (click)="connectAndUnlock()">Connect owner signer</button>
+      <button mat-raised-button class="primary" type="button" (click)="connectAndUnlock()">Connect owner signer</button>
     </div>
   } @else {
     <div class="topbar">

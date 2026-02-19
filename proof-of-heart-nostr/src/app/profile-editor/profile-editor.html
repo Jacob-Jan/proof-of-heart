@@ -49,13 +49,13 @@
       <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
 
       <div class="account-buttons">
-        <button type="submit">Publish charity profile</button>
+        <button mat-flat-button type="submit">Save profile</button>
         @if (ownNpub) {
           <a [routerLink]="['/charities', ownNpub]">
-            <button type="button" class="secondary">View charity page</button>
+            <button mat-stroked-button type="button" class="secondary">View profile</button>
           </a>
         }
-        <button type="button" class="secondary" (click)="disconnect()">Disconnect</button>
+        <button mat-stroked-button type="button" class="secondary" (click)="disconnect()">Disconnect</button>
       </div>
     </form>
   </div>

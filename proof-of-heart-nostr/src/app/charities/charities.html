@@ -1,13 +1,13 @@
 <div class="banner">
-  <span>Nostr-native, nonprofit, always direct</span>
-  <h1>Donate to Charities on Nostr</h1>
-  <h2>Discover verified npubs and support via lightning or zaps</h2>
+  <span>Nostr-native, nonprofit, always free</span>
+  <h1>Donate bitcoin to charities on Nostr</h1>
+  <h2>Transform our world to a new standard</h2>
   <div class="buttons">
-    <button class="primary" (click)="goForCharities()" mat-raised-button>
+    <button (click)="goForCharities()" mat-raised-button>
       For charities
       <i class="fa-solid fa-arrow-right"></i>
     </button>
-    <button class="secondary" routerLink="/paper" mat-stroked-button>
+    <button routerLink="/paper" mat-stroked-button>
       Our mission
     </button>
   </div>
@@ -15,7 +15,7 @@
 
 <div class="filterbar">
   <div class="row">
-    <input class="search" placeholder="Search charities, npubs, mission..." [(ngModel)]="filter_name" (input)="search(filter_name)">
+    <input class="search" placeholder="Search charities..." [(ngModel)]="filter_name" (input)="search(filter_name)">
     <div class="morefilters" (click)="showAdvanced = !showAdvanced" [ngClass]="{'active': showAdvanced}">
       <div class="label">Advanced</div>
       <i class="fa-solid fa-chevron-down"></i>
@@ -42,7 +42,7 @@
 
 <div class="charities" *ngIf="!loading">
   @for (charity of charities; track charity.pubkey) {
-    <div class="charity">
+    <div class="charity" (click)="goToCharity(charity.pubkey)" matRipple>
       <div class="top">
         <img [src]="charity.picture || '/assets/logo-contrast.png'" alt="">
         <div class="spacer"></div>
@@ -66,10 +66,10 @@
         <p>{{ charity.charity.shortDescription || charity.charity.description || charity.about || 'No charity description yet.' }}</p>
       </div>
       <div class="bottom">
-        <a [routerLink]="['/charities', charity.npub]" class="primary action-link">
-          <i class="fa-brands fa-bitcoin"></i>
-          Open profile
-        </a>
+        <button class="primary" mat-stroked-button>
+            <i class="fa-brands fa-bitcoin"></i>
+            Open profile
+        </button>
       </div>
     </div>
   } @empty {

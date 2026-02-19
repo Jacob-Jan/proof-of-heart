@@ -106,4 +106,8 @@ export class CharitiesComponent implements OnInit {
         return matchesName && matchesCategory && matchesCountry;
       });
   }
+
+  goToCharity(pubkey: string) {
+    this.router.navigate(['/charities', pubkey]);
+  }
 }

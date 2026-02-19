@@ -5,11 +5,12 @@ import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { NostrService } from '../nostr.service';
+import { MatButtonModule, MatAnchor } from '@angular/material/button';
 
 @Component({
   selector: 'app-charity-onboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatCheckboxModule],
+  imports: [CommonModule, FormsModule, MatCheckboxModule, MatAnchor],
   templateUrl: './charity-onboard.html',
   styleUrl: './charity-onboard.scss'
 })
