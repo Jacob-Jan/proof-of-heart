@@ -1,24 +1,166 @@
+<!-- partner.html -->
+
 <main class="seo-page seo-partner">
-  <header><h1>Partner with Proof of Heart</h1><p>Help users donate bitcoin to real-world charities by linking to Proof of Heart.</p></header>
-  <section class="embed-options">
-    <h2>Embed options</h2>
-    <div class="embed-grid">
-      <article class="embed-card">
-        <h3>Option 1: Dark badge</h3>
-        <div class="embed-code-header">
-          <span class="label">Embed code</span>
-          <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeDark, 0)">{{ copied[0] ? 'Copied!' : 'Copy' }}</button>
+    <header>
+        <h1>Partner with Proof of Heart</h1>
+        <p>
+            If you run a bitcoin business, wallet, meetup group, podcast or online community, you can
+            help more people <strong>donate bitcoin to real-world charities</strong> by pointing
+            interested users to the Proof of Heart register.<br>
+            Doing so also signals that your project supports <strong>self-custody bitcoin charity
+                infrastructure</strong>.
+        </p>
+        <p>
+            On this page you'll find simple HTML snippets you can embed on your website. They show a small
+            “Donate bitcoin to charities” badge with our logo and link directly to
+            <strong>https://proofofheart.org</strong>.
+        </p>
+    </header>
+
+    <section class="embed-options">
+        <h2>Embed options</h2>
+
+        <div class="embed-grid">
+            <!-- Dark option -->
+            <article class="embed-card">
+                <h3>Option 1: Dark badge</h3>
+                <p class="description">
+                    <!-- A compact dark button that works well on light backgrounds. -->
+                </p>
+
+                <div class="embed-preview">
+                    <a href="https://proofofheart.org/?utm_source=partner_site&utm_medium=referral&utm_campaign=donate_bitcoin_widget"
+                        target="_blank" rel="noopener noreferrer" style="
+              display:inline-flex;
+              align-items:center;
+              gap:8px;
+              padding:10px 14px;
+              border-radius:999px;
+              background:#111827;
+              color:#ffffff;
+              font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+              font-size:14px;
+              text-decoration:none;
+            ">
+                        <img src="https://proofofheart.org/assets/favicon-96x96.png" alt="Proof of Heart logo" style="
+                height:24px;
+                width:24px;
+                border-radius:999px;
+                background:#ffffff;
+                padding:2px;
+              " />
+                        <div style="display:flex; flex-direction:column; line-height:1.2;">
+                            <span style="font-weight:600; font-size:14px;">Donate bitcoin to charities</span>
+                            <span style="font-size:12px; opacity:0.9;">on Proof of Heart</span>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="embed-code-block">
+                    <div class="embed-code-header">
+                        <span class="label">Embed code</span>
+                        <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeDark, 0)"
+                            [class.copied]="copied[0]">
+                            <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                            <span *ngIf="!copied[0]">Copy</span>
+                            <span *ngIf="copied[0]">Copied!</span>
+                        </button>
+                    </div>
+                    <textarea readonly class="embed-code-textarea">{{ embedCodeDark }}</textarea>
+                </div>
+            </article>
+
+            <!-- Light option -->
+            <article class="embed-card">
+                <h3>Option 2: Light badge</h3>
+                <p class="description">
+                    <!-- A light, pill-shaped button with a soft shadow that works on darker or colored backgrounds. -->
+                </p>
+
+                <div class="embed-preview">
+                    <a href="https://proofofheart.org/?utm_source=partner_site&utm_medium=referral&utm_campaign=donate_bitcoin_widget_light"
+                        target="_blank" rel="noopener noreferrer" style="
+              display:inline-flex;
+              align-items:center;
+              gap:10px;
+              padding:10px 16px;
+              border-radius:40px;
+              border:3px solid #fcfcfc;
+              background-color:#F0EFE9;
+              color:#111827;
+              font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+              font-size:14px;
+              text-decoration:none;
+              box-shadow:0 0 10px rgba(0, 0, 0, 0.2);
+            ">
+                        <img src="https://proofofheart.org/assets/favicon-96x96.png" alt="Proof of Heart logo" style="
+                height:28px;
+                width:28px;
+                border-radius:999px;
+                background:#ffffff;
+                padding:2px;
+              " />
+                        <div style="display:flex; flex-direction:column; line-height:1.2;">
+                            <span style="font-weight:600; font-size:14px;">Donate bitcoin to charities</span>
+                            <span style="font-size:12px; opacity:0.9;">on Proof of Heart</span>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="embed-code-block">
+                    <div class="embed-code-header">
+                        <span class="label">Embed code</span>
+                        <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeLight, 1)"
+                            [class.copied]="copied[1]">
+                            <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                            <span *ngIf="!copied[1]">Copy</span>
+                            <span *ngIf="copied[1]">Copied!</span>
+                        </button>
+                    </div>
+                    <textarea readonly class="embed-code-textarea">{{ embedCodeLight }}</textarea>
+                </div>
+            </article>
         </div>
-        <textarea readonly class="embed-code-textarea">{{ embedCodeDark }}</textarea>
-      </article>
-      <article class="embed-card">
-        <h3>Option 2: Light badge</h3>
-        <div class="embed-code-header">
-          <span class="label">Embed code</span>
-          <button type="button" class="copy-button" (click)="copyToClipboard(embedCodeLight, 1)">{{ copied[1] ? 'Copied!' : 'Copy' }}</button>
-        </div>
-        <textarea readonly class="embed-code-textarea">{{ embedCodeLight }}</textarea>
-      </article>
-    </div>
-  </section>
+
+        <p class="help-text">
+            You are welcome to adjust fonts and colors to match your design, but please keep the link
+            pointing to <code>https://proofofheart.org</code> so visitors land on the official register.
+        </p>
+    </section>
+
+    <section>
+        <h2>Who this is for</h2>
+        <p>This embed is designed for:</p>
+        <ul>
+            <li>Bitcoin wallets and exchanges with users asking how to donate bitcoin.</li>
+            <li>Bitcoin educators, newsletters, and content creators.</li>
+            <li>Communities, meetups, and NGOs that want to highlight bitcoin donations.</li>
+        </ul>
+        <p>
+            It is intentionally low-key: only visitors who are already curious about
+            <strong>bitcoin donations</strong> will click through.
+        </p>
+    </section>
+
+    <section>
+        <h2>How this helps</h2>
+        <ul>
+            <li>
+                People who care about <strong>bitcoin donations</strong> get a clear, trusted destination
+                for their giving.
+            </li>
+            <li>
+                Charities listed on Proof of Heart get more visibility and direct support, without
+                intermediaries.
+            </li>
+            <li>
+                You show your users that you support
+                <strong>non-custodial, self-custody bitcoin charity</strong> infrastructure.
+            </li>
+        </ul>
+        <p>
+            If you add the embed and want to let us know, you can always reach us at
+            <a href="mailto:jacob-jan@proofofheart.org">jacob-jan@proofofheart.org</a>.
+        </p>
+    </section>
 </main>
