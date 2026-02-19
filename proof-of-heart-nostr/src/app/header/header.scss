@@ -37,7 +37,7 @@
     .socialmedia {
       display: flex;
       align-items: center;
-      gap: 6px;
+      // gap: 6px;
       color: #333;
       border: 3px solid #fcfcfc;
       box-shadow: 0 0 10px 0px rgba(0, 0, 0, 0.2);
@@ -79,7 +79,6 @@
     grid-template-columns: repeat(3, 1fr);
     align-items: center;
     justify-items: center;
-    gap: 10px;
 
     .menuitem {
       display: flex;
@@ -94,7 +93,7 @@
       padding: 0 4px 3px;
 
       i { font-size: 14px; line-height: 1; }
-      span { font-size: 13px; }
+      span { font-size: 14px; }
 
       &.active {
         border-bottom: 3px solid #1f1f1f;
