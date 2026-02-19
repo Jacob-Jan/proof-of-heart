@@ -149,18 +149,9 @@ export class NostrService {
   }
 
   async getCurrentPubkey(): Promise<string> {
-    try {
-      if (window.nostr) {
-        const pubkey = await window.nostr.getPublicKey();
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(LAST_PUBKEY_KEY, pubkey);
-        }
-        return pubkey;
-      }
-    } catch {
-      // fall back to cached pubkey
-    }
-
+    // IMPORTANT: do not call window.nostr.getPublicKey() here.
+    // Some signers show a permission/sign-in prompt when accessed,
+    // and this method is used during route navigation.
     if (typeof window !== 'undefined') {
       return window.localStorage.getItem(LAST_PUBKEY_KEY) || '';
     }
