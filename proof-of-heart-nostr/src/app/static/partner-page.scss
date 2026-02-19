@@ -1,6 +1,113 @@
-.embed-grid { display:grid; gap:1.5rem; }
-@media (min-width:768px){ .embed-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-.embed-card { border-radius:1rem; border:1px solid #e5e7eb; background-color:#fff; padding:1.25rem; }
-.embed-code-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; }
-.copy-button { border-radius:999px; border:1px solid #d1d5db; background-color:#f9fafb; padding:.25rem .6rem; }
-.embed-code-textarea { width:100%; font-family:monospace; font-size:13px; padding:12px; border-radius:8px; border:1px solid #d1d5db; min-height:160px; }
+.embed-options {
+  margin-top: 2.5rem;
+}
+
+.embed-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .embed-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.embed-card {
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.embed-card h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+
+.embed-card p.description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.embed-preview {
+  margin: 1rem 0 1.2rem;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Code block */
+.embed-code-block {
+  margin-top: 0.5rem;
+}
+
+.embed-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.embed-code-header span.label {
+  font-weight: 500;
+}
+
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #374151;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.copy-button i {
+  font-size: 0.9rem;
+}
+
+.copy-button:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.copy-button.copied {
+  background-color: #ecfdf3;
+  border-color: #16a34a;
+  color: #166534;
+}
+
+.copy-button.copied i {
+  color: #16a34a;
+}
+
+.embed-code-textarea {
+  width: 100%;
+  max-width: 100%;
+  font-family: monospace;
+  font-size: 13px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 160px;
+}
+
+/* Bottom explanation */
+.help-text {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
