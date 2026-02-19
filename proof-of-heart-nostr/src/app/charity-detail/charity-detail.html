@@ -20,20 +20,43 @@
 
       @if (canEdit) {
         <div class="top-actions">
-          <a routerLink="/charity/profile"><button mat-stroked-button type="button">Edit charity profile</button></a>
+          <a routerLink="/charity/profile">
+            <button mat-flat-button type="button" class="edit-profile-btn">
+              <i class="fa-solid fa-pen"></i>
+              <span>Edit profile</span>
+            </button>
+          </a>
         </div>
       }
     </div>
 
     <div class="stats-row">
-      <span class="stat-chip">{{ charity.charity.category || 'Uncategorized' }}</span>
+      <span class="stat-chip">
+        <i class="fa-solid fa-tag"></i>
+        {{ charity.charity.category || 'Uncategorized' }}
+      </span>
       @if (charity.charity.country) {
-        <span class="stat-chip">{{ charity.charity.country }}</span>
+        <span class="stat-chip">
+          <i class="fa-solid fa-location-dot"></i>
+          {{ charity.charity.country }}
+        </span>
       }
-      <span class="stat-chip">{{ charity.followers }} followers</span>
-      <span class="stat-chip">{{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)</span>
-      <span class="stat-chip">{{ charity.zappedSats | number }} sats zapped</span>
-      <span class="stat-chip">{{ charity.flags }} flags</span>
+      <span class="stat-chip">
+        <i class="fa-solid fa-users"></i>
+        {{ charity.followers }} followers
+      </span>
+      <span class="stat-chip">
+        <i class="fa-solid fa-star"></i>
+        {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)
+      </span>
+      <span class="stat-chip">
+        <i class="fa-solid fa-bolt"></i>
+        {{ charity.zappedSats | number }} sats zapped
+      </span>
+      <span class="stat-chip">
+        <i class="fa-solid fa-flag"></i>
+        {{ charity.flags }} flags
+      </span>
     </div>
 
     <div class="middle">
@@ -112,8 +135,22 @@
     <div class="dialog-overlay" (click)="closeRateDialog()">
       <div class="dialog-card" (click)="$event.stopPropagation()">
         <h3>Rate this charity</h3>
-        <label>Rating (1-5)</label>
-        <input type="number" min="1" max="5" [(ngModel)]="rating" name="rating" />
+        <label>Your rating</label>
+        <div class="star-picker" (mouseleave)="clearRatingHover()">
+          @for (star of [1,2,3,4,5]; track star) {
+            <button
+              type="button"
+              class="star-btn"
+              [class.active]="isStarActive(star)"
+              (mouseenter)="setRatingHover(star)"
+              (focus)="setRatingHover(star)"
+              (click)="setRating(star)"
+              [attr.aria-label]="'Rate ' + star + ' stars'">
+              <i [class]="isStarActive(star) ? 'fa-solid fa-star' : 'fa-regular fa-star'"></i>
+            </button>
+          }
+        </div>
+        <p class="rating-selected">Selected: {{ rating }} / 5</p>
         <label>Note (optional)</label>
         <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
         <div class="dialog-actions">

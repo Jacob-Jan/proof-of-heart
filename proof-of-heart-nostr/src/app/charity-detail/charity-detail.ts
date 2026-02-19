@@ -34,6 +34,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   currentIdParam = '';
 
   rating = 5;
+  ratingHover = 0;
   ratingNote = '';
   reportReason: 'spam' | 'impersonation' | 'scam' = 'scam';
   reportNote = '';
@@ -139,12 +140,31 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   openRateDialog() {
     this.rating = 5;
+    this.ratingHover = 0;
     this.ratingNote = '';
     this.showRateDialog = true;
   }
 
   closeRateDialog() {
     this.showRateDialog = false;
+    this.ratingHover = 0;
+  }
+
+  setRating(value: number) {
+    this.rating = Math.max(1, Math.min(5, Math.round(value)));
+  }
+
+  setRatingHover(value: number) {
+    this.ratingHover = Math.max(0, Math.min(5, Math.round(value)));
+  }
+
+  clearRatingHover() {
+    this.ratingHover = 0;
+  }
+
+  isStarActive(star: number): boolean {
+    const activeValue = this.ratingHover || this.rating;
+    return star <= activeValue;
   }
 
   openFlagDialog() {

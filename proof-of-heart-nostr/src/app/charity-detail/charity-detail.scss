@@ -38,10 +38,17 @@
     }
 
     .top-actions {
-      button {
-        min-height: 40px;
+      .edit-profile-btn {
+        min-height: 34px;
         border-radius: 999px;
-        padding: 0 16px;
+        padding: 0 12px;
+        font-size: 0.83rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f7f1e6;
+        color: #7a4a09;
       }
     }
 
@@ -71,12 +78,20 @@
     gap: 8px;
 
     .stat-chip {
-      border: 1px solid #ddd;
-      background: #fff;
+      border: 1px solid #e7e2d7;
+      background: #fffdf9;
       border-radius: 999px;
       padding: 6px 12px;
       font-size: 14px;
-      color: #444;
+      color: #5a564d;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+
+      i {
+        color: #9a6b2d;
+        font-size: 12px;
+      }
     }
   }
 
@@ -360,6 +375,35 @@
     textarea {
       min-height: 90px;
       resize: vertical;
+    }
+
+    .star-picker {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+
+      .star-btn {
+        min-height: auto;
+        border: none;
+        background: transparent;
+        padding: 2px;
+        border-radius: 8px;
+        color: #c7c7c7;
+
+        i {
+          font-size: 24px;
+        }
+
+        &.active {
+          color: #f2b01e;
+        }
+      }
+    }
+
+    .rating-selected {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #6b6b6b;
     }
 
     .dialog-actions {
