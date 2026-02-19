@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { NavigationEnd, Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { NostrService } from '../nostr.service';
 
 @Component({
@@ -10,13 +11,29 @@ import { NostrService } from '../nostr.service';
   templateUrl: './header.html',
   styleUrl: './header.scss'
 })
-export class HeaderComponent implements OnInit {
+export class HeaderComponent implements OnInit, OnDestroy {
   private nostr = inject(NostrService);
+  private router = inject(Router);
+  private navSub?: Subscription;
 
   isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   isSignedInCharity = false;
 
   async ngOnInit(): Promise<void> {
+    await this.refreshCharityState();
+
+    this.navSub = this.router.events.subscribe(async (event) => {
+      if (event instanceof NavigationEnd) {
+        await this.refreshCharityState();
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.navSub?.unsubscribe();
+  }
+
+  private async refreshCharityState(): Promise<void> {
     const pubkey = await this.nostr.getCurrentPubkey();
     this.isSignedInCharity = this.nostr.hasLocalOnboarding(pubkey);
   }

@@ -48,6 +48,13 @@ export class ProfileEditorComponent implements OnInit {
 
     try {
       const { pubkey, npub } = await this.nostr.connectSigner();
+
+      if (!this.nostr.hasLocalOnboarding(pubkey)) {
+        this.toast('This charity account is disconnected on this device. Connect again from onboarding.', 'info', 4500);
+        await this.router.navigate(['/charity/onboard']);
+        return;
+      }
+
       this.ownNpub = npub;
 
       const [existing, kind0] = await Promise.all([
