@@ -7,7 +7,7 @@ import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
+import { MatButtonModule, MatAnchor } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -20,8 +20,8 @@ import { firstValueFrom } from 'rxjs';
       This disconnects this charity on this device. You can reconnect anytime from onboarding.
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close="false">Cancel</button>
-      <button mat-flat-button color="warn" mat-dialog-close="true">Disconnect</button>
+      <button mat-button [mat-dialog-close]="false">Cancel</button>
+      <button mat-flat-button color="warn" [mat-dialog-close]="true">Disconnect</button>
     </mat-dialog-actions>
   `
 })
@@ -30,7 +30,7 @@ export class DisconnectConfirmDialogComponent {}
 @Component({
   selector: 'app-profile-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule],
+  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule, MatAnchor],
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
