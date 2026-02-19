@@ -1,5 +1,7 @@
 @if (loading) {
-  <div class="loadingcharity">Loading charity…</div>
+  <div class="loadingcharity">
+    <mat-spinner diameter="42"></mat-spinner>
+  </div>
 } @else if (!charity) {
   <div class="loadingcharity">Charity not found.</div>
 } @else {

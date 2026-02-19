@@ -7,11 +7,12 @@ import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Meta, Title } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatButtonModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './charity-detail.html',
   styleUrl: './charity-detail.scss'
 })
