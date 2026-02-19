@@ -143,6 +143,6 @@ export class ProfileEditorComponent implements OnInit {
     const pubkey = await this.nostr.getCurrentPubkey();
     this.nostr.disconnectCurrentSession(pubkey);
     this.toast('Disconnected. You can connect a different signer anytime.', 'info', 3500);
-    await this.router.navigate(['/onboard']);
+    await this.router.navigate(['/']);
   }
 }
