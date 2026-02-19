@@ -13,3 +13,20 @@
     © {{ currentYear }} Proof of Heart — Non-custodial bitcoin donations — Powered by Nostr
   </p>
 </footer>
+
+<div class="app-menu">
+  <nav class="menu">
+    <a routerLink="/" class="menuitem" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      <i class="fa-solid fa-heart"></i>
+      <span>Donate</span>
+    </a>
+    <a routerLink="/paper" class="menuitem" routerLinkActive="active">
+      <i class="fa-solid fa-file-lines"></i>
+      <span>Paper</span>
+    </a>
+    <a [routerLink]="charityNavRoute" class="menuitem" routerLinkActive="active">
+      <i class="fa-solid fa-user"></i>
+      <span>{{ charityNavLabel }}</span>
+    </a>
+  </nav>
+</div>
