@@ -10,7 +10,7 @@
     <p>
       <a routerLink="/" class="link-inline">Browse bitcoin charities</a>
       or
-      <a routerLink="/charity/profile" class="link-inline">add your charity to the register</a>.
+      <a routerLink="/onboard" class="link-inline">add your charity to the register</a>.
     </p>
   </header>
 
@@ -18,7 +18,69 @@
     <h2>How Bitcoin Donations Work</h2>
     <p>
       A bitcoin donation is a transaction on the Bitcoin network from your address to a charity’s
-      address.
+      address. In practice, the process is simple:
+    </p>
+    <ol>
+      <li>Find a charity that accepts bitcoin on Proof of Heart.</li>
+      <li>Open its official bitcoin donation profile.</li>
+      <li>Send funds from your wallet to the on-chain address or lightning invoice.</li>
+    </ol>
+    <p>
+      The transaction is recorded on the blockchain (or via lightning), and the charity can manage
+      the funds directly in its own wallet.
+    </p>
+  </section>
+
+  <section>
+    <h2>Donate Bitcoin vs Donate Lightning</h2>
+    <p>
+      Many charities listed on Proof of Heart can receive both
+      <strong>on-chain bitcoin donations</strong> and
+      <strong>lightning donations</strong>:
+    </p>
+    <ul>
+      <li><strong>On-chain bitcoin</strong> is ideal for larger or less frequent gifts.</li>
+      <li><strong>Lightning donations</strong> are perfect for small, instant contributions.</li>
+    </ul>
+    <p>
+      Proof of Heart treats both as part of a single donation endpoint. You choose how to donate
+      bitcoin based on your wallet, fees, and the urgency of your support.
+    </p>
+  </section>
+
+  <section>
+    <h2>Why Self-Custody Matters for Bitcoin Donations</h2>
+    <p>
+      A self-custody charity holds its own keys instead of relying on an exchange or custodial
+      payment processor. This matters because:
+    </p>
+    <ul>
+      <li>Funds cannot be frozen by a third-party custodian.</li>
+      <li>The organization designs its own security and treasury policy.</li>
+      <li>There is a direct relationship between donor and recipient on the Bitcoin network.</li>
+    </ul>
+    <p>
+      When you donate bitcoin on Proof of Heart, you support charities that treat bitcoin as a
+      native asset, held in wallets they control.
+    </p>
+  </section>
+
+  <section>
+    <h2>How to Make Your First Bitcoin Donation</h2>
+    <ol>
+      <li>Visit the <a routerLink="/" class="link-inline">Proof of Heart donate page</a>.</li>
+      <li>Choose a charity whose mission you believe in.</li>
+      <li>Open its profile and verify the bitcoin donation endpoint.</li>
+      <li>Scan the QR code or paste the address from your wallet and send.</li>
+    </ol>
+    <p>
+      In just a few confirmations, your bitcoin donation arrives directly in the charity’s wallet,
+      ready to be used for real-world impact.
+    </p>
+    <p>
+      Want to go deeper? Read our
+      <a routerLink="/paper" class="link-inline">Proof of Heart paper</a>
+      about non-custodial bitcoin donations.
     </p>
   </section>
 </main>
