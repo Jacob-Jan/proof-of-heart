@@ -17,10 +17,7 @@
 
     <form (ngSubmit)="save()" class="account-form">
       <p class="appear-in-register">
-        <label class="row-checkbox">
-          <input type="checkbox" [(ngModel)]="model.isVisible" name="isVisible" />
-          Appear in register
-        </label>
+        <mat-checkbox [(ngModel)]="model.isVisible" name="isVisible">Appear in register</mat-checkbox>
       </p>
 
       <label>Charity name (from kind 0)</label>
@@ -58,6 +55,7 @@
             <button type="button" class="secondary">View charity page</button>
           </a>
         }
+        <button type="button" class="secondary" (click)="disconnect()">Disconnect</button>
       </div>
     </form>
   </div>

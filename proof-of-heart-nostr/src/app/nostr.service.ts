@@ -192,6 +192,26 @@ export class NostrService {
     }
   }
 
+  disconnectCurrentSession(pubkey: string): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(ONBOARDED_PUBKEYS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const next = Array.isArray(arr)
+        ? arr.filter((v: any) => typeof v === 'string' && v !== pubkey)
+        : [];
+      window.localStorage.setItem(ONBOARDED_PUBKEYS_KEY, JSON.stringify(next));
+    } catch {
+      window.localStorage.setItem(ONBOARDED_PUBKEYS_KEY, JSON.stringify([]));
+    }
+
+    const lastPubkey = window.localStorage.getItem(LAST_PUBKEY_KEY);
+    if (!pubkey || lastPubkey === pubkey) {
+      window.localStorage.removeItem(LAST_PUBKEY_KEY);
+    }
+  }
+
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getWriteRelays();

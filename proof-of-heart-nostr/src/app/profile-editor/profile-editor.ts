@@ -1,15 +1,16 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CharityExtraFields, NostrService } from '../nostr.service';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
   selector: 'app-profile-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule],
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
@@ -19,6 +20,7 @@ export class ProfileEditorComponent implements OnInit {
   }
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
+  private router = inject(Router);
 
   model: CharityExtraFields = {
     shortDescription: '',
@@ -92,5 +94,18 @@ export class ProfileEditorComponent implements OnInit {
     } catch (e: any) {
       this.toast(e.message || 'Failed to publish charity profile', 'error', 4500);
     }
+  }
+
+  async disconnect() {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm('Disconnect this charity account on this device?');
+
+    if (!confirmed) return;
+
+    const pubkey = await this.nostr.getCurrentPubkey();
+    this.nostr.disconnectCurrentSession(pubkey);
+    this.toast('Disconnected. You can connect a different signer anytime.', 'info', 3500);
+    await this.router.navigate(['/charity/onboard']);
   }
 }
