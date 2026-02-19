@@ -6,6 +6,26 @@ import { CharityExtraFields, NostrService } from '../nostr.service';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { firstValueFrom } from 'rxjs';
+
+@Component({
+  selector: 'app-disconnect-confirm-dialog',
+  standalone: true,
+  imports: [CommonModule, MatDialogModule, MatButtonModule],
+  template: `
+    <h2 mat-dialog-title>Disconnect charity account?</h2>
+    <mat-dialog-content>
+      This disconnects this charity on this device. You can reconnect anytime from onboarding.
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close="false">Cancel</button>
+      <button mat-flat-button color="warn" mat-dialog-close="true">Disconnect</button>
+    </mat-dialog-actions>
+  `
+})
+export class DisconnectConfirmDialogComponent {}
 
 @Component({
   selector: 'app-profile-editor',
@@ -21,6 +41,7 @@ export class ProfileEditorComponent implements OnInit {
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
+  private dialog = inject(MatDialog);
 
   model: CharityExtraFields = {
     shortDescription: '',
@@ -110,10 +131,13 @@ export class ProfileEditorComponent implements OnInit {
   }
 
   async disconnect() {
-    const confirmed = typeof window === 'undefined'
-      ? true
-      : window.confirm('Disconnect this charity account on this device?');
+    const dialogRef = this.dialog.open(DisconnectConfirmDialogComponent, {
+      width: '420px',
+      maxWidth: '92vw',
+      autoFocus: false
+    });
 
+    const confirmed = await firstValueFrom(dialogRef.afterClosed());
     if (!confirmed) return;
 
     const pubkey = await this.nostr.getCurrentPubkey();
