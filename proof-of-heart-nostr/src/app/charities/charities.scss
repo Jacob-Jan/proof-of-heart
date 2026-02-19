@@ -39,12 +39,11 @@
     .primary,
     .secondary {
       border-radius: 40px;
-      padding: 10px 26px;
+      padding: 10px 20px;
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-weight: 500;
-      min-height: 50px;
 
       .mdc-button__label {
         display: inline-flex;
@@ -190,6 +189,10 @@
           display: flex;
           align-items: center;
           gap: 6px;
+
+          i {
+            color: #8a5100;
+          }
         }
       }
 
@@ -225,4 +228,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+
+  i {
+    color: #8a5100;
+  }
 }
