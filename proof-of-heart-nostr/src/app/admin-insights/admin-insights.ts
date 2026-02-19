@@ -4,13 +4,14 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { NostrService, CharityProfile } from '../nostr.service';
 import { nip19 } from 'nostr-tools';
 import { RouterModule } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
 
 const ADMIN_NPUB = 'npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0';
 
 @Component({
   selector: 'app-admin-insights',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, MatButtonModule],
   templateUrl: './admin-insights.html',
   styleUrl: './admin-insights.scss'
 })

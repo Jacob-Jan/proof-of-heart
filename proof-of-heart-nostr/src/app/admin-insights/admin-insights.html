@@ -9,12 +9,12 @@
       @if (connectedNpub) {
         <p><strong>Connected:</strong> {{ connectedNpub }}</p>
       }
-      <button mat-raised-button class="primary" type="button" (click)="connectAndUnlock()">Connect owner signer</button>
+      <button mat-flat-button (click)="connectAndUnlock()">Connect owner signer</button>
     </div>
   } @else {
     <div class="topbar">
       <p><strong>Signed in as:</strong> {{ connectedNpub }}</p>
-      <button type="button" (click)="reload()" [disabled]="loading">{{ loading ? 'Refreshing…' : 'Refresh insights' }}</button>
+      <button mat-flat-button (click)="reload()" [disabled]="loading">{{ loading ? 'Refreshing…' : 'Refresh insights' }}</button>
     </div>
 
     <div class="kpis">

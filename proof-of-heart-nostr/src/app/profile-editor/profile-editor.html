@@ -52,10 +52,10 @@
         <button mat-flat-button type="submit">Save profile</button>
         @if (ownNpub) {
           <a [routerLink]="['/charities', ownNpub]">
-            <button mat-stroked-button type="button" class="secondary">View profile</button>
+            <button mat-stroked-button type="button">View profile</button>
           </a>
         }
-        <button mat-stroked-button type="button" class="secondary" (click)="disconnect()">Disconnect</button>
+        <button mat-stroked-button type="button" (click)="disconnect()">Disconnect</button>
       </div>
     </form>
   </div>
