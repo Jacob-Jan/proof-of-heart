@@ -137,6 +137,17 @@ button:not(.mdc-button) {
   opacity: 1 !important;
 }
 
+.mat-mdc-snack-bar-container .mat-mdc-snack-bar-label,
+.mat-mdc-snack-bar-container .mat-mdc-snack-bar-label a,
+.mat-mdc-snack-bar-container .mat-mdc-button,
+.mat-mdc-snack-bar-container .mat-mdc-button .mdc-button__label {
+  color: var(--toast-color) !important;
+}
+
+.mat-mdc-snack-bar-container .mat-mdc-snack-bar-label a {
+  text-decoration: underline;
+}
+
 .mat-mdc-snack-bar-container.toast-success {
   --toast-color: #1f7a44;
 }
