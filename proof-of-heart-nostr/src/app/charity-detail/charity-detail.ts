@@ -40,6 +40,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   reportNote = '';
   showRateDialog = false;
   showFlagDialog = false;
+  hasFlagged = false;
 
   visitorPubkey = '';
   signerConnected = false;
@@ -130,6 +131,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       && this.charity.pubkey === this.visitorPubkey;
 
     if (this.charity) {
+      if (this.visitorPubkey) {
+        this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
+      } else {
+        this.hasFlagged = false;
+      }
       this.updateSeo(this.charity);
     } else {
       this.title.setTitle('Charity not found | Proof of Heart');
@@ -173,6 +179,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.showFlagDialog = true;
   }
 
+  get flagDialogTitle(): string {
+    return this.hasFlagged ? 'Remove your flag?' : 'Flag this charity';
+  }
+
   closeFlagDialog() {
     this.showFlagDialog = false;
   }
@@ -192,12 +202,17 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   async report() {
     if (!this.charity) return;
     try {
-      await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
-      this.toast('Flag published to Nostr.', 'success', 3000);
+      if (this.hasFlagged) {
+        await this.nostr.publishUnreport(this.charity.pubkey);
+        this.toast('Flag removed from Nostr.', 'success', 3000);
+      } else {
+        await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
+        this.toast('Flag published to Nostr.', 'success', 3000);
+      }
       this.closeFlagDialog();
       await this.refreshCharity();
     } catch (e: any) {
-      this.toast(e?.message || 'Failed to publish flag.', 'error', 4000);
+      this.toast(e?.message || 'Failed to update flag.', 'error', 4000);
     }
   }
 

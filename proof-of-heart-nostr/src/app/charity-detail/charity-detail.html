@@ -121,9 +121,9 @@
               <i class="fa-solid fa-star"></i>
               <span>Rate</span>
             </button>
-            <button type="button" class="icon-action" (click)="openFlagDialog()" title="Flag charity">
-              <i class="fa-solid fa-flag"></i>
-              <span>Flag</span>
+            <button type="button" class="icon-action" (click)="openFlagDialog()" [title]="hasFlagged ? 'Remove your flag' : 'Flag charity'">
+              <i class="fa-solid" [class.fa-flag]="!hasFlagged" [class.fa-flag-checkered]="hasFlagged"></i>
+              <span>{{ hasFlagged ? 'Unflag' : 'Flag' }}</span>
             </button>
           </div>
         </div>
@@ -164,18 +164,22 @@
   @if (showFlagDialog) {
     <div class="dialog-overlay" (click)="closeFlagDialog()">
       <div class="dialog-card" (click)="$event.stopPropagation()">
-        <h3>Flag this charity</h3>
-        <label>Reason</label>
-        <select [(ngModel)]="reportReason" name="reportReason">
-          <option value="scam">Scam</option>
-          <option value="spam">Spam</option>
-          <option value="impersonation">Impersonation</option>
-        </select>
-        <label>Details</label>
-        <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
+        <h3>{{ flagDialogTitle }}</h3>
+        @if (!hasFlagged) {
+          <label>Reason</label>
+          <select [(ngModel)]="reportReason" name="reportReason">
+            <option value="scam">Scam</option>
+            <option value="spam">Spam</option>
+            <option value="impersonation">Impersonation</option>
+          </select>
+          <label>Details</label>
+          <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
+        } @else {
+          <p class="rating-selected">This will remove your previous flag for this charity.</p>
+        }
         <div class="dialog-actions">
           <button type="button" (click)="closeFlagDialog()">Cancel</button>
-          <button type="button" (click)="report()">Publish flag</button>
+          <button type="button" (click)="report()">{{ hasFlagged ? 'Remove flag' : 'Publish flag' }}</button>
         </div>
       </div>
     </div>

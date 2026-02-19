@@ -293,13 +293,59 @@ export class NostrService {
     const event = {
       kind: KIND_REPORT,
       created_at: Math.floor(Date.now() / 1000),
-      tags: [['p', targetPubkey, reason]],
+      tags: [
+        ['p', targetPubkey, reason],
+        ['d', `report:${targetPubkey}`],
+        ['report_state', '1']
+      ],
       content: note || `Report reason: ${reason}`
     };
 
     const signed = await window.nostr.signEvent(event);
     await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
+  }
+
+  async publishUnreport(targetPubkey: string): Promise<string> {
+    if (!window.nostr) throw new Error('No Nostr signer found.');
+    const relays = this.getWriteRelays();
+
+    const event = {
+      kind: KIND_REPORT,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['p', targetPubkey],
+        ['d', `report:${targetPubkey}`],
+        ['report_state', '0']
+      ],
+      content: 'Report withdrawn'
+    };
+
+    const signed = await window.nostr.signEvent(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
+    return signed.id;
+  }
+
+  async hasUserFlagged(targetPubkey: string, reporterPubkey: string): Promise<boolean> {
+    if (!targetPubkey || !reporterPubkey) return false;
+    const relays = this.getActiveRelays();
+    const reports = await this.pool.querySync(relays, {
+      kinds: [KIND_REPORT],
+      authors: [reporterPubkey],
+      '#p': [targetPubkey],
+      limit: 200
+    });
+
+    const latest = [...reports]
+      .sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0))[0] as any;
+
+    if (!latest) return false;
+
+    const stateTag = latest.tags?.find((t: string[]) => t[0] === 'report_state')?.[1];
+    if (stateTag === '0') return false;
+    if (stateTag === '1') return true;
+
+    return true;
   }
 
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
@@ -373,10 +419,24 @@ export class NostrService {
       if (!prev || (ev as any).created_at > prev.created_at) latestCharity.set((ev as any).pubkey, ev);
     }
 
-    const flagMap = new Map<string, Set<string>>();
+    const latestReportByReporterAndTarget = new Map<string, any>();
     for (const ev of reports as any[]) {
       const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
       if (!p) continue;
+      const key = `${ev.pubkey}:${p}`;
+      const prev = latestReportByReporterAndTarget.get(key);
+      if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) {
+        latestReportByReporterAndTarget.set(key, ev);
+      }
+    }
+
+    const flagMap = new Map<string, Set<string>>();
+    for (const ev of latestReportByReporterAndTarget.values()) {
+      const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
+      if (!p) continue;
+      const stateTag = ev.tags.find((t: string[]) => t[0] === 'report_state')?.[1];
+      const isFlagged = stateTag === '0' ? false : true;
+      if (!isFlagged) continue;
       if (!flagMap.has(p)) flagMap.set(p, new Set());
       flagMap.get(p)!.add(ev.pubkey);
     }
