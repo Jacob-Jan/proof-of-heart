@@ -62,6 +62,21 @@ const FLAG_HIDE_THRESHOLD = 3;
 export class NostrService {
   private pool = new SimplePool();
 
+  private async withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      promise
+        .then((value) => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  }
+
   async hasSigner(): Promise<boolean> {
     return typeof window !== 'undefined' && !!window.nostr;
   }
@@ -218,7 +233,11 @@ export class NostrService {
 
     let signed: any;
     try {
-      signed = await window.nostr.signEvent(event);
+      signed = await this.withTimeout(
+        window.nostr.signEvent(event),
+        20_000,
+        'Signer response'
+      );
       console.info('[PoH] publishCharityProfile:signed', { id: signed?.id, pubkey: signed?.pubkey });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:sign-failed', e);
@@ -226,7 +245,11 @@ export class NostrService {
     }
 
     try {
-      await Promise.any(this.pool.publish(relays, signed as any));
+      await this.withTimeout(
+        Promise.any(this.pool.publish(relays, signed as any)),
+        15_000,
+        'Relay publish acknowledgement'
+      );
       console.info('[PoH] publishCharityProfile:publish-accepted', { id: signed.id, relays });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:publish-failed', e);

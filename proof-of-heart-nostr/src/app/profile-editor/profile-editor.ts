@@ -54,6 +54,7 @@ export class ProfileEditorComponent implements OnInit {
 
   private existingModel: CharityExtraFields = {};
   loadingExisting = false;
+  saving = false;
   needsSignerForLoad = false;
   ownNpub: string | null = null;
   readonly categories = CHARITY_CATEGORIES;
@@ -114,6 +115,9 @@ export class ProfileEditorComponent implements OnInit {
   }
 
   async save() {
+    if (this.saving) return;
+    this.saving = true;
+
     try {
       const payload: CharityExtraFields = {
         ...this.existingModel,
@@ -126,7 +130,9 @@ export class ProfileEditorComponent implements OnInit {
       this.model = { ...payload };
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
-      this.toast(e.message || 'Failed to publish charity profile', 'error', 4500);
+      this.toast(e?.message || 'Failed to publish charity profile', 'error', 4500);
+    } finally {
+      this.saving = false;
     }
   }
 

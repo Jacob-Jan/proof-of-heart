@@ -49,7 +49,7 @@
       <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
 
       <div class="account-buttons">
-        <button mat-flat-button type="submit">Save profile</button>
+        <button mat-flat-button type="submit" [disabled]="saving">{{ saving ? 'Saving…' : 'Save profile' }}</button>
         @if (ownNpub) {
           <a [routerLink]="['/charities', ownNpub]">
             <button mat-stroked-button type="button">View profile</button>
