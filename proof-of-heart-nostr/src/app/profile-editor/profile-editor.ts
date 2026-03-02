@@ -125,6 +125,7 @@ export class ProfileEditorComponent implements OnInit {
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
 
+      this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
       const id = await this.nostr.publishCharityProfile(payload);
       this.existingModel = { ...payload };
       this.model = { ...payload };

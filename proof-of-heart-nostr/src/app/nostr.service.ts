@@ -222,20 +222,29 @@ export class NostrService {
     if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getWriteRelays();
 
+    const localPubkey = typeof window !== 'undefined'
+      ? (window.localStorage.getItem(LAST_PUBKEY_KEY) || undefined)
+      : undefined;
+
     const event = {
       kind: KIND_CHARITY_PROFILE,
       created_at: Math.floor(Date.now() / 1000),
       tags: [['d', 'proofofheart-charity-profile-v1']],
-      content: JSON.stringify(fields)
+      content: JSON.stringify(fields),
+      ...(localPubkey ? { pubkey: localPubkey } : {})
     };
 
-    console.info('[PoH] publishCharityProfile:start', { relays, event });
+    console.info('[PoH] publishCharityProfile:start', {
+      relays,
+      event,
+      userActivationActive: (navigator as any)?.userActivation?.isActive ?? null
+    });
 
     let signed: any;
     try {
       signed = await this.withTimeout(
         window.nostr.signEvent(event),
-        20_000,
+        60_000,
         'Signer response'
       );
       console.info('[PoH] publishCharityProfile:signed', { id: signed?.id, pubkey: signed?.pubkey });
