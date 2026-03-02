@@ -130,6 +130,7 @@ export class ProfileEditorComponent implements OnInit {
       this.model = { ...payload };
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
+      console.error('[PoH] profile-editor:save-failed', e);
       this.toast(e?.message || 'Failed to publish charity profile', 'error', 4500);
     } finally {
       this.saving = false;
