@@ -214,9 +214,49 @@ export class NostrService {
       content: JSON.stringify(fields)
     };
 
-    const signed = await window.nostr.signEvent(event);
-    await Promise.any(this.pool.publish(relays, signed as any));
-    return signed.id;
+    console.info('[PoH] publishCharityProfile:start', { relays, event });
+
+    let signed: any;
+    try {
+      signed = await window.nostr.signEvent(event);
+      console.info('[PoH] publishCharityProfile:signed', { id: signed?.id, pubkey: signed?.pubkey });
+    } catch (e: any) {
+      console.error('[PoH] publishCharityProfile:sign-failed', e);
+      throw new Error(`Signer could not sign charity profile event. ${e?.message || ''}`.trim());
+    }
+
+    try {
+      await Promise.any(this.pool.publish(relays, signed as any));
+      console.info('[PoH] publishCharityProfile:publish-accepted', { id: signed.id, relays });
+    } catch (e: any) {
+      console.error('[PoH] publishCharityProfile:publish-failed', e);
+      throw new Error('Signed profile event, but relays did not accept it. Try another relay/signer and retry.');
+    }
+
+    // Read-after-write verification to surface signer/relay issues explicitly.
+    const verifyStart = Date.now();
+    while (Date.now() - verifyStart < 10_000) {
+      try {
+        const found = await this.pool.querySync(relays, {
+          kinds: [KIND_CHARITY_PROFILE],
+          authors: [signed.pubkey],
+          '#d': ['proofofheart-charity-profile-v1'],
+          limit: 1
+        });
+
+        if (found.length > 0) {
+          console.info('[PoH] publishCharityProfile:verified', { id: signed.id });
+          return signed.id;
+        }
+      } catch (e) {
+        console.warn('[PoH] publishCharityProfile:verify-query-failed', e);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 700));
+    }
+
+    console.error('[PoH] publishCharityProfile:not-visible-after-timeout', { id: signed.id, relays });
+    throw new Error('Profile was signed, but not visible on app relays yet. Please retry in a few seconds or switch signer.');
   }
 
   async loadOwnCharityProfile(pubkey: string): Promise<CharityExtraFields | null> {
