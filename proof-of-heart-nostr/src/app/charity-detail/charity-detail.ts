@@ -414,7 +414,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         const zapRequest = {
           kind: 9734,
           created_at: Math.floor(Date.now() / 1000),
-          content: '',
+          content: `Proof of Heart zap request (optional): sign to attach Nostr zap metadata for ${sats} sats to ${this.charity?.name || 'this charity'}. Payment itself happens in your Lightning wallet via invoice/QR.`,
           pubkey: donorPubkey,
           tags: [
             ['relays', ...relays],
