@@ -243,12 +243,21 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       const invoice = await this.createZapInvoice(lightningAddress, sats);
       this.lastInvoice = invoice;
       await this.generateQr(invoice);
-      this.donationStatus = 'Invoice created. Opening your wallet…';
-      this.toast('Invoice ready. Trying to open your wallet…', 'info', 3000);
-      window.location.href = `lightning:${invoice}`;
-      if (!this.isLikelyMobile) {
+
+      const launched = await this.tryLaunchInvoice(invoice);
+
+      if (launched) {
+        this.donationStatus = 'Invoice created. Opening your wallet…';
+        this.toast('Invoice ready. Trying to open your wallet…', 'info', 3000);
+      } else {
+        this.donationStatus = 'Invoice ready. No lightning app handler detected in this browser. Use QR or copy invoice.';
+        this.toast('Invoice ready. Open with QR code or copy invoice.', 'info', 4500);
+      }
+
+      if (!this.isLikelyMobile || !launched) {
         this.showQrModal = true;
       }
+
       setTimeout(() => this.refreshCharity(), 4000);
     } catch (e: any) {
       this.donationStatus = e?.message || 'Could not create invoice.';
@@ -320,6 +329,30 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       });
     } catch {
       this.qrDataUrl = '';
+    }
+  }
+
+  private async tryLaunchInvoice(invoice: string): Promise<boolean> {
+    if (!invoice) return false;
+
+    const lightningUri = `lightning:${invoice}`;
+
+    try {
+      const webln = (window as any)?.webln;
+      if (webln?.enable && webln?.sendPayment) {
+        await webln.enable();
+        await webln.sendPayment(invoice);
+        return true;
+      }
+    } catch {
+      // ignore webln failures and fallback to URI launch
+    }
+
+    try {
+      window.location.href = lightningUri;
+      return true;
+    } catch {
+      return false;
     }
   }
 
