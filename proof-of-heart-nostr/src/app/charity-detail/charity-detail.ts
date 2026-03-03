@@ -415,6 +415,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           kind: 9734,
           created_at: Math.floor(Date.now() / 1000),
           content: '',
+          pubkey: donorPubkey,
           tags: [
             ['relays', ...relays],
             ['amount', String(amountMsat)],
@@ -423,6 +424,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         } as any;
 
         this.donationStatus = 'Waiting for signer approval… check extension popup.';
+        console.info('[PoH] donate:signer-request', {
+          hasSigner: !!window.nostr,
+          donorPubkey,
+          userActivationActive: (navigator as any)?.userActivation?.isActive ?? null,
+          amountMsat
+        });
+
         const signedZap = await this.withTimeout(signer.signEvent(zapRequest), 4_000, 'Signer approval');
 
         const callbackUrl = new URL(payParams.callback);
@@ -438,7 +446,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       try {
         // UX-first: do not block on signer. Whichever path returns first wins.
         return await Promise.any([fetchSignedZapInvoice(), fetchLnurlInvoice()]);
-      } catch {
+      } catch (e) {
+        console.warn('[PoH] donate:both-invoice-paths-failed, retrying lnurl', e);
         // fall through to final lnurl attempt
       }
     }
