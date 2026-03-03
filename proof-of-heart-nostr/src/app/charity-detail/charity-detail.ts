@@ -21,6 +21,21 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
   }
 
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      promise
+        .then((value) => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  }
+
   private route = inject(ActivatedRoute);
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
@@ -375,8 +390,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     let donorPubkey = this.visitorPubkey;
     if (!donorPubkey && window.nostr) {
-      donorPubkey = await window.nostr.getPublicKey();
-      this.visitorPubkey = donorPubkey;
+      try {
+        donorPubkey = await this.withTimeout(window.nostr.getPublicKey(), 8_000, 'Signer public key');
+        this.visitorPubkey = donorPubkey;
+      } catch {
+        // signer unavailable/slow; continue with lnurl fallback path
+      }
     }
 
     const relays = this.nostr.getActiveRelays();
@@ -392,14 +411,25 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } as any;
 
     if (donorPubkey && window.nostr) {
-      const signedZap = await window.nostr.signEvent(zapRequest);
-      const callbackUrl = new URL(payParams.callback);
-      callbackUrl.searchParams.set('amount', String(amountMsat));
-      callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
+      try {
+        this.donationStatus = 'Waiting for signer approval… check extension popup.';
 
-      const zapInvoiceRes = await fetch(callbackUrl.toString());
-      const zapInvoice = await zapInvoiceRes.json();
-      if (zapInvoice?.pr) return zapInvoice.pr;
+        const signedZap = await this.withTimeout(
+          window.nostr.signEvent(zapRequest),
+          12_000,
+          'Signer approval'
+        );
+
+        const callbackUrl = new URL(payParams.callback);
+        callbackUrl.searchParams.set('amount', String(amountMsat));
+        callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
+
+        const zapInvoiceRes = await fetch(callbackUrl.toString());
+        const zapInvoice = await zapInvoiceRes.json();
+        if (zapInvoice?.pr) return zapInvoice.pr;
+      } catch {
+        // If signer hangs/fails in browser extension, continue with regular LNURL invoice.
+      }
     }
 
     const callbackUrl = new URL(payParams.callback);
