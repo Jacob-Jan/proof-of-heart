@@ -78,8 +78,32 @@
     background: #f2f2f2;
     border: 1px solid #d9d9d9;
     border-radius: 999px;
-    padding: 4px 10px;
+    padding: 3px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     white-space: nowrap;
+
+    .relay-label {
+      padding: 0 4px;
+    }
+
+    .relay-toggle {
+      border: 1px solid #cfcfcf;
+      background: #ffffff;
+      color: #4f4f4f;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+
+      &.active {
+        background: #1f1f1f;
+        color: #fff;
+        border-color: #1f1f1f;
+      }
+    }
   }
 
   .menu {

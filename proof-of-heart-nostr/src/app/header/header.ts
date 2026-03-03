@@ -18,8 +18,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   isSignedInCharity = false;
+  relayMode: 'auto' | 'test' | 'prod' = 'auto';
 
   async ngOnInit(): Promise<void> {
+    this.relayMode = this.nostr.getRelayMode();
     await this.refreshCharityState();
 
     this.navSub = this.router.events.subscribe(async (event) => {
@@ -46,11 +48,16 @@ export class HeaderComponent implements OnInit, OnDestroy {
     return this.isSignedInCharity ? '/charity/profile' : '/charity/onboard';
   }
 
+  setRelayMode(mode: 'test' | 'prod'): void {
+    this.nostr.setRelayMode(mode);
+    this.relayMode = mode;
+  }
+
   get relayBadgeLabel() {
     const mode = this.nostr.getRelayMode();
     const active = this.nostr.getActiveRelays();
 
-    if (mode === 'test') return `Relay: TEST (${active[0] ?? 'n/a'})`;
+    if (mode === 'test') return `Relay: LOCAL (${active[0] ?? 'n/a'})`;
     if (mode === 'prod') return `Relay: PROD (${active[0] ?? 'n/a'})`;
 
     return `Relay: AUTO (${active[0] ?? 'n/a'})`;

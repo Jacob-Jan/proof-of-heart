@@ -23,7 +23,11 @@
   </div>
 
   @if (isLocalhost) {
-    <div class="relay-badge">{{ relayBadgeLabel }}</div>
+    <div class="relay-badge" role="group" aria-label="Relay mode toggle">
+      <span class="relay-label">{{ relayBadgeLabel }}</span>
+      <button type="button" class="relay-toggle" [class.active]="relayMode === 'test'" (click)="setRelayMode('test')">Local</button>
+      <button type="button" class="relay-toggle" [class.active]="relayMode === 'prod'" (click)="setRelayMode('prod')">Prod</button>
+    </div>
   }
 
   <nav class="menu">
