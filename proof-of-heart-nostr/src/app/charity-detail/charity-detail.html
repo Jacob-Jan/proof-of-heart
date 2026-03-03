@@ -104,9 +104,7 @@
               {{ donating ? 'Creating invoice…' : 'Zap / Donate now' }}
             </button>
             <p class="donation-help">After click, we open a payment dialog. You may get a signer popup for optional zap proof, then you can open wallet, show QR, or copy invoice.</p>
-            @if (donationStatus) {
-              <p class="donation-status">{{ donationStatus }}</p>
-            }
+            <!-- donation status is shown inside the donation dialog -->
             <!-- invoice actions moved into donation dialog -->
           </div>
 
