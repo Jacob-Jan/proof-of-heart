@@ -107,15 +107,7 @@
             @if (donationStatus) {
               <p class="donation-status">{{ donationStatus }}</p>
             }
-            @if (lastInvoice) {
-              <div class="invoice-box">
-                <small>{{ lastInvoice.slice(0, 40) }}…</small>
-                <div class="invoice-actions">
-                  <button type="button" (click)="openQrModal()">Show QR</button>
-                  <button type="button" (click)="copyInvoice()">Copy invoice</button>
-                </div>
-              </div>
-            }
+            <!-- invoice actions moved into donation dialog -->
           </div>
 
           <div class="actions-row">
@@ -193,25 +185,20 @@
         <h3>Complete your donation</h3>
         <p class="qr-help">{{ donationStatus || 'Preparing payment…' }}</p>
 
-        @if (showQrInDonateModal) {
+        @if (lastInvoice) {
           @if (qrDataUrl) {
             <img [src]="qrDataUrl" alt="Lightning invoice QR" />
           } @else {
             <p>QR preview unavailable in this browser. Use copy invoice.</p>
           }
-        }
-
-        @if (lastInvoice) {
           <small>{{ lastInvoice.slice(0, 40) }}…</small>
           <div class="qr-actions">
             <button type="button" (click)="openWalletAgain()">Open wallet</button>
-            <button type="button" (click)="openQrModal()">Show QR</button>
             <button type="button" (click)="copyInvoice()">Copy invoice</button>
           </div>
         } @else {
           <div class="qr-actions">
             <button type="button" disabled>Open wallet</button>
-            <button type="button" disabled>Show QR</button>
             <button type="button" disabled>Copy invoice</button>
           </div>
         }

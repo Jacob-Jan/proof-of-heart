@@ -70,7 +70,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   donationStatus = '';
   lastInvoice = '';
   showDonateModal = false;
-  showQrInDonateModal = false;
   qrDataUrl = '';
   readonly isLikelyMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
@@ -82,9 +81,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
   }
 
-  get canStartZap(): boolean {
-    return this.canDonate;
-  }
+  // single CTA flow uses canDonate directly
 
   get donationSats(): number {
     if (!this.donationInput || this.donationInput <= 0) return 0;
@@ -257,7 +254,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     this.showDonateModal = true;
-    this.showQrInDonateModal = false;
     this.lastInvoice = '';
     this.qrDataUrl = '';
     this.donating = true;
@@ -270,8 +266,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
       const launched = await this.tryLaunchInvoice(invoice);
       this.donationStatus = launched
-        ? 'Invoice ready. Wallet open attempted. If nothing opened, use the buttons below.'
-        : 'Invoice ready. Use Open wallet, Show QR, or Copy invoice.';
+        ? 'Invoice ready. Wallet open attempted. If nothing opened, use the options below.'
+        : 'Invoice ready. Use Open wallet or Copy invoice.';
+      if (!launched) {
+        this.toast('Could not open wallet automatically. Use QR or copy invoice.', 'info', 3500);
+      }
 
       setTimeout(() => this.refreshCharity(), 4000);
     } catch (e: any) {
@@ -328,12 +327,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   openQrModal() {
     if (!this.lastInvoice) return;
-    this.showQrInDonateModal = true;
+    this.showDonateModal = true;
   }
 
   closeQrModal() {
     this.showDonateModal = false;
-    this.showQrInDonateModal = false;
   }
 
   async openWalletAgain() {
