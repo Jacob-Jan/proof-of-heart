@@ -344,8 +344,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private async generateQr(invoice: string) {
     try {
-      const QRCode = await import('qrcode');
-      this.qrDataUrl = await QRCode.toDataURL(`lightning:${invoice}`, {
+      const qrModule: any = await import('qrcode');
+      const toDataURL = qrModule?.toDataURL || qrModule?.default?.toDataURL;
+      if (typeof toDataURL !== 'function') {
+        throw new Error('qrcode.toDataURL is unavailable in loaded module shape');
+      }
+
+      this.qrDataUrl = await toDataURL(`lightning:${invoice}`, {
         width: 320,
         margin: 1
       });
