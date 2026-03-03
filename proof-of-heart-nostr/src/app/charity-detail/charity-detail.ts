@@ -349,7 +349,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         width: 320,
         margin: 1
       });
-    } catch {
+    } catch (err) {
+      console.error('[PoH] QR generation failed', err);
       this.qrDataUrl = '';
     }
   }
