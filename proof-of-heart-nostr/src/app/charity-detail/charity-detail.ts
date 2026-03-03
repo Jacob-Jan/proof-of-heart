@@ -81,6 +81,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
   }
 
+  get canStartZap(): boolean {
+    return this.canDonate;
+  }
+
   get donationSats(): number {
     if (!this.donationInput || this.donationInput <= 0) return 0;
     if (this.donationMode === 'sats') return Math.round(this.donationInput);
@@ -236,7 +240,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
-  async donate() {
+  async zapDonate() {
+    await this.performDonation('zap');
+  }
+
+  async donateFast() {
+    await this.performDonation('fast');
+  }
+
+  private async performDonation(mode: 'zap' | 'fast') {
     if (!this.charity) return;
 
     const sats = this.donationSats;
@@ -252,24 +264,26 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     this.donating = true;
-    this.donationStatus = '';
+    this.donationStatus = mode === 'zap'
+      ? 'Starting zap flow… you may be asked to approve a signer prompt.'
+      : 'Creating donation invoice…';
 
     try {
-      const invoice = await this.createZapInvoice(lightningAddress, sats);
+      const invoice = await this.createZapInvoice(lightningAddress, sats, mode === 'zap');
       this.lastInvoice = invoice;
       await this.generateQr(invoice);
 
       const launched = await this.tryLaunchInvoice(invoice);
 
       if (launched) {
-        this.donationStatus = 'Invoice created. Opening your wallet…';
+        this.donationStatus = 'Invoice ready. Trying to open your wallet…';
         this.toast('Invoice ready. Trying to open your wallet…', 'info', 3000);
       } else {
         this.donationStatus = 'Invoice ready. No lightning app handler detected in this browser. Use QR or copy invoice.';
         this.toast('Invoice ready. Open with QR code or copy invoice.', 'info', 4500);
       }
 
-      if (!this.isLikelyMobile || !launched) {
+      if (!this.isLikelyMobile || !launched || mode === 'zap') {
         this.showQrModal = true;
       }
 
@@ -371,7 +385,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async createZapInvoice(lightningAddress: string, sats: number): Promise<string> {
+  private async createZapInvoice(lightningAddress: string, sats: number, preferZap: boolean): Promise<string> {
     const [name, domain] = lightningAddress.split('@');
     if (!name || !domain) throw new Error('Invalid lightning address format.');
 
@@ -407,7 +421,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (donorPubkey && window.nostr) {
+    const allowsZap = payParams?.allowsNostr === true && typeof payParams?.nostrPubkey === 'string' && payParams.nostrPubkey.length > 0;
+
+    if (preferZap && donorPubkey && window.nostr && allowsZap) {
       const signer = window.nostr;
       const fetchSignedZapInvoice = async (): Promise<string> => {
         const relays = this.nostr.getActiveRelays();
@@ -423,7 +439,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           ]
         } as any;
 
-        this.donationStatus = 'Waiting for signer approval… check extension popup.';
+        this.donationStatus = 'Approve zap signature in your Nostr signer (optional social proof)…';
         console.info('[PoH] donate:signer-request', {
           hasSigner: !!window.nostr,
           donorPubkey,
@@ -431,7 +447,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           amountMsat
         });
 
-        const signedZap = await this.withTimeout(signer.signEvent(zapRequest), 4_000, 'Signer approval');
+        const signedZap = await this.withTimeout(signer.signEvent(zapRequest), 8_000, 'Signer approval');
 
         const callbackUrl = new URL(payParams.callback);
         callbackUrl.searchParams.set('amount', String(amountMsat));
@@ -444,11 +460,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       };
 
       try {
-        // UX-first: do not block on signer. Whichever path returns first wins.
-        return await Promise.any([fetchSignedZapInvoice(), fetchLnurlInvoice()]);
+        return await fetchSignedZapInvoice();
       } catch (e) {
-        console.warn('[PoH] donate:both-invoice-paths-failed, retrying lnurl', e);
-        // fall through to final lnurl attempt
+        console.warn('[PoH] donate:zap-path-failed, fallback to lnurl', e);
+        this.donationStatus = 'Zap signature was not completed. You can still donate via regular invoice.';
       }
     }
 

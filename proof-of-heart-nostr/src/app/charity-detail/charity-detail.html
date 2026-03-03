@@ -100,10 +100,15 @@
               </button>
             </div>
             <p class="converted">{{ convertedHint }}</p>
-            <button type="button" class="donate-btn" (click)="donate()" [disabled]="!canDonate">
-              {{ donating ? 'Creating invoice…' : 'Zap / Donate now' }}
-            </button>
-            <p class="donation-help">If no wallet opens on desktop, use <strong>Show QR</strong> and scan with your phone wallet.</p>
+            <div class="donate-buttons">
+              <button type="button" class="donate-btn" (click)="zapDonate()" [disabled]="!canStartZap">
+                {{ donating ? 'Creating invoice…' : 'Zap (social proof)' }}
+              </button>
+              <button type="button" class="donate-btn secondary" (click)="donateFast()" [disabled]="!canDonate">
+                {{ donating ? 'Creating invoice…' : 'Donate (fast)' }}
+              </button>
+            </div>
+            <p class="donation-help">Zap asks your Nostr signer to approve a <strong>zap signature</strong> (optional social proof). Payment still happens in your Lightning wallet. If no wallet opens on desktop, use <strong>Show QR</strong>.</p>
             @if (donationStatus) {
               <p class="donation-status">{{ donationStatus }}</p>
             }

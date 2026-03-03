@@ -233,12 +233,24 @@
             color: #666;
           }
 
-          .donate-btn {
+          .donate-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
             margin-top: 10px;
+          }
+
+          .donate-btn {
             width: 100%;
             min-height: 42px;
             border-radius: 10px;
             font-weight: 600;
+
+            &.secondary {
+              background: #f5f5f5;
+              color: #333;
+              border: 1px solid #ddd;
+            }
 
             &:disabled {
               opacity: 0.65;
