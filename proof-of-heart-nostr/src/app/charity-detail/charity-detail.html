@@ -100,15 +100,10 @@
               </button>
             </div>
             <p class="converted">{{ convertedHint }}</p>
-            <div class="donate-buttons">
-              <button type="button" class="donate-btn" (click)="zapDonate()" [disabled]="!canStartZap">
-                {{ donating ? 'Creating invoice…' : 'Zap (social proof)' }}
-              </button>
-              <button type="button" class="donate-btn secondary" (click)="donateFast()" [disabled]="!canDonate">
-                {{ donating ? 'Creating invoice…' : 'Donate (fast)' }}
-              </button>
-            </div>
-            <p class="donation-help">Zap asks your Nostr signer to approve a <strong>zap signature</strong> (optional social proof). Payment still happens in your Lightning wallet. If no wallet opens on desktop, use <strong>Show QR</strong>.</p>
+            <button type="button" class="donate-btn" (click)="donate()" [disabled]="!canDonate">
+              {{ donating ? 'Creating invoice…' : 'Zap / Donate now' }}
+            </button>
+            <p class="donation-help">After click, we open a payment dialog. You may get a signer popup for optional zap proof, then you can open wallet, show QR, or copy invoice.</p>
             @if (donationStatus) {
               <p class="donation-status">{{ donationStatus }}</p>
             }
@@ -192,18 +187,36 @@
     </div>
   }
 
-  @if (showQrModal) {
+  @if (showDonateModal) {
     <div class="qr-overlay" (click)="closeQrModal()">
       <div class="qr-modal" (click)="$event.stopPropagation()">
-        <h3>Scan to pay</h3>
-        @if (qrDataUrl) {
-          <img [src]="qrDataUrl" alt="Lightning invoice QR" />
-        } @else {
-          <p>QR preview unavailable in this browser. Use copy invoice.</p>
+        <h3>Complete your donation</h3>
+        <p class="qr-help">{{ donationStatus || 'Preparing payment…' }}</p>
+
+        @if (showQrInDonateModal) {
+          @if (qrDataUrl) {
+            <img [src]="qrDataUrl" alt="Lightning invoice QR" />
+          } @else {
+            <p>QR preview unavailable in this browser. Use copy invoice.</p>
+          }
         }
-        <p class="qr-help">If your wallet did not open, scan this QR from your phone wallet.</p>
+
+        @if (lastInvoice) {
+          <small>{{ lastInvoice.slice(0, 40) }}…</small>
+          <div class="qr-actions">
+            <button type="button" (click)="openWalletAgain()">Open wallet</button>
+            <button type="button" (click)="openQrModal()">Show QR</button>
+            <button type="button" (click)="copyInvoice()">Copy invoice</button>
+          </div>
+        } @else {
+          <div class="qr-actions">
+            <button type="button" disabled>Open wallet</button>
+            <button type="button" disabled>Show QR</button>
+            <button type="button" disabled>Copy invoice</button>
+          </div>
+        }
+
         <div class="qr-actions">
-          <button type="button" (click)="copyInvoice()">Copy invoice</button>
           <button type="button" (click)="closeQrModal()">Close</button>
         </div>
       </div>

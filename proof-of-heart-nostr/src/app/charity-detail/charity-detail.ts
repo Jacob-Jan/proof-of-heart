@@ -69,7 +69,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   donating = false;
   donationStatus = '';
   lastInvoice = '';
-  showQrModal = false;
+  showDonateModal = false;
+  showQrInDonateModal = false;
   qrDataUrl = '';
   readonly isLikelyMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
@@ -240,15 +241,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
-  async zapDonate() {
-    await this.performDonation('zap');
-  }
-
-  async donateFast() {
-    await this.performDonation('fast');
-  }
-
-  private async performDonation(mode: 'zap' | 'fast') {
+  async donate() {
     if (!this.charity) return;
 
     const sats = this.donationSats;
@@ -263,29 +256,22 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.showDonateModal = true;
+    this.showQrInDonateModal = false;
+    this.lastInvoice = '';
+    this.qrDataUrl = '';
     this.donating = true;
-    this.donationStatus = mode === 'zap'
-      ? 'Starting zap flow… you may be asked to approve a signer prompt.'
-      : 'Creating donation invoice…';
+    this.donationStatus = 'Connecting to signer and creating zap invoice…';
 
     try {
-      const invoice = await this.createZapInvoice(lightningAddress, sats, mode === 'zap');
+      const invoice = await this.createZapInvoice(lightningAddress, sats, true);
       this.lastInvoice = invoice;
       await this.generateQr(invoice);
 
       const launched = await this.tryLaunchInvoice(invoice);
-
-      if (launched) {
-        this.donationStatus = 'Invoice ready. Trying to open your wallet…';
-        this.toast('Invoice ready. Trying to open your wallet…', 'info', 3000);
-      } else {
-        this.donationStatus = 'Invoice ready. No lightning app handler detected in this browser. Use QR or copy invoice.';
-        this.toast('Invoice ready. Open with QR code or copy invoice.', 'info', 4500);
-      }
-
-      if (!this.isLikelyMobile || !launched || mode === 'zap') {
-        this.showQrModal = true;
-      }
+      this.donationStatus = launched
+        ? 'Invoice ready. Wallet open attempted. If nothing opened, use the buttons below.'
+        : 'Invoice ready. Use Open wallet, Show QR, or Copy invoice.';
 
       setTimeout(() => this.refreshCharity(), 4000);
     } catch (e: any) {
@@ -342,11 +328,20 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   openQrModal() {
     if (!this.lastInvoice) return;
-    this.showQrModal = true;
+    this.showQrInDonateModal = true;
   }
 
   closeQrModal() {
-    this.showQrModal = false;
+    this.showDonateModal = false;
+    this.showQrInDonateModal = false;
+  }
+
+  async openWalletAgain() {
+    if (!this.lastInvoice) return;
+    const launched = await this.tryLaunchInvoice(this.lastInvoice);
+    if (!launched) {
+      this.toast('Could not trigger a lightning app. Use QR or copy invoice.', 'info', 3500);
+    }
   }
 
   private async generateQr(invoice: string) {
