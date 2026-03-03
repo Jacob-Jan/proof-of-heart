@@ -110,8 +110,9 @@ export class NostrService {
     if (mode === 'test') return TEST_RELAYS;
     if (mode === 'prod') return PROD_RELAYS;
 
-    // auto mode: localhost/dev -> test, everything else -> prod
-    return this.isLocalhostRuntime() ? TEST_RELAYS : PROD_RELAYS;
+    // auto mode defaults to production relays.
+    // Use explicit "test" mode when running a local relay on 127.0.0.1:7777.
+    return PROD_RELAYS;
   }
 
   /**
