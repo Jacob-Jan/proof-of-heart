@@ -388,37 +388,42 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       throw new Error('Amount is outside allowed range for this lightning address.');
     }
 
+    const fetchLnurlInvoice = async (): Promise<string> => {
+      const callbackUrl = new URL(payParams.callback);
+      callbackUrl.searchParams.set('amount', String(amountMsat));
+      const lnurlInvoiceRes = await fetch(callbackUrl.toString());
+      const lnurlInvoice = await lnurlInvoiceRes.json();
+      if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
+      return lnurlInvoice.pr;
+    };
+
     let donorPubkey = this.visitorPubkey;
     if (!donorPubkey && window.nostr) {
       try {
-        donorPubkey = await this.withTimeout(window.nostr.getPublicKey(), 8_000, 'Signer public key');
+        donorPubkey = await this.withTimeout(window.nostr.getPublicKey(), 2_500, 'Signer public key');
         this.visitorPubkey = donorPubkey;
       } catch {
-        // signer unavailable/slow; continue with lnurl fallback path
+        // signer unavailable/slow; continue with plain lnurl invoice
       }
     }
 
-    const relays = this.nostr.getActiveRelays();
-    const zapRequest = {
-      kind: 9734,
-      created_at: Math.floor(Date.now() / 1000),
-      content: '',
-      tags: [
-        ['relays', ...relays],
-        ['amount', String(amountMsat)],
-        ['p', this.charity!.pubkey]
-      ]
-    } as any;
-
     if (donorPubkey && window.nostr) {
-      try {
-        this.donationStatus = 'Waiting for signer approval… check extension popup.';
+      const signer = window.nostr;
+      const fetchSignedZapInvoice = async (): Promise<string> => {
+        const relays = this.nostr.getActiveRelays();
+        const zapRequest = {
+          kind: 9734,
+          created_at: Math.floor(Date.now() / 1000),
+          content: '',
+          tags: [
+            ['relays', ...relays],
+            ['amount', String(amountMsat)],
+            ['p', this.charity!.pubkey]
+          ]
+        } as any;
 
-        const signedZap = await this.withTimeout(
-          window.nostr.signEvent(zapRequest),
-          12_000,
-          'Signer approval'
-        );
+        this.donationStatus = 'Waiting for signer approval… check extension popup.';
+        const signedZap = await this.withTimeout(signer.signEvent(zapRequest), 4_000, 'Signer approval');
 
         const callbackUrl = new URL(payParams.callback);
         callbackUrl.searchParams.set('amount', String(amountMsat));
@@ -426,18 +431,19 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
         const zapInvoiceRes = await fetch(callbackUrl.toString());
         const zapInvoice = await zapInvoiceRes.json();
-        if (zapInvoice?.pr) return zapInvoice.pr;
+        if (!zapInvoice?.pr) throw new Error('No invoice returned by zap callback.');
+        return zapInvoice.pr;
+      };
+
+      try {
+        // UX-first: do not block on signer. Whichever path returns first wins.
+        return await Promise.any([fetchSignedZapInvoice(), fetchLnurlInvoice()]);
       } catch {
-        // If signer hangs/fails in browser extension, continue with regular LNURL invoice.
+        // fall through to final lnurl attempt
       }
     }
 
-    const callbackUrl = new URL(payParams.callback);
-    callbackUrl.searchParams.set('amount', String(amountMsat));
-    const lnurlInvoiceRes = await fetch(callbackUrl.toString());
-    const lnurlInvoice = await lnurlInvoiceRes.json();
-    if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
-    return lnurlInvoice.pr;
+    return fetchLnurlInvoice();
   }
 
   private updateSeo(charity: CharityProfile) {
