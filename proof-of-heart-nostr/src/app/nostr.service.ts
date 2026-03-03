@@ -52,6 +52,9 @@ const TEST_RELAYS = [
 const RELAY_MODE_KEY = 'poh_relay_mode'; // auto | test | prod
 const LAST_PUBKEY_KEY = 'poh_last_pubkey';
 const ONBOARDED_PUBKEYS_KEY = 'poh_onboarded_pubkeys';
+const PRIMAL_WS_URL = 'wss://cache2.primal.net/v1';
+const FOLLOWERS_CACHE_KEY = 'poh_followers_cache_v1';
+const FOLLOWERS_CACHE_TTL_MS = 10 * 60 * 1000;
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -411,6 +414,179 @@ export class NostrService {
     return true;
   }
 
+  private readFollowerCache(): Record<string, { value: number; ts: number }> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(FOLLOWERS_CACHE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (!parsed || typeof parsed !== 'object') return {};
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  private writeFollowerCache(cache: Record<string, { value: number; ts: number }>): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FOLLOWERS_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // ignore quota / storage errors
+    }
+  }
+
+  private extractFollowersCount(payload: any): number | null {
+    if (!payload || typeof payload !== 'object') return null;
+
+    const candidates = [
+      payload?.followers_count,
+      payload?.followersCount,
+      payload?.user?.followers_count,
+      payload?.user?.followersCount,
+      payload?.profile?.followers_count,
+      payload?.profile?.followersCount,
+      payload?.stats?.followers_count,
+      payload?.stats?.followersCount
+    ];
+
+    for (const value of candidates) {
+      const n = Number(value);
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
+
+    if (typeof payload.content === 'string') {
+      const nested = this.safeJson(payload.content);
+      const nestedCount = this.extractFollowersCount(nested);
+      if (nestedCount !== null) return nestedCount;
+    }
+
+    return null;
+  }
+
+  private async queryPrimalFollowerCount(pubkey: string, timeoutMs = 6_000): Promise<number | null> {
+    if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return null;
+
+    return new Promise<number | null>((resolve) => {
+      let settled = false;
+      let ws: WebSocket | null = null;
+
+      const finish = (value: number | null) => {
+        if (settled) return;
+        settled = true;
+        try {
+          ws?.close();
+        } catch {
+          // ignore
+        }
+        resolve(value);
+      };
+
+      const timer = setTimeout(() => finish(null), timeoutMs);
+
+      try {
+        ws = new WebSocket(PRIMAL_WS_URL);
+      } catch {
+        clearTimeout(timer);
+        finish(null);
+        return;
+      }
+
+      ws.onopen = () => {
+        try {
+          const req = ['REQ', `poh-profile-${pubkey.slice(0, 12)}-${Date.now()}`, {
+            cache: ['user_profile', { pubkey }]
+          }];
+          ws?.send(JSON.stringify(req));
+        } catch {
+          clearTimeout(timer);
+          finish(null);
+        }
+      };
+
+      ws.onmessage = (msg) => {
+        try {
+          const parsed = JSON.parse(String(msg.data));
+          if (Array.isArray(parsed)) {
+            const type = parsed[0];
+            if (type === 'EVENT' && parsed.length >= 3) {
+              const count = this.extractFollowersCount(parsed[2]);
+              if (count !== null) {
+                clearTimeout(timer);
+                finish(count);
+                return;
+              }
+            }
+            if (type === 'EOSE') {
+              clearTimeout(timer);
+              finish(null);
+              return;
+            }
+          }
+
+          const count = this.extractFollowersCount(parsed);
+          if (count !== null) {
+            clearTimeout(timer);
+            finish(count);
+          }
+        } catch {
+          // ignore parse failures and keep listening until timeout/eose
+        }
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timer);
+        finish(null);
+      };
+
+      ws.onclose = () => {
+        if (!settled) {
+          clearTimeout(timer);
+          finish(null);
+        }
+      };
+    });
+  }
+
+  private async loadStableFollowerCounts(pubkeys: string[], relayFollowerMap: Map<string, Set<string>>): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    const now = Date.now();
+    const cache = this.readFollowerCache();
+
+    const staleOrMissing: string[] = [];
+    for (const pubkey of pubkeys) {
+      const cached = cache[pubkey];
+      if (cached && Number.isFinite(cached.value) && (now - cached.ts) < FOLLOWERS_CACHE_TTL_MS) {
+        result.set(pubkey, Math.max(0, Math.floor(cached.value)));
+      } else {
+        staleOrMissing.push(pubkey);
+      }
+    }
+
+    if (!staleOrMissing.length) return result;
+
+    for (const pubkey of staleOrMissing) {
+      const primalCount = await this.queryPrimalFollowerCount(pubkey);
+      if (primalCount !== null) {
+        result.set(pubkey, primalCount);
+        cache[pubkey] = { value: primalCount, ts: now };
+        continue;
+      }
+
+      const fallback = relayFollowerMap.get(pubkey)?.size;
+      if (typeof fallback === 'number' && fallback >= 0) {
+        result.set(pubkey, fallback);
+      }
+
+      const previous = cache[pubkey];
+      if (!result.has(pubkey) && previous && Number.isFinite(previous.value)) {
+        result.set(pubkey, Math.max(0, Math.floor(previous.value)));
+      }
+    }
+
+    this.writeFollowerCache(cache);
+    return result;
+  }
+
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
     const appRelays = this.getActiveRelays();
     const kind0Relays = this.getKind0ReadRelays();
@@ -513,6 +689,8 @@ export class NostrService {
       }
     }
 
+    const stableFollowerCounts = await this.loadStableFollowerCounts(pubkeys, followerMap);
+
     const ratingMap = new Map<string, { total: number; count: number }>();
     for (const ev of ratings as any[]) {
       const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
@@ -557,7 +735,7 @@ export class NostrService {
         website: metadata?.website,
         lud16: metadata?.lud16,
         lud06: metadata?.lud06,
-        followers: followerMap.get(pubkey)?.size ?? 0,
+        followers: stableFollowerCounts.get(pubkey) ?? followerMap.get(pubkey)?.size ?? 0,
         flags,
         hidden: flags >= FLAG_HIDE_THRESHOLD,
         ratingAvg: rating.count ? rating.total / rating.count : 0,
