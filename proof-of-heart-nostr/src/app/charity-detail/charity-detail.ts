@@ -9,6 +9,8 @@ import { Meta, Title } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
+const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
+
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
@@ -384,13 +386,61 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async fetchJsonOrThrow(url: string): Promise<any> {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.reason || `Request failed (${res.status})`);
+    }
+    return data;
+  }
+
+  private isCorsLikeFetchError(err: unknown): boolean {
+    const msg = String((err as any)?.message || err || '').toLowerCase();
+    return msg.includes('failed to fetch') || msg.includes('networkerror');
+  }
+
+  private async loadPayParams(lightningAddress: string, name: string, domain: string): Promise<any> {
+    const directUrl = `https://${domain}/.well-known/lnurlp/${name}`;
+
+    try {
+      return await this.fetchJsonOrThrow(directUrl);
+    } catch (err) {
+      if (!this.isCorsLikeFetchError(err)) throw err;
+      console.warn('[PoH] lnurlp direct fetch failed, falling back to worker proxy', err);
+      const proxyUrl = `${LNURL_PROXY_BASE}/lnurlp?address=${encodeURIComponent(lightningAddress)}`;
+      return this.fetchJsonOrThrow(proxyUrl);
+    }
+  }
+
+  private async fetchInvoiceFromCallback(callbackUrl: URL): Promise<any> {
+    try {
+      return await this.fetchJsonOrThrow(callbackUrl.toString());
+    } catch (err) {
+      if (!this.isCorsLikeFetchError(err)) throw err;
+      console.warn('[PoH] lnurl callback direct fetch failed, falling back to worker proxy', err);
+
+      const proxyUrl = new URL(`${LNURL_PROXY_BASE}/callback`);
+      proxyUrl.searchParams.set('callback', callbackUrl.origin + callbackUrl.pathname);
+
+      const amount = callbackUrl.searchParams.get('amount');
+      if (amount) proxyUrl.searchParams.set('amount', amount);
+
+      const nostr = callbackUrl.searchParams.get('nostr');
+      if (nostr) proxyUrl.searchParams.set('nostr', nostr);
+
+      const comment = callbackUrl.searchParams.get('comment');
+      if (comment) proxyUrl.searchParams.set('comment', comment);
+
+      return this.fetchJsonOrThrow(proxyUrl.toString());
+    }
+  }
+
   private async createZapInvoice(lightningAddress: string, sats: number, preferZap: boolean): Promise<string> {
     const [name, domain] = lightningAddress.split('@');
     if (!name || !domain) throw new Error('Invalid lightning address format.');
 
-    const lnurlp = `https://${domain}/.well-known/lnurlp/${name}`;
-    const payParamsRes = await fetch(lnurlp);
-    const payParams = await payParamsRes.json();
+    const payParams = await this.loadPayParams(lightningAddress, name, domain);
 
     if (!payParams?.callback) {
       throw new Error('Lightning address does not expose a valid LNURL callback.');
@@ -404,8 +454,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const fetchLnurlInvoice = async (): Promise<string> => {
       const callbackUrl = new URL(payParams.callback);
       callbackUrl.searchParams.set('amount', String(amountMsat));
-      const lnurlInvoiceRes = await fetch(callbackUrl.toString());
-      const lnurlInvoice = await lnurlInvoiceRes.json();
+      const lnurlInvoice = await this.fetchInvoiceFromCallback(callbackUrl);
       if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
       return lnurlInvoice.pr;
     };
@@ -452,8 +501,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         callbackUrl.searchParams.set('amount', String(amountMsat));
         callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
 
-        const zapInvoiceRes = await fetch(callbackUrl.toString());
-        const zapInvoice = await zapInvoiceRes.json();
+        const zapInvoice = await this.fetchInvoiceFromCallback(callbackUrl);
         if (!zapInvoice?.pr) throw new Error('No invoice returned by zap callback.');
         return zapInvoice.pr;
       };
