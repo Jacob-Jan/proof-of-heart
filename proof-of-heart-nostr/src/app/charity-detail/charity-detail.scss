@@ -468,6 +468,28 @@
     width: 100%;
     padding: 20px;
     text-align: center;
+    position: relative;
+
+    .qr-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #e5e5e5;
+      background: #fafafa;
+      color: #666;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      &:hover {
+        background: #f0f0f0;
+        color: #222;
+      }
+    }
 
     h3 {
       margin: 2px 0 8px;

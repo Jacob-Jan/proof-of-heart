@@ -180,6 +180,9 @@
   @if (showDonateModal) {
     <div class="qr-overlay" (click)="closeQrModal()">
       <div class="qr-modal" (click)="$event.stopPropagation()">
+        <button type="button" class="qr-close" (click)="closeQrModal()" aria-label="Close dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
         <h3>Complete your donation</h3>
         <p class="qr-help">{{ donationStatus || 'Preparing payment…' }}</p>
 
@@ -201,9 +204,7 @@
           </div>
         }
 
-        <div class="qr-actions">
-          <button type="button" (click)="closeQrModal()">Close</button>
-        </div>
+        <!-- close moved to top-right icon button -->
       </div>
     </div>
   }
