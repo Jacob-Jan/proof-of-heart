@@ -240,6 +240,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
+  private donationErrorMessage(err: any): string {
+    const raw = String(err?.message || err || '').toLowerCase();
+
+    if (raw.includes('status 429') || raw.includes('429') || raw.includes('rate limit')) {
+      return 'The Lightning provider is temporarily rate limiting requests. Please retry in a few seconds.';
+    }
+
+    return err?.message || 'Could not create invoice.';
+  }
+
   async donate() {
     if (!this.charity) return;
 
@@ -276,8 +286,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
       setTimeout(() => this.refreshCharity(), 4000);
     } catch (e: any) {
-      this.donationStatus = e?.message || 'Could not create invoice.';
-      this.toast(this.donationStatus, 'error', 4500);
+      this.donationStatus = this.donationErrorMessage(e);
     } finally {
       this.donating = false;
     }
