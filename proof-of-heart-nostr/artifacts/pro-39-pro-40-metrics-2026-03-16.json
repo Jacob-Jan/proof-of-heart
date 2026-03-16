@@ -1,0 +1,50 @@
+{
+  "method": {
+    "description": "5-run relay query benchmark measuring kind 30078 fetch phase then kind 0 fetch/merge-input phase",
+    "command": "node --input-type=module (SimplePool.querySync over relay.damus/primal/nostr.wine/snort)",
+    "relaySet": [
+      "wss://relay.damus.io",
+      "wss://relay.primal.net",
+      "wss://nostr.wine",
+      "wss://relay.snort.social"
+    ]
+  },
+  "baseline": {
+    "params": {
+      "limit30078": 400,
+      "kind0Multiplier": 4
+    },
+    "stats": {
+      "pubkeys": { "avg": 4, "p50": 4, "p95": 4 },
+      "k30078Ms": { "avg": 737, "p50": 164, "p95": 3029 },
+      "k0Ms": { "avg": 362, "p50": 171, "p95": 1129 },
+      "totalMs": { "avg": 1099, "p50": 340, "p95": 4158 }
+    },
+    "runs": [
+      { "k30078": 3029, "k0": 1129, "total": 4158, "pubkeys": 2 },
+      { "k30078": 164, "k0": 177, "total": 341, "pubkeys": 4 },
+      { "k30078": 162, "k0": 167, "total": 329, "pubkeys": 4 },
+      { "k30078": 169, "k0": 171, "total": 340, "pubkeys": 4 },
+      { "k30078": 161, "k0": 166, "total": 327, "pubkeys": 4 }
+    ]
+  },
+  "after": {
+    "params": {
+      "limit30078": 250,
+      "kind0Multiplier": 2
+    },
+    "stats": {
+      "pubkeys": { "avg": 4, "p50": 4, "p95": 4 },
+      "k30078Ms": { "avg": 166, "p50": 165, "p95": 173 },
+      "k0Ms": { "avg": 182, "p50": 177, "p95": 216 },
+      "totalMs": { "avg": 347, "p50": 338, "p95": 382 }
+    },
+    "runs": [
+      { "k30078": 161, "k0": 177, "total": 338, "pubkeys": 4 },
+      { "k30078": 165, "k0": 169, "total": 334, "pubkeys": 4 },
+      { "k30078": 164, "k0": 169, "total": 333, "pubkeys": 4 },
+      { "k30078": 173, "k0": 177, "total": 350, "pubkeys": 4 },
+      { "k30078": 166, "k0": 216, "total": 382, "pubkeys": 4 }
+    ]
+  }
+}

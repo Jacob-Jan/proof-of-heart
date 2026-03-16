@@ -609,7 +609,9 @@ export class NostrService {
     const charityEvents = await this.pool.querySync(appRelays, {
       kinds: [KIND_CHARITY_PROFILE],
       '#d': ['proofofheart-charity-profile-v1'],
-      limit: limit * 4
+      // Keep an over-fetch buffer for relay duplicates, but avoid very high fan-out.
+      // This reduces 30078 fetch payload without changing selection semantics.
+      limit: Math.max(limit * 2, limit + 50)
     });
 
     const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
@@ -618,7 +620,9 @@ export class NostrService {
     const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
       authors: pubkeys,
-      limit: Math.max(limit * 4, pubkeys.length * 4)
+      // Same strategy as 30078: enough headroom for duplicates + replaceable history,
+      // while reducing load on large relay responses.
+      limit: Math.max(limit * 2, pubkeys.length * 2, 100)
     });
 
     const [reports, ratings, followers, zapReceipts] = await Promise.all([
