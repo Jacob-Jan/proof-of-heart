@@ -464,7 +464,7 @@ export class NostrService {
     return null;
   }
 
-  private async queryPrimalFollowerCount(pubkey: string, timeoutMs = 6_000): Promise<number | null> {
+  private async queryPrimalFollowerCount(pubkey: string, timeoutMs = 2_500): Promise<number | null> {
     if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return null;
 
     return new Promise<number | null>((resolve) => {
@@ -565,24 +565,38 @@ export class NostrService {
 
     if (!staleOrMissing.length) return result;
 
-    for (const pubkey of staleOrMissing) {
-      const primalCount = await this.queryPrimalFollowerCount(pubkey);
-      if (primalCount !== null) {
-        result.set(pubkey, primalCount);
-        cache[pubkey] = { value: primalCount, ts: now };
-        continue;
-      }
+    // Query follower counts concurrently instead of serially.
+    // Serial primal queries can make first-load charity rendering very slow.
+    const CONCURRENCY = 12;
+    const queue = [...staleOrMissing];
 
-      const fallback = relayFollowerMap.get(pubkey)?.size;
-      if (typeof fallback === 'number' && fallback >= 0) {
-        result.set(pubkey, fallback);
-      }
+    const worker = async () => {
+      while (queue.length > 0) {
+        const pubkey = queue.shift();
+        if (!pubkey) return;
 
-      const previous = cache[pubkey];
-      if (!result.has(pubkey) && previous && Number.isFinite(previous.value)) {
-        result.set(pubkey, Math.max(0, Math.floor(previous.value)));
+        const primalCount = await this.queryPrimalFollowerCount(pubkey);
+        if (primalCount !== null) {
+          result.set(pubkey, primalCount);
+          cache[pubkey] = { value: primalCount, ts: now };
+          continue;
+        }
+
+        const fallback = relayFollowerMap.get(pubkey)?.size;
+        if (typeof fallback === 'number' && fallback >= 0) {
+          result.set(pubkey, fallback);
+          continue;
+        }
+
+        const previous = cache[pubkey];
+        if (!result.has(pubkey) && previous && Number.isFinite(previous.value)) {
+          result.set(pubkey, Math.max(0, Math.floor(previous.value)));
+        }
       }
-    }
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, staleOrMissing.length) }, () => worker());
+    await Promise.all(workers);
 
     this.writeFollowerCache(cache);
     return result;
