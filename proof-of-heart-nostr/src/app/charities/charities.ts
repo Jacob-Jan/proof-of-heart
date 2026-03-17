@@ -25,6 +25,7 @@ export class CharitiesComponent implements OnInit {
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
   loading = true;
+  enrichmentLoaded = false;
 
   filter_name = '';
   filter_category = '';
@@ -37,6 +38,7 @@ export class CharitiesComponent implements OnInit {
 
   async reload() {
     this.loading = true;
+    this.enrichmentLoaded = false;
     try {
       // Fast path: render list as soon as kind 30078 + kind 0 are available.
       this.allCharities = await this.nostr.loadCharitiesFast(200);
@@ -46,16 +48,23 @@ export class CharitiesComponent implements OnInit {
       // Background enrichment: hydrate followers/ratings/flags/zaps after first paint.
       this.nostr.loadCharities(200)
         .then((full) => {
+          // Keep visual order stable to avoid UI reshuffle while enrichment arrives.
+          const order = new Map(this.allCharities.map((c, i) => [c.pubkey, i]));
+          full.sort((a, b) => (order.get(a.pubkey) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.pubkey) ?? Number.MAX_SAFE_INTEGER));
+
           this.allCharities = full;
+          this.enrichmentLoaded = true;
           this.applyFilters();
         })
         .catch((e) => {
           console.warn('Background charity enrichment failed', e);
+          this.enrichmentLoaded = true;
         });
     } catch (e) {
       console.error(e);
       this.toast('Failed to load charities from relays.', 'error', 4500);
       this.loading = false;
+      this.enrichmentLoaded = true;
     }
   }
 
