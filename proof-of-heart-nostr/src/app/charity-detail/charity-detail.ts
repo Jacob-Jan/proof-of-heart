@@ -50,6 +50,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   charity?: CharityProfile;
   loading = true;
   currentIdParam = '';
+  followersLoaded = false;
 
   rating = 5;
   ratingHover = 0;
@@ -145,8 +146,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
-    const applyCharity = async (found?: CharityProfile) => {
+    const applyCharity = async (found?: CharityProfile, enriched = false) => {
       this.charity = found;
+      if (enriched) this.followersLoaded = true;
       this.canEdit = !!this.charity
         && !!this.visitorPubkey
         && this.localCharitySignedIn
@@ -166,6 +168,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     };
 
+    this.followersLoaded = false;
+
     // Fast path: load minimal data first so detail page appears quickly.
     const fast = await this.nostr.loadCharitiesFast(300);
     const fastFound = fast.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
@@ -175,10 +179,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.nostr.loadCharities(300)
       .then(async (all) => {
         const fullFound = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
-        if (fullFound) await applyCharity(fullFound);
+        if (fullFound) {
+          await applyCharity(fullFound, true);
+        } else {
+          this.followersLoaded = true;
+        }
       })
       .catch((e) => {
         console.warn('Background charity detail enrichment failed', e);
+        this.followersLoaded = true;
       });
   }
 
