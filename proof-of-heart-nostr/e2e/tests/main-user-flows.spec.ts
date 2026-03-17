@@ -1,7 +1,21 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from '../support/app.po';
+import { seedLocalRelayCharity } from '../support/seed-local-relay';
+import { startLocalRelay } from '../support/local-relay';
 
 test.describe('Main user flows', () => {
+  let relayStop: (() => Promise<void>) | null = null;
+
+  test.beforeAll(async () => {
+    const relay = await startLocalRelay(7777);
+    relayStop = relay.stop;
+    await seedLocalRelayCharity();
+  });
+
+  test.afterAll(async () => {
+    await relayStop?.();
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem('poh_relay_mode', 'test');
@@ -18,9 +32,6 @@ test.describe('Main user flows', () => {
     await home.open();
     await home.waitForCharitiesToRender();
 
-    const count = await home.charities.count();
-    test.skip(count === 0, 'No local-relay charities available for search/filter assertion');
-
     const firstName = (await home.charities.first().locator('h2').textContent())?.trim() ?? '';
     expect(firstName.length).toBeGreaterThan(1);
 
@@ -32,9 +43,6 @@ test.describe('Main user flows', () => {
     const home = new HomePage(page);
     await home.open();
     await home.waitForCharitiesToRender();
-
-    const count = await home.charities.count();
-    test.skip(count === 0, 'No local-relay charities available for detail-route assertion');
 
     const firstCard = home.charities.first();
     await firstCard.click();
