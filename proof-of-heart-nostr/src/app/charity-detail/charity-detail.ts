@@ -117,8 +117,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.localCharitySignedIn = this.signerConnected && this.nostr.hasLocalOnboarding(this.visitorPubkey);
 
     await this.refreshCharity();
-    await this.loadBtcUsdRate();
     this.loading = false;
+
+    // Non-blocking: rate fetch should never delay profile rendering.
+    this.loadBtcUsdRate();
   }
 
   ngOnDestroy(): void {
@@ -143,25 +145,41 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
-    const all = await this.nostr.loadCharities(300);
-    this.charity = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
-    this.canEdit = !!this.charity
-      && !!this.visitorPubkey
-      && this.localCharitySignedIn
-      && this.charity.pubkey === this.visitorPubkey;
+    const applyCharity = async (found?: CharityProfile) => {
+      this.charity = found;
+      this.canEdit = !!this.charity
+        && !!this.visitorPubkey
+        && this.localCharitySignedIn
+        && this.charity.pubkey === this.visitorPubkey;
 
-    if (this.charity) {
-      if (this.visitorPubkey) {
-        this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
+      if (this.charity) {
+        if (this.visitorPubkey) {
+          this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
+        } else {
+          this.hasFlagged = false;
+        }
+        this.updateSeo(this.charity);
       } else {
-        this.hasFlagged = false;
+        this.title.setTitle('Charity not found | Proof of Heart');
+        this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
+        this.setCanonical('https://proofofheart.org/');
       }
-      this.updateSeo(this.charity);
-    } else {
-      this.title.setTitle('Charity not found | Proof of Heart');
-      this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
-      this.setCanonical('https://proofofheart.org/');
-    }
+    };
+
+    // Fast path: load minimal data first so detail page appears quickly.
+    const fast = await this.nostr.loadCharitiesFast(300);
+    const fastFound = fast.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
+    await applyCharity(fastFound);
+
+    // Background enrichment path: hydrate followers/ratings/flags/zaps without blocking first paint.
+    this.nostr.loadCharities(300)
+      .then(async (all) => {
+        const fullFound = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
+        if (fullFound) await applyCharity(fullFound);
+      })
+      .catch((e) => {
+        console.warn('Background charity detail enrichment failed', e);
+      });
   }
 
   openRateDialog() {
