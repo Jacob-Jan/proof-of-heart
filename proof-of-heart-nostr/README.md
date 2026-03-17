@@ -87,6 +87,34 @@ Optional env vars:
 - `SITE_URL` (default: `https://proofofheart.org`)
 - `SITEMAP_RELAYS` (comma-separated relay URLs)
 
+## End-to-end tests (Playwright)
+
+Install browser dependencies once:
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+Run E2E suite:
+
+```bash
+npm run e2e
+```
+
+Headed mode for debugging:
+
+```bash
+npm run e2e:headed
+```
+
+Covered flows:
+
+- Home load → charities visible
+- Search/filter charities
+- Open charity detail
+- Navigate static pages (mission/paper)
+- Charity onboarding entry flow (non-destructive; no publish action)
+
 ## Notes
 
 - This repository describes the current Nostr-based Proof of Heart app.
