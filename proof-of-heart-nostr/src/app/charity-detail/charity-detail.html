@@ -45,7 +45,7 @@
       }
       <span class="stat-chip">
         <i class="fa-solid fa-users"></i>
-        {{ charity.followers }} followers
+        {{ followersLoaded ? charity.followers : '...' }} followers
       </span>
       <span class="stat-chip">
         <i class="fa-solid fa-star"></i>

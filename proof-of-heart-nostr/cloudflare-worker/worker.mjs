@@ -7,6 +7,10 @@ const ALLOWED_HOSTS = new Set([
   'localhost:4200'
 ]);
 
+const CHARITIES_CACHE_URL = 'https://worker.internal/cache/charities';
+const CHARITIES_SNAPSHOT_URL = 'https://worker.internal/cache/charities-snapshot';
+const CACHE_CONTROL_SWR = 'public, max-age=60, stale-while-revalidate=300';
+
 function corsHeaders(origin) {
   const allowOrigin = origin && ALLOWED_HOSTS.has(new URL(origin).host) ? origin : '*';
   return {
@@ -37,6 +41,26 @@ function isSafeHostname(hostname) {
   return /^[a-z0-9.-]+$/i.test(hostname);
 }
 
+function parseSources(env) {
+  const raw = env?.CHARITY_AGGREGATION_SOURCES || '';
+  const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return parts.filter((value) => {
+    try {
+      const u = new URL(value);
+      return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  });
+}
+
+function normalizeCharities(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.charities)) return payload.charities;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
 async function fetchJson(url) {
   const res = await fetch(url.toString(), {
     method: 'GET',
@@ -60,8 +84,108 @@ async function fetchJson(url) {
   return data;
 }
 
+async function aggregateCharities(env) {
+  const sources = parseSources(env);
+  if (!sources.length) {
+    throw new Error('CHARITY_AGGREGATION_SOURCES is not configured');
+  }
+
+  const responses = await Promise.allSettled(
+    sources.map((source) => fetchJson(source))
+  );
+
+  const merged = [];
+  const seen = new Set();
+
+  for (const response of responses) {
+    if (response.status !== 'fulfilled') continue;
+    const rows = normalizeCharities(response.value);
+    for (const item of rows) {
+      const key = String(item?.pubkey || item?.npub || item?.id || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  if (!merged.length) {
+    throw new Error('No charities returned by aggregation sources');
+  }
+
+  return {
+    charities: merged,
+    fetchedAt: new Date().toISOString(),
+    sourceCount: sources.length
+  };
+}
+
+function withCacheHeaders(headers, cacheStatus) {
+  return {
+    ...headers,
+    'Cache-Control': CACHE_CONTROL_SWR,
+    'X-Cache-Status': cacheStatus
+  };
+}
+
+async function getCharitiesResponse(request, env, ctx, cors) {
+  const cache = caches.default;
+  const cacheKey = new Request(CHARITIES_CACHE_URL);
+  const snapshotKey = new Request(CHARITIES_SNAPSHOT_URL);
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const revalidate = async () => {
+      try {
+        const fresh = await aggregateCharities(env);
+        const freshRes = json(fresh, 200, withCacheHeaders(cors, 'REFRESHED'));
+        await cache.put(cacheKey, freshRes.clone());
+        await cache.put(snapshotKey, freshRes.clone());
+      } catch {
+        // keep stale cache and snapshot
+      }
+    };
+
+    ctx.waitUntil(revalidate());
+
+    const body = await cached.text();
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        ...withCacheHeaders(cors, 'HIT')
+      }
+    });
+  }
+
+  try {
+    const fresh = await aggregateCharities(env);
+    const freshRes = json(fresh, 200, withCacheHeaders(cors, 'MISS'));
+    ctx.waitUntil(cache.put(cacheKey, freshRes.clone()));
+    ctx.waitUntil(cache.put(snapshotKey, freshRes.clone()));
+    return freshRes;
+  } catch (error) {
+    const snapshot = await cache.match(snapshotKey);
+    if (snapshot) {
+      const body = await snapshot.text();
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          ...withCacheHeaders(cors, 'SNAPSHOT')
+        }
+      });
+    }
+
+    return json(
+      { status: 'ERROR', reason: error instanceof Error ? error.message : 'Failed to load charities' },
+      502,
+      cors
+    );
+  }
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const c = corsHeaders(origin);
 
@@ -74,6 +198,11 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // GET /api/charities
+    if (url.pathname === '/api/charities') {
+      return getCharitiesResponse(request, env, ctx, c);
+    }
 
     // GET /lnurlp?address=name@domain.tld
     if (url.pathname === '/lnurlp') {
@@ -133,6 +262,7 @@ export default {
     return json({
       ok: true,
       endpoints: {
+        charities: '/api/charities',
         lnurlp: '/lnurlp?address=name@domain.tld',
         callback: '/callback?callback=https://...&amount=1000[&nostr=JSON]'
       }

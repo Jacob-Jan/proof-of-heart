@@ -58,7 +58,7 @@
           </span>
           <span class="charity-meta">
             <i class="fa-solid fa-users"></i>
-            {{ charity.followers }} followers
+            {{ enrichmentLoaded ? charity.followers : '...' }} followers
           </span>
         </div>
       </div>
