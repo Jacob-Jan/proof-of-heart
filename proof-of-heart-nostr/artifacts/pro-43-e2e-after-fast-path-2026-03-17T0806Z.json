@@ -1,0 +1,23 @@
+{
+  "measuredAt": "2026-03-17T08:06:08.071Z",
+  "metric": "navigation start -> charities visible",
+  "cold": {
+    "avg": 1149,
+    "p50": 1131,
+    "p95": 1282,
+    "runs": [1282, 973, 1131, 1345, 1015]
+  },
+  "warm": {
+    "avg": 819,
+    "p50": 722,
+    "p95": 730,
+    "runs": [722, 1310, 695, 730, 640]
+  },
+  "change": {
+    "approach": "Two-phase charity loading: fast initial render from kind 30078 + kind 0, background enrichment for followers/ratings/flags/zaps",
+    "files": [
+      "src/app/nostr.service.ts",
+      "src/app/charities/charities.ts"
+    ]
+  }
+}

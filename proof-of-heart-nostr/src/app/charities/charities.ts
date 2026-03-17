@@ -38,12 +38,23 @@ export class CharitiesComponent implements OnInit {
   async reload() {
     this.loading = true;
     try {
-      this.allCharities = await this.nostr.loadCharities(200);
+      // Fast path: render list as soon as kind 30078 + kind 0 are available.
+      this.allCharities = await this.nostr.loadCharitiesFast(200);
       this.applyFilters();
+      this.loading = false;
+
+      // Background enrichment: hydrate followers/ratings/flags/zaps after first paint.
+      this.nostr.loadCharities(200)
+        .then((full) => {
+          this.allCharities = full;
+          this.applyFilters();
+        })
+        .catch((e) => {
+          console.warn('Background charity enrichment failed', e);
+        });
     } catch (e) {
       console.error(e);
       this.toast('Failed to load charities from relays.', 'error', 4500);
-    } finally {
       this.loading = false;
     }
   }

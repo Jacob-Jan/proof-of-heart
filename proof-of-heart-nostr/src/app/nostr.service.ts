@@ -602,6 +602,97 @@ export class NostrService {
     return result;
   }
 
+  async loadCharitiesFast(limit = 100): Promise<CharityProfile[]> {
+    const appRelays = this.getActiveRelays();
+    const kind0Relays = this.getKind0ReadRelays();
+
+    const charityEvents = await this.pool.querySync(appRelays, {
+      kinds: [KIND_CHARITY_PROFILE],
+      '#d': ['proofofheart-charity-profile-v1'],
+      limit: Math.max(limit * 2, limit + 50)
+    });
+
+    const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
+    if (!pubkeys.length) return [];
+
+    const profileEvents = await this.pool.querySync(kind0Relays, {
+      kinds: [0],
+      authors: pubkeys,
+      limit: Math.max(limit * 2, pubkeys.length * 2, 100)
+    });
+
+    const metadataByPubkey = new Map<string, any>();
+    const profileEventsByPubkey = new Map<string, any[]>();
+    for (const ev of profileEvents as any[]) {
+      const key = ev.pubkey;
+      const arr = profileEventsByPubkey.get(key) ?? [];
+      arr.push(ev);
+      profileEventsByPubkey.set(key, arr);
+    }
+
+    for (const [pubkey, events] of profileEventsByPubkey.entries()) {
+      const sorted = [...events].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      const merged: any = {};
+      for (const ev of sorted) {
+        const data = this.safeJson(ev.content || '{}');
+        for (const key of ['name', 'display_name', 'displayName', 'username', 'about', 'picture', 'website', 'lud16', 'lud06']) {
+          if ((merged[key] === undefined || merged[key] === null || merged[key] === '') && data[key] !== undefined && data[key] !== null && data[key] !== '') {
+            merged[key] = data[key];
+          }
+        }
+      }
+      metadataByPubkey.set(pubkey, merged);
+    }
+
+    const latestCharity = new Map<string, any>();
+    for (const ev of charityEvents) {
+      const prev = latestCharity.get((ev as any).pubkey);
+      if (!prev || (ev as any).created_at > prev.created_at) latestCharity.set((ev as any).pubkey, ev);
+    }
+
+    const charities: CharityProfile[] = [];
+
+    for (const [pubkey, charityEvent] of latestCharity.entries()) {
+      const metadata = metadataByPubkey.get(pubkey) || {};
+      const extra = this.safeJson(charityEvent.content) as CharityExtraFields;
+
+      const resolvedName = [
+        metadata?.display_name,
+        metadata?.displayName,
+        metadata?.name,
+        metadata?.username
+      ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
+
+      charities.push({
+        pubkey,
+        npub: nip19.npubEncode(pubkey),
+        name: resolvedName?.trim() || `Charity ${nip19.npubEncode(pubkey).slice(0, 14)}…`,
+        about: metadata?.about || '',
+        picture: metadata?.picture,
+        website: metadata?.website,
+        lud16: metadata?.lud16,
+        lud06: metadata?.lud06,
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        charity: {
+          shortDescription: extra?.shortDescription,
+          description: extra?.description,
+          country: extra?.country,
+          category: extra?.category,
+          donationMessage: extra?.donationMessage,
+          lightningAddress: extra?.lightningAddress,
+          isVisible: extra?.isVisible ?? true
+        }
+      });
+    }
+
+    return charities.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
     const appRelays = this.getActiveRelays();
     const kind0Relays = this.getKind0ReadRelays();
