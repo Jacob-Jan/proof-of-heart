@@ -1,0 +1,9 @@
+# Proof of Heart
+
+> Machine-readable charity data
+
+- Charity JSON feed: https://proofofheart.org/charities.json
+- Charity sitemap: https://proofofheart.org/sitemap-charities.xml
+- Sitemap index: https://proofofheart.org/sitemap.xml
+- Crawlable charity list: https://proofofheart.org/charity-list
+

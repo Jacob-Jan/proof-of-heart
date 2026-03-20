@@ -2,3 +2,8 @@ User-agent: *
 Allow: /
 
 Sitemap: https://proofofheart.org/sitemap.xml
+Sitemap: https://proofofheart.org/sitemap-charities.xml
+
+# Machine-readable feeds
+# https://proofofheart.org/charities.json
+# https://proofofheart.org/llms.txt

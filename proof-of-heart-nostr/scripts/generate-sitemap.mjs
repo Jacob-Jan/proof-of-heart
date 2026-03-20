@@ -28,7 +28,8 @@ const STATIC_ROUTES = [
   { path: '/bitcoin-charities', changefreq: 'weekly', priority: '0.8' },
   { path: '/bitcoin-donations', changefreq: 'weekly', priority: '0.8' },
   { path: '/proof-of-heart', changefreq: 'monthly', priority: '0.7' },
-  { path: '/partner', changefreq: 'monthly', priority: '0.6' }
+  { path: '/partner', changefreq: 'monthly', priority: '0.6' },
+  { path: '/charity-list', changefreq: 'daily', priority: '0.8' }
 ];
 
 const toIsoDay = (unixSeconds) => {
@@ -60,6 +61,34 @@ const makeUrlset = (entries) => {
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+};
+
+const makeCharityListHtml = (records) => {
+  const items = records
+    .map((c) => `<li><a href="${escapeXml(c.url)}">${escapeXml(c.name)}</a>${c.country ? ` — ${escapeXml(c.country)}` : ''}${c.category ? ` (${escapeXml(c.category)})` : ''}</li>`)
+    .join('\n');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proof of Heart Charity List</title>
+  <meta name="description" content="Static crawlable list of currently indexed charities on Proof of Heart." />
+  <link rel="canonical" href="${SITE_URL}/charity-list" />
+</head>
+<body>
+  <main>
+    <h1>Proof of Heart Charity List</h1>
+    <p>Static crawlable list generated at build time for crawler and LLM discoverability.</p>
+    <p><a href="${SITE_URL}/charities.json">Machine-readable JSON feed</a> · <a href="${SITE_URL}/sitemap-charities.xml">Charity sitemap</a></p>
+    <ul>
+${items}
+    </ul>
+  </main>
+</body>
+</html>
+`;
 };
 
 const makeSitemapIndex = (entries) => {
@@ -169,10 +198,26 @@ async function main() {
     { loc: `${SITE_URL}/sitemap-charities.xml`, lastmod: now }
   ]);
 
+  const charityListHtml = makeCharityListHtml(charityRecords);
+  const llmsTxt = `# Proof of Heart\n\n> Machine-readable charity data\n\n- Charity JSON feed: ${SITE_URL}/charities.json\n- Charity sitemap: ${SITE_URL}/sitemap-charities.xml\n- Sitemap index: ${SITE_URL}/sitemap.xml\n- Crawlable charity list: ${SITE_URL}/charity-list\n`;
+
+  const llmsFullTxt = [
+    '# Proof of Heart Charity Feed (full)',
+    `Generated: ${new Date().toISOString()}`,
+    '',
+    `Feed: ${SITE_URL}/charities.json`,
+    `Sitemap: ${SITE_URL}/sitemap-charities.xml`,
+    '',
+    ...charityRecords.map((c) => `- ${c.name} | ${c.url}`)
+  ].join('\n');
+
   await writeFile(path.join(PUBLIC_DIR, 'sitemap-static.xml'), staticXml, 'utf8');
   await writeFile(path.join(PUBLIC_DIR, 'sitemap-charities.xml'), charitiesXml, 'utf8');
   await writeFile(path.join(PUBLIC_DIR, 'sitemap.xml'), indexXml, 'utf8');
   await writeFile(path.join(PUBLIC_DIR, 'charities.json'), `${JSON.stringify(charityRecords, null, 2)}\n`, 'utf8');
+  await writeFile(path.join(PUBLIC_DIR, 'charity-list.html'), charityListHtml, 'utf8');
+  await writeFile(path.join(PUBLIC_DIR, 'llms.txt'), `${llmsTxt}\n`, 'utf8');
+  await writeFile(path.join(PUBLIC_DIR, 'llms-full.txt'), `${llmsFullTxt}\n`, 'utf8');
 
   console.log(`[sitemap] static urls: ${staticEntries.length}`);
   console.log(`[sitemap] charity urls: ${charityEntries.length}`);
