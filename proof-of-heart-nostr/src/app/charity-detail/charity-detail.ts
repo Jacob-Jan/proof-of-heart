@@ -554,11 +554,17 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private updateSeo(charity: CharityProfile) {
-    const title = `${charity.name} | Donate with Bitcoin on Proof of Heart`;
-    const description = (charity.charity.shortDescription || charity.about || `Donate to ${charity.name} with lightning or zaps.`)
-      .slice(0, 155);
+    const country = charity.charity.country?.trim();
+    const category = charity.charity.category?.trim();
+    const titleBits = [charity.name, category, country, 'Bitcoin Charity | Proof of Heart'].filter(Boolean);
+    const title = titleBits.join(' · ');
+    const description = (
+      charity.charity.shortDescription
+      || charity.about
+      || `Support ${charity.name}${country ? ` in ${country}` : ''}${category ? ` (${category})` : ''} with Bitcoin and Lightning donations.`
+    ).slice(0, 155);
     const canonical = `https://proofofheart.org/charities/${charity.npub}`;
-    const image = charity.picture || 'https://proofofheart.org/assets/logo.png';
+    const image = this.toAbsoluteAssetUrl(charity.picture) || 'https://proofofheart.org/assets/logo.png';
 
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
@@ -616,6 +622,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     script.text = JSON.stringify(jsonLdObject);
     this.doc.head.appendChild(script);
     this.jsonLdScriptElement = script;
+  }
+
+  private toAbsoluteAssetUrl(url?: string): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return `https://proofofheart.org${url}`;
+    return `https://proofofheart.org/${url}`;
   }
 
   private async loadBtcUsdRate() {

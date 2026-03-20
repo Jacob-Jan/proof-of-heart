@@ -78,7 +78,7 @@ const makeSitemapIndex = (entries) => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${nodes}\n</sitemapindex>\n`;
 };
 
-async function fetchCharityEvents() {
+async function fetchCharityRecords() {
   const pool = new SimplePool();
   try {
     const events = await pool.querySync(RELAYS, {
@@ -96,11 +96,12 @@ async function fetchCharityEvents() {
       }
     }
 
-    const result = [];
+    const records = [];
     for (const event of latestByPubkey.values()) {
+      let parsed = {};
       let isVisible = true;
       try {
-        const parsed = JSON.parse(event.content || '{}');
+        parsed = JSON.parse(event.content || '{}');
         if (typeof parsed?.isVisible === 'boolean') isVisible = parsed.isVisible;
       } catch {
         // keep default
@@ -114,16 +115,23 @@ async function fetchCharityEvents() {
         continue;
       }
 
-      result.push({
-        loc: `${SITE_URL}/charities/${npub}`,
-        lastmod: toIsoDay(event.created_at),
-        changefreq: 'daily',
-        priority: '0.8'
+      const profile = parsed || {};
+      records.push({
+        pubkey: event.pubkey,
+        npub,
+        url: `${SITE_URL}/charities/${npub}`,
+        name: String(profile?.name || '').trim() || `Charity ${npub}`,
+        country: String(profile?.country || '').trim() || null,
+        category: String(profile?.category || '').trim() || null,
+        shortDescription: String(profile?.shortDescription || profile?.description || '').trim() || null,
+        image: String(profile?.picture || '').trim() || `${SITE_URL}/assets/logo.png`,
+        updatedAt: event.created_at ? new Date(event.created_at * 1000).toISOString() : null,
+        updatedDay: toIsoDay(event.created_at)
       });
     }
 
-    result.sort((a, b) => a.loc.localeCompare(b.loc));
-    return result;
+    records.sort((a, b) => a.url.localeCompare(b.url));
+    return records;
   } finally {
     pool.close(RELAYS);
   }
@@ -138,13 +146,20 @@ async function main() {
     priority: r.priority
   }));
 
-  let charityEntries = [];
+  let charityRecords = [];
   try {
-    charityEntries = await fetchCharityEvents();
+    charityRecords = await fetchCharityRecords();
   } catch (err) {
     console.warn('[sitemap] failed to fetch charity events from relays; proceeding with static sitemap only.');
     console.warn(err?.message || err);
   }
+
+  const charityEntries = charityRecords.map((c) => ({
+    loc: c.url,
+    lastmod: c.updatedDay,
+    changefreq: 'daily',
+    priority: '0.8'
+  }));
 
   const staticXml = makeUrlset(staticEntries);
   const charitiesXml = makeUrlset(charityEntries);
@@ -156,10 +171,12 @@ async function main() {
   await writeFile(path.join(PUBLIC_DIR, 'sitemap-static.xml'), staticXml, 'utf8');
   await writeFile(path.join(PUBLIC_DIR, 'sitemap-charities.xml'), charitiesXml, 'utf8');
   await writeFile(path.join(PUBLIC_DIR, 'sitemap.xml'), indexXml, 'utf8');
+  await writeFile(path.join(PUBLIC_DIR, 'charities.json'), `${JSON.stringify(charityRecords, null, 2)}\n`, 'utf8');
 
   console.log(`[sitemap] static urls: ${staticEntries.length}`);
   console.log(`[sitemap] charity urls: ${charityEntries.length}`);
   console.log('[sitemap] wrote public/sitemap.xml + child sitemaps');
+  console.log('[sitemap] wrote public/charities.json');
 }
 
 main().catch((err) => {

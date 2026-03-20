@@ -87,6 +87,39 @@ export const routes: Routes = [
     title: 'Partner | Proof of Heart'
   },
   {
+    path: 'charities/discover',
+    loadComponent: () => import('./static/geo-landing-page').then(m => m.GeoLandingPageComponent),
+    title: 'Discover Bitcoin Charities by Country and Category | Proof of Heart',
+    data: {
+      seo: {
+        description: 'Browse Bitcoin charities by country and category to improve geo discoverability and matching donor intent.',
+        canonicalPath: '/charities/discover'
+      }
+    }
+  },
+  {
+    path: 'charities/country/:slug',
+    loadComponent: () => import('./static/geo-landing-page').then(m => m.GeoLandingPageComponent),
+    title: 'Bitcoin Charities by Country | Proof of Heart',
+    data: {
+      seo: {
+        description: 'Country-focused route for discovering Bitcoin charities on Proof of Heart.',
+        canonicalPath: '/charities/discover'
+      }
+    }
+  },
+  {
+    path: 'charities/category/:slug',
+    loadComponent: () => import('./static/geo-landing-page').then(m => m.GeoLandingPageComponent),
+    title: 'Bitcoin Charities by Category | Proof of Heart',
+    data: {
+      seo: {
+        description: 'Category-focused route for discovering Bitcoin charities on Proof of Heart.',
+        canonicalPath: '/charities/discover'
+      }
+    }
+  },
+  {
     path: 'admin',
     loadComponent: () => import('./admin-insights/admin-insights').then(m => m.AdminInsightsComponent),
     title: 'Admin Insights | Proof of Heart'

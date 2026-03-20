@@ -169,8 +169,11 @@ export class CharitiesComponent implements OnInit, OnDestroy {
           item: {
             '@type': 'NGO',
             name: c.name,
+            url: `https://proofofheart.org/charities/${c.npub}`,
             description: c.charity.shortDescription || c.about || '',
-            image: c.picture || undefined
+            image: c.picture || 'https://proofofheart.org/assets/logo.png',
+            areaServed: c.charity.country ? { '@type': 'Country', name: c.charity.country } : undefined,
+            sameAs: c.website ? [c.website] : undefined
           }
         }))
       }

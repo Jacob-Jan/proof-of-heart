@@ -75,6 +75,7 @@ Build now generates sitemaps first (deploy-time refresh):
 - `public/sitemap.xml` (sitemap index)
 - `public/sitemap-static.xml` (fixed pages)
 - `public/sitemap-charities.xml` (dynamic charity pages from kind `30078`)
+- `public/charities.json` (machine-readable charity feed generated at build time)
 
 You can also generate only sitemaps:
 
@@ -86,6 +87,21 @@ Optional env vars:
 
 - `SITE_URL` (default: `https://proofofheart.org`)
 - `SITEMAP_RELAYS` (comma-separated relay URLs)
+
+### `public/charities.json` schema
+
+Each record includes:
+
+- `pubkey` (hex)
+- `npub` (bech32 public key)
+- `url` (stable canonical profile URL)
+- `name`
+- `country` (nullable)
+- `category` (nullable)
+- `shortDescription` (nullable)
+- `image` (absolute URL)
+- `updatedAt` (ISO timestamp, nullable)
+- `updatedDay` (`YYYY-MM-DD`, nullable)
 
 ## End-to-end tests (Playwright)
 
