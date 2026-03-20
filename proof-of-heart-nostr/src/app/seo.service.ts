@@ -44,6 +44,7 @@ export class SeoService {
     const canonicalPath = seoData.canonicalPath ?? this.router.url.split('?')[0];
     this.setCanonical(canonicalPath);
     this.setHreflang(canonicalPath);
+    this.setCharityFeedAlternate();
   }
 
   private setCanonical(path: string): void {
@@ -72,6 +73,19 @@ export class SeoService {
       this.document.head.appendChild(linkEl);
     }
     linkEl.setAttribute('href', href);
+  }
+
+  private setCharityFeedAlternate(): void {
+    const href = this.toAbsolute('/charities.json');
+    let linkEl = this.document.head.querySelector('link[rel="alternate"][type="application/json"][href$="/charities.json"]') as HTMLLinkElement | null;
+    if (!linkEl) {
+      linkEl = this.document.createElement('link');
+      linkEl.setAttribute('rel', 'alternate');
+      linkEl.setAttribute('type', 'application/json');
+      this.document.head.appendChild(linkEl);
+    }
+    linkEl.setAttribute('href', href);
+    linkEl.setAttribute('title', 'Proof of Heart charity data feed');
   }
 
   private toAbsolute(path: string): string {
