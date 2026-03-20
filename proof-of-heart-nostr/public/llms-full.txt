@@ -1,10 +1,10 @@
 # Proof of Heart Charity Feed (full)
-Generated: 2026-03-20T12:21:16.630Z
+Generated: 2026-03-20T12:47:21.523Z
 
 Feed: https://proofofheart.org/charities.json
 Sitemap: https://proofofheart.org/sitemap-charities.xml
 
-- Charity npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3 | https://proofofheart.org/charities/npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3
-- Charity npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp | https://proofofheart.org/charities/npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp
-- Charity npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0 | https://proofofheart.org/charities/npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0
-- Charity npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec | https://proofofheart.org/charities/npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec
+- My First Bitcoin | https://proofofheart.org/charities/npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3
+- Bitcoin In The Wild | https://proofofheart.org/charities/npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp
+- Proof of Heart | https://proofofheart.org/charities/npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0
+- BitcoinEkasi | https://proofofheart.org/charities/npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec
