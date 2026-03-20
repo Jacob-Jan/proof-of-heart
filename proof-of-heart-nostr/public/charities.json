@@ -1,5 +1,41 @@
 [
   {
+    "pubkey": "f609d58b4253458768d9baf1b28ab4dfb5f6e690d99bb2760c83de3a840c3ea2",
+    "npub": "npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
+    "url": "https://proofofheart.org/charities/npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
+    "name": "Charity npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
+    "country": null,
+    "category": null,
+    "shortDescription": null,
+    "image": "https://proofofheart.org/assets/logo.png",
+    "updatedAt": "2026-03-02T22:02:42.000Z",
+    "updatedDay": "2026-03-02"
+  },
+  {
+    "pubkey": "bf82afa43acd19d1afd84093ab38acad4b9db86db3013c093698ddae597ad1ba",
+    "npub": "npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp",
+    "url": "https://proofofheart.org/charities/npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp",
+    "name": "Charity npub1h7p2lfp6e5vart7cgzf6kw9v449emwrdkvqnczfknrw6ukt66xaqee38qp",
+    "country": "Belgium",
+    "category": "Animal Welfare & Environment",
+    "shortDescription": "Funding the Future of Wildlife Conservation & Educating the Next Generation\n\n 🌍 LNaddress⚡️ donate@bitcoininthewild.org",
+    "image": "https://proofofheart.org/assets/logo.png",
+    "updatedAt": "2026-03-10T07:37:16.000Z",
+    "updatedDay": "2026-03-10"
+  },
+  {
+    "pubkey": "1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d",
+    "npub": "npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0",
+    "url": "https://proofofheart.org/charities/npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0",
+    "name": "Charity npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0",
+    "country": "Netherlands",
+    "category": "Technology & Innovation",
+    "shortDescription": "The internet made giving global. Bitcoin fixes the money. Proof of Heart lets you find authentic charities and donate directly, no intermediaries.",
+    "image": "https://proofofheart.org/assets/logo.png",
+    "updatedAt": "2026-03-02T21:51:19.000Z",
+    "updatedDay": "2026-03-02"
+  },
+  {
     "pubkey": "1586fd57ac81b66177b0087bb0c0fa465f30b9895949c8936836ec5e6cd13132",
     "npub": "npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
     "url": "https://proofofheart.org/charities/npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
