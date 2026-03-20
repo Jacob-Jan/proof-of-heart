@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "sitemap:generate": "node scripts/generate-sitemap.mjs",
+    "seo:validate-structured-data": "node scripts/validate-structured-data.mjs",
     "build": "npm run sitemap:generate && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

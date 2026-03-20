@@ -1,5 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -14,13 +14,16 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   templateUrl: './charities.html',
   styleUrl: './charities.scss'
 })
-export class CharitiesComponent implements OnInit {
+export class CharitiesComponent implements OnInit, OnDestroy {
   private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
   }
   private nostr = inject(NostrService);
   private router = inject(Router);
   private snack = inject(MatSnackBar);
+  private doc = inject(DOCUMENT);
+
+  private jsonLdScriptElement?: HTMLScriptElement;
 
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
@@ -36,6 +39,13 @@ export class CharitiesComponent implements OnInit {
     await this.reload();
   }
 
+  ngOnDestroy(): void {
+    if (this.jsonLdScriptElement) {
+      this.doc.head.removeChild(this.jsonLdScriptElement);
+      this.jsonLdScriptElement = undefined;
+    }
+  }
+
   async reload() {
     this.loading = true;
     this.enrichmentLoaded = false;
@@ -43,6 +53,7 @@ export class CharitiesComponent implements OnInit {
       // Fast path: render list as soon as kind 30078 + kind 0 are available.
       this.allCharities = await this.nostr.loadCharitiesFast(200);
       this.applyFilters();
+      this.updateHomeJsonLd();
       this.loading = false;
 
       // Background enrichment: hydrate followers/ratings/flags/zaps after first paint.
@@ -55,6 +66,7 @@ export class CharitiesComponent implements OnInit {
           this.allCharities = full;
           this.enrichmentLoaded = true;
           this.applyFilters();
+          this.updateHomeJsonLd();
         })
         .catch((e) => {
           console.warn('Background charity enrichment failed', e);
@@ -129,5 +141,48 @@ export class CharitiesComponent implements OnInit {
 
   goToCharity(pubkey: string) {
     this.router.navigate(['/charities', pubkey]);
+  }
+
+  private updateHomeJsonLd() {
+    if (this.jsonLdScriptElement) {
+      this.doc.head.removeChild(this.jsonLdScriptElement);
+      this.jsonLdScriptElement = undefined;
+    }
+
+    const visible = this.allCharities
+      .filter(c => c.charity.isVisible !== false)
+      .filter(c => !c.hidden)
+      .slice(0, 50);
+
+    const jsonLdObject = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Proof of Heart — Bitcoin charities',
+      url: 'https://proofofheart.org/',
+      hasPart: {
+        '@type': 'ItemList',
+        numberOfItems: visible.length,
+        itemListElement: visible.map((c, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          url: `https://proofofheart.org/charities/${c.npub}`,
+          item: {
+            '@type': 'NGO',
+            name: c.name,
+            url: `https://proofofheart.org/charities/${c.npub}`,
+            description: c.charity.shortDescription || c.about || '',
+            image: c.picture || 'https://proofofheart.org/assets/logo.png',
+            areaServed: c.charity.country ? { '@type': 'Country', name: c.charity.country } : undefined,
+            sameAs: c.website ? [c.website] : undefined
+          }
+        }))
+      }
+    };
+
+    const script = this.doc.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify(jsonLdObject);
+    this.doc.head.appendChild(script);
+    this.jsonLdScriptElement = script;
   }
 }
