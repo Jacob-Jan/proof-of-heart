@@ -11,6 +11,7 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 
 const SITE_URL = process.env.SITE_URL || 'https://proofofheart.org';
 const KIND_CHARITY_PROFILE = 30078;
+const KIND_PROFILE_METADATA = 0;
 const D_TAG = 'proofofheart-charity-profile-v1';
 
 const RELAYS = (process.env.SITEMAP_RELAYS
@@ -31,6 +32,13 @@ const STATIC_ROUTES = [
   { path: '/partner', changefreq: 'monthly', priority: '0.6' },
   { path: '/charity-list', changefreq: 'daily', priority: '0.8' }
 ];
+
+const pickFirstNonEmpty = (...values) => {
+  for (const v of values) {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+};
 
 const toIsoDay = (unixSeconds) => {
   if (!unixSeconds) return undefined;
@@ -126,6 +134,25 @@ async function fetchCharityRecords() {
       }
     }
 
+    const pubkeys = [...latestByPubkey.keys()];
+
+    // Pull kind:0 metadata and merge like app logic does (prefer real profile fields over fallbacks).
+    const kind0Events = pubkeys.length
+      ? await pool.querySync(RELAYS, {
+          kinds: [KIND_PROFILE_METADATA],
+          authors: pubkeys,
+          limit: Math.max(100, pubkeys.length * 3)
+        })
+      : [];
+
+    const latestKind0ByPubkey = new Map();
+    for (const event of kind0Events) {
+      const prev = latestKind0ByPubkey.get(event.pubkey);
+      if (!prev || (event.created_at || 0) > (prev.created_at || 0)) {
+        latestKind0ByPubkey.set(event.pubkey, event);
+      }
+    }
+
     const records = [];
     for (const event of latestByPubkey.values()) {
       let parsed = {};
@@ -145,16 +172,39 @@ async function fetchCharityRecords() {
         continue;
       }
 
+      let kind0 = {};
+      const k0Event = latestKind0ByPubkey.get(event.pubkey);
+      if (k0Event) {
+        try {
+          kind0 = JSON.parse(k0Event.content || '{}');
+        } catch {
+          kind0 = {};
+        }
+      }
+
       const profile = parsed || {};
+      const displayName = pickFirstNonEmpty(
+        profile?.name,
+        profile?.display_name,
+        profile?.displayName,
+        kind0?.display_name,
+        kind0?.displayName,
+        kind0?.name,
+        kind0?.username
+      );
+
+      const image = pickFirstNonEmpty(profile?.picture, kind0?.picture);
+      const about = pickFirstNonEmpty(profile?.shortDescription, profile?.description, kind0?.about);
+
       records.push({
         pubkey: event.pubkey,
         npub,
         url: `${SITE_URL}/charities/${npub}`,
-        name: String(profile?.name || '').trim() || `Charity ${npub}`,
-        country: String(profile?.country || '').trim() || null,
-        category: String(profile?.category || '').trim() || null,
-        shortDescription: String(profile?.shortDescription || profile?.description || '').trim() || null,
-        image: String(profile?.picture || '').trim() || `${SITE_URL}/assets/logo.png`,
+        name: displayName || `Charity ${npub}`,
+        country: pickFirstNonEmpty(profile?.country) || null,
+        category: pickFirstNonEmpty(profile?.category) || null,
+        shortDescription: about || null,
+        image: image || `${SITE_URL}/assets/logo.png`,
         updatedAt: event.created_at ? new Date(event.created_at * 1000).toISOString() : null,
         updatedDay: toIsoDay(event.created_at)
       });
