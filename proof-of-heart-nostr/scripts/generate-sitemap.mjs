@@ -81,15 +81,16 @@ const makeSitemapIndex = (entries) => {
 async function fetchCharityRecords() {
   const pool = new SimplePool();
   try {
+    // Match homepage discovery path exactly: query with #d directly.
+    // Generic kind queries can under-return/over-return different replaceable variants.
     const events = await pool.querySync(RELAYS, {
       kinds: [KIND_CHARITY_PROFILE],
-      limit: 5000
+      '#d': [D_TAG],
+      limit: 800
     });
 
     const latestByPubkey = new Map();
     for (const event of events) {
-      const dTag = (event.tags || []).find((t) => t?.[0] === 'd')?.[1];
-      if (dTag !== D_TAG) continue;
       const prev = latestByPubkey.get(event.pubkey);
       if (!prev || (event.created_at || 0) > (prev.created_at || 0)) {
         latestByPubkey.set(event.pubkey, event);
