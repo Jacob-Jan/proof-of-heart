@@ -38,6 +38,11 @@ export interface CharityExtraFields {
   isVisible?: boolean;
 }
 
+export interface CharityLoadResult {
+  charities: CharityProfile[];
+  fromCache: boolean;
+}
+
 const PROD_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
@@ -55,6 +60,11 @@ const ONBOARDED_PUBKEYS_KEY = 'poh_onboarded_pubkeys';
 const PRIMAL_WS_URL = 'wss://cache2.primal.net/v1';
 const FOLLOWERS_CACHE_KEY = 'poh_followers_cache_v1';
 const FOLLOWERS_CACHE_TTL_MS = 10 * 60 * 1000;
+const CHARITIES_CACHE_KEY = 'poh_charities_cache_v2';
+const CHARITIES_CACHE_VERSION = 2;
+const CHARITIES_CACHE_TTL_HOME_MS = 30 * 60 * 1000;
+const CHARITIES_CACHE_TTL_DETAIL_MS = 10 * 60 * 1000;
+const CHARITY_DETAIL_CACHE_PREFIX = 'poh_charity_detail_cache_v1:';
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -436,6 +446,117 @@ export class NostrService {
     }
   }
 
+  private readCharityCache(limit = 100, maxAgeMs = CHARITIES_CACHE_TTL_HOME_MS): CharityProfile[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(CHARITIES_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (parsed?.v !== CHARITIES_CACHE_VERSION) {
+        window.localStorage.removeItem(CHARITIES_CACHE_KEY);
+        return [];
+      }
+      const ts = Number(parsed?.ts);
+      if (!Number.isFinite(ts) || Date.now() - ts > maxAgeMs) {
+        window.localStorage.removeItem(CHARITIES_CACHE_KEY);
+        return [];
+      }
+      const records = Array.isArray(parsed?.charities) ? parsed.charities : [];
+      return records
+        .map((record: any) => this.coerceCachedCharity(record))
+        .filter((value: CharityProfile | null): value is CharityProfile => !!value)
+        .slice(0, limit);
+    } catch {
+      try {
+        window.localStorage.removeItem(CHARITIES_CACHE_KEY);
+      } catch {
+        // ignore storage errors
+      }
+      return [];
+    }
+  }
+
+  private writeCharityCache(charities: CharityProfile[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = { v: CHARITIES_CACHE_VERSION, ts: Date.now(), charities };
+      window.localStorage.setItem(CHARITIES_CACHE_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore quota / storage errors
+    }
+  }
+
+  private charityDetailCacheKey(pubkey: string): string {
+    return `${CHARITY_DETAIL_CACHE_PREFIX}${pubkey}`;
+  }
+
+  cacheCharityDetail(charity: CharityProfile): void {
+    if (typeof window === 'undefined' || !charity?.pubkey) return;
+    try {
+      const payload = { v: CHARITIES_CACHE_VERSION, ts: Date.now(), charity };
+      window.localStorage.setItem(this.charityDetailCacheKey(charity.pubkey), JSON.stringify(payload));
+    } catch {
+      // ignore quota / storage errors
+    }
+  }
+
+  readCharityDetailCache(pubkey: string, maxAgeMs = CHARITIES_CACHE_TTL_DETAIL_MS): CharityProfile | null {
+    if (typeof window === 'undefined' || !pubkey) return null;
+    try {
+      const raw = window.localStorage.getItem(this.charityDetailCacheKey(pubkey));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed?.v !== CHARITIES_CACHE_VERSION) {
+        window.localStorage.removeItem(this.charityDetailCacheKey(pubkey));
+        return null;
+      }
+      const ts = Number(parsed?.ts);
+      if (!Number.isFinite(ts) || Date.now() - ts > maxAgeMs) {
+        window.localStorage.removeItem(this.charityDetailCacheKey(pubkey));
+        return null;
+      }
+      return this.coerceCachedCharity(parsed?.charity) ?? null;
+    } catch {
+      try {
+        window.localStorage.removeItem(this.charityDetailCacheKey(pubkey));
+      } catch {
+        // ignore storage errors
+      }
+      return null;
+    }
+  }
+
+  private coerceCachedCharity(record: any): CharityProfile | null {
+    if (!record || typeof record !== 'object') return null;
+    if (typeof record.pubkey !== 'string' || typeof record.npub !== 'string' || typeof record.name !== 'string') return null;
+
+    return {
+      pubkey: record.pubkey,
+      npub: record.npub,
+      name: record.name,
+      about: typeof record.about === 'string' ? record.about : '',
+      picture: typeof record.picture === 'string' ? record.picture : undefined,
+      website: typeof record.website === 'string' ? record.website : undefined,
+      lud16: typeof record.lud16 === 'string' ? record.lud16 : undefined,
+      lud06: typeof record.lud06 === 'string' ? record.lud06 : undefined,
+      followers: Number.isFinite(Number(record.followers)) ? Number(record.followers) : 0,
+      flags: Number.isFinite(Number(record.flags)) ? Number(record.flags) : 0,
+      hidden: Boolean(record.hidden),
+      ratingAvg: Number.isFinite(Number(record.ratingAvg)) ? Number(record.ratingAvg) : 0,
+      ratingCount: Number.isFinite(Number(record.ratingCount)) ? Number(record.ratingCount) : 0,
+      zappedSats: Number.isFinite(Number(record.zappedSats)) ? Number(record.zappedSats) : 0,
+      charity: {
+        shortDescription: typeof record.charity?.shortDescription === 'string' ? record.charity.shortDescription : undefined,
+        description: typeof record.charity?.description === 'string' ? record.charity.description : undefined,
+        country: typeof record.charity?.country === 'string' ? record.charity.country : undefined,
+        category: typeof record.charity?.category === 'string' ? record.charity.category : undefined,
+        donationMessage: typeof record.charity?.donationMessage === 'string' ? record.charity.donationMessage : undefined,
+        lightningAddress: typeof record.charity?.lightningAddress === 'string' ? record.charity.lightningAddress : undefined,
+        isVisible: typeof record.charity?.isVisible === 'boolean' ? record.charity.isVisible : undefined
+      }
+    };
+  }
+
   private extractFollowersCount(payload: any): number | null {
     if (!payload || typeof payload !== 'object') return null;
 
@@ -602,7 +723,10 @@ export class NostrService {
     return result;
   }
 
-  async loadCharitiesFast(limit = 100): Promise<CharityProfile[]> {
+  async loadCharitiesFast(limit = 100, cacheMaxAgeMs = CHARITIES_CACHE_TTL_HOME_MS): Promise<CharityLoadResult> {
+    const cached = this.readCharityCache(limit, cacheMaxAgeMs);
+    if (cached.length) return { charities: cached, fromCache: true };
+
     const appRelays = this.getActiveRelays();
     const kind0Relays = this.getKind0ReadRelays();
 
@@ -613,7 +737,7 @@ export class NostrService {
     });
 
     const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
-    if (!pubkeys.length) return [];
+    if (!pubkeys.length) return { charities: [], fromCache: false };
 
     const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
@@ -690,7 +814,9 @@ export class NostrService {
       });
     }
 
-    return charities.sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = charities.sort((a, b) => a.name.localeCompare(b.name));
+    this.writeCharityCache(sorted);
+    return { charities: sorted, fromCache: false };
   }
 
   async loadCharities(limit = 100): Promise<CharityProfile[]> {
@@ -863,11 +989,13 @@ export class NostrService {
       });
     }
 
-    return charities.sort((a, b) => {
+    const sorted = charities.sort((a, b) => {
       if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
       if (b.followers !== a.followers) return b.followers - a.followers;
       return b.ratingAvg - a.ratingAvg;
     });
+    this.writeCharityCache(sorted);
+    return sorted;
   }
 
   private safeJson(content: string): any {

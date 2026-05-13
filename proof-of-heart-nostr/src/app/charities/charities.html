@@ -38,8 +38,24 @@
 </div>
 
 <div class="loading-wrap" *ngIf="loading">
-  <mat-spinner diameter="42"></mat-spinner>
+  <div class="status-card" [ngClass]="loadStatusTone">
+    <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
+    <div class="status-copy">
+      <span class="status-badge">{{ loadStatusBadge }}</span>
+      <p>{{ loadStatus }}</p>
+    </div>
+  </div>
 </div>
+
+@if (!loading && loadStatus) {
+  <div class="status-card inline" [ngClass]="loadStatusTone">
+    <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
+    <div class="status-copy">
+      <span class="status-badge">{{ loadStatusBadge }}</span>
+      <p>{{ loadStatus }}</p>
+    </div>
+  </div>
+}
 
 <div class="charities" *ngIf="!loading">
   @for (charity of charities; track charity.pubkey) {

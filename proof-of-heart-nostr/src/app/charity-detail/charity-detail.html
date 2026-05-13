@@ -1,6 +1,12 @@
 @if (loading) {
   <div class="loadingcharity">
-    <mat-spinner diameter="42"></mat-spinner>
+    <div class="status-card" [ngClass]="loadStatusTone">
+      <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
+      <div class="status-copy">
+        <span class="status-badge">{{ loadStatusBadge }}</span>
+        <p>{{ loadStatus }}</p>
+      </div>
+    </div>
   </div>
 } @else if (!charity) {
   <div class="loadingcharity">Charity not found.</div>
@@ -60,6 +66,10 @@
         {{ charity.flags }} flags
       </span>
     </div>
+
+    @if (loadStatus) {
+      <p class="load-status">{{ loadStatus }}</p>
+    }
 
     <div class="middle">
       <div class="left">

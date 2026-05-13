@@ -120,11 +120,108 @@
 
 .loading-wrap {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
   margin: 30px 0;
-  color: #666;
+}
+
+.status-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid #e7dfd4;
+  background: linear-gradient(180deg, #fffdf9 0%, #fffaf3 100%);
+  box-shadow: 0 8px 24px rgba(122, 74, 9, 0.08);
+  color: #5f5442;
+  max-width: min(620px, 100%);
+
+  &.inline {
+    margin: 0 0 14px;
+  }
+
+  .status-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    background: #f3e8d7;
+    color: #8a5100;
+    font-size: 18px;
+  }
+
+  .status-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    p {
+      margin: 0;
+      line-height: 1.4;
+    }
+  }
+
+  .status-badge {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    border-radius: 999px;
+    padding: 3px 9px;
+    background: rgba(138, 81, 0, 0.08);
+    color: #8a5100;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &.cache {
+    border-color: #d9d3e9;
+    background: linear-gradient(180deg, #fbfaff 0%, #f7f5ff 100%);
+
+    .status-icon {
+      background: #ece8ff;
+      color: #6b4fd6;
+    }
+
+    .status-badge {
+      background: rgba(107, 79, 214, 0.08);
+      color: #6b4fd6;
+    }
+  }
+
+  &.success {
+    border-color: #d7e8d8;
+    background: linear-gradient(180deg, #fbfff9 0%, #f2fbf0 100%);
+
+    .status-icon {
+      background: #e6f6e4;
+      color: #2f855a;
+    }
+
+    .status-badge {
+      background: rgba(47, 133, 90, 0.08);
+      color: #2f855a;
+    }
+  }
+
+  &.warning {
+    border-color: #f3d9a5;
+    background: linear-gradient(180deg, #fffdf6 0%, #fff6e4 100%);
+
+    .status-icon {
+      background: #fff0cc;
+      color: #b45309;
+    }
+
+    .status-badge {
+      background: rgba(180, 83, 9, 0.08);
+      color: #b45309;
+    }
+  }
 }
 
 .charities {

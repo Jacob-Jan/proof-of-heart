@@ -74,7 +74,23 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   lastInvoice = '';
   showDonateModal = false;
   qrDataUrl = '';
-  readonly isLikelyMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  loadStatus = 'fetching charity profile from nostr relays...';
+  loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
+
+  get loadStatusBadge(): string {
+    if (this.loadStatusTone === 'cache') return 'Cache';
+    if (this.loadStatusTone === 'success') return 'Live';
+    if (this.loadStatusTone === 'warning') return 'Relay issue';
+    return 'Loading';
+  }
+
+  get loadStatusIcon(): string {
+    if (this.loadStatusTone === 'cache') return 'fa-database';
+    if (this.loadStatusTone === 'success') return 'fa-circle-check';
+    if (this.loadStatusTone === 'warning') return 'fa-triangle-exclamation';
+    return 'fa-arrows-rotate';
+  }
+  private refreshToken = 0;
 
   get donationAddress(): string {
     return (this.charity?.charity.lightningAddress || this.charity?.lud16 || '').trim();
@@ -118,7 +134,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.localCharitySignedIn = this.signerConnected && this.nostr.hasLocalOnboarding(this.visitorPubkey);
 
     await this.refreshCharity();
-    this.loading = false;
 
     // Non-blocking: rate fetch should never delay profile rendering.
     this.loadBtcUsdRate();
@@ -132,7 +147,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   async refreshCharity() {
+    const refreshToken = ++this.refreshToken;
     const idParam = this.currentIdParam;
+
+    this.charity = undefined;
+    this.loading = true;
+    this.followersLoaded = false;
+    this.canEdit = false;
+    this.hasFlagged = false;
+    this.loadStatus = 'fetching charity profile from nostr relays...';
+    this.loadStatusTone = 'relay';
 
     let resolvedPubkey = idParam;
     if (idParam.startsWith('npub1')) {
@@ -146,7 +170,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
+    const isCurrent = () => refreshToken === this.refreshToken;
+
     const applyCharity = async (found?: CharityProfile, enriched = false) => {
+      if (!isCurrent()) return;
       this.charity = found;
       if (enriched) this.followersLoaded = true;
       this.canEdit = !!this.charity
@@ -157,10 +184,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (this.charity) {
         if (this.visitorPubkey) {
           this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
+          if (!isCurrent()) return;
         } else {
           this.hasFlagged = false;
         }
         this.updateSeo(this.charity);
+        this.loading = false;
       } else {
         this.title.setTitle('Charity not found | Proof of Heart');
         this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
@@ -170,24 +199,54 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     this.followersLoaded = false;
 
+    const cachedDetail = this.nostr.readCharityDetailCache(resolvedPubkey);
+    if (cachedDetail) {
+      this.loadStatus = 'restored charity profile from local cache; checking relays...';
+      this.loadStatusTone = 'cache';
+      await applyCharity(cachedDetail);
+    }
+
     // Fast path: load minimal data first so detail page appears quickly.
-    const fast = await this.nostr.loadCharitiesFast(300);
-    const fastFound = fast.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
-    await applyCharity(fastFound);
+    const fast = await this.nostr.loadCharitiesFast(300, 10 * 60 * 1000);
+    if (!isCurrent()) return;
+    const fastFound = fast.charities.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
+    if (fastFound) {
+      this.nostr.cacheCharityDetail(fastFound);
+      this.loadStatus = fast.fromCache
+        ? 'showing cached charity profile while relays refresh in the background...'
+        : 'loaded charity profile from nostr relays.';
+      this.loadStatusTone = fast.fromCache ? 'cache' : 'success';
+      await applyCharity(fastFound);
+    }
 
     // Background enrichment path: hydrate followers/ratings/flags/zaps without blocking first paint.
     this.nostr.loadCharities(300)
       .then(async (all) => {
+        if (!isCurrent()) return;
         const fullFound = all.find(c => c.pubkey === resolvedPubkey || c.npub === idParam);
         if (fullFound) {
+          this.nostr.cacheCharityDetail(fullFound);
+          this.loadStatus = 'charity profile refreshed from relays.';
+          this.loadStatusTone = 'success';
           await applyCharity(fullFound, true);
+        } else if (!this.charity) {
+          this.loadStatus = 'charity profile not found on the currently queried relays.';
+          this.loadStatusTone = 'warning';
+          this.loading = false;
+          this.followersLoaded = true;
         } else {
           this.followersLoaded = true;
         }
       })
       .catch((e) => {
+        if (!isCurrent()) return;
         console.warn('Background charity detail enrichment failed', e);
         this.followersLoaded = true;
+        if (!this.charity) {
+          this.loadStatus = 'failed to refresh charity profile from nostr relays.';
+          this.loadStatusTone = 'warning';
+          this.loading = false;
+        }
       });
   }
 
