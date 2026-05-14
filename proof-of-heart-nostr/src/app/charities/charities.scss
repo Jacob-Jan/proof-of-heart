@@ -118,13 +118,72 @@
   }
 }
 
-.loading-wrap {
+.loading-state {
+  margin: 28px 0 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin: 30px 0;
-  color: #666;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  color: #6a6255;
+  text-align: center;
+
+  p {
+    margin: 0;
+    font-size: 0.98rem;
+    color: #7a746a;
+  }
+}
+
+.load-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 16px;
+  padding: 2px 6px 2px 2px;
+  color: #6a6255;
+  font-size: 0.92rem;
+  min-height: 24px;
+  text-align: right;
+
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #c5b79d;
+    flex: 0 0 auto;
+  }
+
+  .status-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #8a5100;
+  }
+
+  .status-text {
+    color: #6a6255;
+  }
+
+  &.cache {
+    .status-dot { background: #6b4fd6; }
+    .status-label { color: #6b4fd6; }
+  }
+
+  &.success {
+    .status-dot { background: #2f855a; }
+    .status-label { color: #2f855a; }
+  }
+
+  &.warning {
+    .status-dot { background: #b45309; }
+    .status-label { color: #b45309; }
+  }
 }
 
 .charities {
@@ -152,6 +211,7 @@
     border: 3px solid #fcfcfc;
     box-shadow: 0 0 10px 0px rgba(0, 0, 0, 0.2);
     border-radius: 40px;
+    cursor: pointer;
     transition: all 0.3s ease-in-out;
 
     .top {

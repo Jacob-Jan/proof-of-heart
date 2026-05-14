@@ -70,9 +70,78 @@
     }
   }
 
-  .relay-badge {
+  .right {
     margin-left: auto;
-    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .charity-feed-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px 3px 4px;
+    border-radius: 999px;
+    border: 1px solid #d9d9d9;
+    background: #f2f2f2;
+    color: #5a5a5a;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+    max-width: 140px;
+    overflow: hidden;
+    transition: max-width 180ms ease, background-color 180ms ease, border-color 180ms ease;
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      background: #c5b79d;
+    }
+
+    .status-label {
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .status-text {
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+      transition: opacity 180ms ease, max-width 180ms ease;
+      text-overflow: clip;
+    }
+
+    &:hover,
+    &:focus-within {
+      max-width: 420px;
+
+      .status-text {
+        opacity: 1;
+        max-width: 320px;
+      }
+    }
+
+    &.cache {
+      .status-dot { background: #6b4fd6; }
+      .status-label { color: #6b4fd6; }
+    }
+
+    &.success {
+      .status-dot { background: #2f855a; }
+      .status-label { color: #2f855a; }
+    }
+
+    &.warning {
+      .status-dot { background: #b45309; }
+      .status-label { color: #b45309; }
+    }
+  }
+
+  .relay-badge {
     font-size: 11px;
     color: #5a5a5a;
     background: #f2f2f2;
@@ -142,6 +211,7 @@
     position: static;
     .menu { display: none; }
     .relay-badge { display: none; }
+    .charity-feed-status { display: none; }
     .left .logo h1 { font-size: 22px; }
   }
 }

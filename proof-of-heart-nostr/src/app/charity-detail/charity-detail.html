@@ -1,6 +1,6 @@
 @if (loading) {
   <div class="loadingcharity">
-    <mat-spinner diameter="42"></mat-spinner>
+    <mat-spinner diameter="28"></mat-spinner>
   </div>
 } @else if (!charity) {
   <div class="loadingcharity">Charity not found.</div>
@@ -43,9 +43,13 @@
           {{ charity.charity.country }}
         </span>
       }
-      <span class="stat-chip">
+      <span class="stat-chip" [attr.aria-label]="followersLoaded ? (charity.followers | number) + ' followers' : 'Followers loading'">
         <i class="fa-solid fa-users"></i>
-        {{ followersLoaded ? charity.followers : '...' }} followers
+        @if (followersLoaded) {
+          <span>{{ charity.followers | number }} followers</span>
+        } @else {
+          <span>...</span>
+        }
       </span>
       <span class="stat-chip">
         <i class="fa-solid fa-star"></i>
@@ -61,7 +65,7 @@
       </span>
     </div>
 
-    <div class="middle">
+<div class="middle">
       <div class="left">
         <h3>More about {{ charity.name }}</h3>
         <div class="description">

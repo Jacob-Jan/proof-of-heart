@@ -38,6 +38,60 @@ input, select, textarea {
   color: #353535;
 }
 
+.loadingcharity {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 10px;
+}
+
+.load-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  color: #6a6255;
+  font-size: 0.92rem;
+  min-height: 24px;
+  text-align: right;
+
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #c5b79d;
+    flex: 0 0 auto;
+  }
+
+  .status-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #8a5100;
+  }
+
+  .status-text {
+    color: #6a6255;
+  }
+
+  &.cache {
+    .status-dot { background: #6b4fd6; }
+    .status-label { color: #6b4fd6; }
+  }
+
+  &.success {
+    .status-dot { background: #2f855a; }
+    .status-label { color: #2f855a; }
+  }
+
+  &.warning {
+    .status-dot { background: #b45309; }
+    .status-label { color: #b45309; }
+  }
+}
+
 *::placeholder {
   color: #353535;
 }
