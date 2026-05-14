@@ -140,6 +140,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.nostr.clearCharityFeedStatus();
     if (this.jsonLdScriptElement) {
       this.doc.head.removeChild(this.jsonLdScriptElement);
       this.jsonLdScriptElement = undefined;
@@ -157,6 +158,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.hasFlagged = false;
     this.loadStatus = 'fetching charity profile from nostr relays...';
     this.loadStatusTone = 'relay';
+    this.nostr.setCharityFeedStatus('relay', this.loadStatus);
 
     let resolvedPubkey = idParam;
     if (idParam.startsWith('npub1')) {
@@ -175,21 +177,29 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const applyCharity = async (found?: CharityProfile, enriched = false) => {
       if (!isCurrent()) return;
       this.charity = found;
-      if (enriched) this.followersLoaded = true;
+      this.followersLoaded = enriched || !!found?.followersLoaded;
       this.canEdit = !!this.charity
         && !!this.visitorPubkey
         && this.localCharitySignedIn
         && this.charity.pubkey === this.visitorPubkey;
 
       if (this.charity) {
+        this.updateSeo(this.charity);
+        this.loading = false;
+
         if (this.visitorPubkey) {
-          this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
-          if (!isCurrent()) return;
+          void this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey)
+            .then((flagged) => {
+              if (!isCurrent()) return;
+              this.hasFlagged = flagged;
+            })
+            .catch((e) => {
+              if (!isCurrent()) return;
+              console.warn('Flag status check failed', e);
+            });
         } else {
           this.hasFlagged = false;
         }
-        this.updateSeo(this.charity);
-        this.loading = false;
       } else {
         this.title.setTitle('Charity not found | Proof of Heart');
         this.meta.updateTag({ name: 'description', content: 'This charity profile could not be found on the currently queried relays.' });
@@ -199,7 +209,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     this.followersLoaded = false;
 
-    const cachedDetail = this.nostr.readCharityDetailCache(resolvedPubkey);
+    const cachedDetail = this.nostr.readCachedCharity(resolvedPubkey);
     if (cachedDetail) {
       this.loadStatus = 'restored charity profile from local cache; checking relays...';
       this.loadStatusTone = 'cache';
@@ -216,6 +226,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         ? 'showing cached charity profile while relays refresh in the background...'
         : 'loaded charity profile from nostr relays.';
       this.loadStatusTone = fast.fromCache ? 'cache' : 'success';
+      this.nostr.setCharityFeedStatus(this.loadStatusTone, this.loadStatus);
       await applyCharity(fastFound);
     }
 
@@ -228,10 +239,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           this.nostr.cacheCharityDetail(fullFound);
           this.loadStatus = 'charity profile refreshed from relays.';
           this.loadStatusTone = 'success';
+          this.nostr.setCharityFeedStatus('success', this.loadStatus);
           await applyCharity(fullFound, true);
         } else if (!this.charity) {
           this.loadStatus = 'charity profile not found on the currently queried relays.';
           this.loadStatusTone = 'warning';
+          this.nostr.setCharityFeedStatus('warning', this.loadStatus);
           this.loading = false;
           this.followersLoaded = true;
         } else {
@@ -245,6 +258,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         if (!this.charity) {
           this.loadStatus = 'failed to refresh charity profile from nostr relays.';
           this.loadStatusTone = 'warning';
+          this.nostr.setCharityFeedStatus('warning', this.loadStatus);
           this.loading = false;
         }
       });

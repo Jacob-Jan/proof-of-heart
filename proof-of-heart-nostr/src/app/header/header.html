@@ -22,26 +22,36 @@
     </div>
   </div>
 
-  @if (isLocalhost) {
-    <div class="relay-badge" role="group" aria-label="Relay mode toggle">
-      <span class="relay-label">{{ relayBadgeLabel }}</span>
-      <button type="button" class="relay-toggle" [class.active]="relayMode === 'test'" (click)="setRelayMode('test')">Local</button>
-      <button type="button" class="relay-toggle" [class.active]="relayMode === 'prod'" (click)="setRelayMode('prod')">Prod</button>
-    </div>
-  }
+  <div class="right">
+    @if (charityFeedStatus$ | async; as charityFeedStatus) {
+      <div class="charity-feed-status" [ngClass]="charityFeedStatus.tone" [attr.aria-label]="charityFeedStatus.label + ': ' + charityFeedStatus.text" [attr.title]="charityFeedStatus.text">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-label">{{ charityFeedStatus.label }}</span>
+        <span class="status-text">{{ charityFeedStatus.text }}</span>
+      </div>
+    }
 
-  <nav class="menu">
-    <a routerLink="/" class="menuitem" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-      <i class="fa-solid fa-heart"></i>
-      <span>Donate</span>
-    </a>
-    <a routerLink="/paper" class="menuitem" routerLinkActive="active">
-      <i class="fa-solid fa-file-lines"></i>
-      <span>Paper</span>
-    </a>
-    <a [routerLink]="charityNavRoute" class="menuitem" routerLinkActive="active">
-      <i class="fa-solid fa-user"></i>
-      <span>{{ charityNavLabel }}</span>
-    </a>
-  </nav>
+    @if (isLocalhost) {
+      <div class="relay-badge" role="group" aria-label="Relay mode toggle">
+        <span class="relay-label">{{ relayBadgeLabel }}</span>
+        <button type="button" class="relay-toggle" [class.active]="relayMode === 'test'" (click)="setRelayMode('test')">Local</button>
+        <button type="button" class="relay-toggle" [class.active]="relayMode === 'prod'" (click)="setRelayMode('prod')">Prod</button>
+      </div>
+    }
+
+    <nav class="menu">
+      <a routerLink="/" class="menuitem" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <i class="fa-solid fa-heart"></i>
+        <span>Donate</span>
+      </a>
+      <a routerLink="/paper" class="menuitem" routerLinkActive="active">
+        <i class="fa-solid fa-file-lines"></i>
+        <span>Paper</span>
+      </a>
+      <a [routerLink]="charityNavRoute" class="menuitem" routerLinkActive="active">
+        <i class="fa-solid fa-user"></i>
+        <span>{{ charityNavLabel }}</span>
+      </a>
+    </nav>
+  </div>
 </div>

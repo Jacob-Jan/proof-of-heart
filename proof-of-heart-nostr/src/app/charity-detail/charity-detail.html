@@ -1,12 +1,6 @@
 @if (loading) {
   <div class="loadingcharity">
-    <div class="status-card" [ngClass]="loadStatusTone">
-      <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
-      <div class="status-copy">
-        <span class="status-badge">{{ loadStatusBadge }}</span>
-        <p>{{ loadStatus }}</p>
-      </div>
-    </div>
+    <mat-spinner diameter="28"></mat-spinner>
   </div>
 } @else if (!charity) {
   <div class="loadingcharity">Charity not found.</div>
@@ -49,9 +43,13 @@
           {{ charity.charity.country }}
         </span>
       }
-      <span class="stat-chip">
+      <span class="stat-chip" [attr.aria-label]="followersLoaded ? (charity.followers | number) + ' followers' : 'Followers loading'">
         <i class="fa-solid fa-users"></i>
-        {{ followersLoaded ? charity.followers : '...' }} followers
+        @if (followersLoaded) {
+          <span>{{ charity.followers | number }} followers</span>
+        } @else {
+          <span>...</span>
+        }
       </span>
       <span class="stat-chip">
         <i class="fa-solid fa-star"></i>
@@ -67,11 +65,7 @@
       </span>
     </div>
 
-    @if (loadStatus) {
-      <p class="load-status">{{ loadStatus }}</p>
-    }
-
-    <div class="middle">
+<div class="middle">
       <div class="left">
         <h3>More about {{ charity.name }}</h3>
         <div class="description">

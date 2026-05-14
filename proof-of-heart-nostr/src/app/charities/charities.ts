@@ -57,6 +57,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.nostr.clearCharityFeedStatus();
     if (this.jsonLdScriptElement) {
       this.doc.head.removeChild(this.jsonLdScriptElement);
       this.jsonLdScriptElement = undefined;
@@ -68,6 +69,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
     this.enrichmentLoaded = false;
     this.loadStatus = 'fetching charities from nostr relays...';
     this.loadStatusTone = 'relay';
+    this.nostr.setCharityFeedStatus('relay', this.loadStatus);
     const token = ++this.reloadToken;
     try {
       // Fast path: render list as soon as kind 30078 + kind 0 are available.
@@ -81,6 +83,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
         ? 'showing cached charities while relays refresh in the background...'
         : 'loaded charities from nostr relays.';
       this.loadStatusTone = fastResult.fromCache ? 'cache' : 'success';
+      this.nostr.setCharityFeedStatus(this.loadStatusTone, this.loadStatus);
 
       // Background enrichment: hydrate followers/ratings/flags/zaps after first paint.
       this.nostr.loadCharities(200)
@@ -98,6 +101,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
             ? 'refreshed charity data from relays.'
             : 'charity data refreshed from relays.';
           this.loadStatusTone = 'success';
+          this.nostr.setCharityFeedStatus('success', this.loadStatus);
         })
         .catch((e) => {
           if (token !== this.reloadToken) return;
@@ -107,6 +111,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
             ? 'showing cached charities; relay refresh failed.'
             : 'relay refresh failed after the initial load.';
           this.loadStatusTone = fastResult.fromCache ? 'cache' : 'warning';
+          this.nostr.setCharityFeedStatus(this.loadStatusTone, this.loadStatus);
         });
     } catch (e) {
       if (token !== this.reloadToken) return;
@@ -116,6 +121,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
       this.enrichmentLoaded = true;
       this.loadStatus = 'failed to load charities from nostr relays.';
       this.loadStatusTone = 'warning';
+      this.nostr.setCharityFeedStatus('warning', this.loadStatus);
     }
   }
 

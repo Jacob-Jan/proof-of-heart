@@ -37,60 +37,53 @@
   </div>
 </div>
 
-<div class="loading-wrap" *ngIf="loading">
-  <div class="status-card" [ngClass]="loadStatusTone">
-    <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
-    <div class="status-copy">
-      <span class="status-badge">{{ loadStatusBadge }}</span>
-      <p>{{ loadStatus }}</p>
-    </div>
-  </div>
-</div>
-
-@if (!loading && loadStatus) {
-  <div class="status-card inline" [ngClass]="loadStatusTone">
-    <span class="status-icon"><i class="fa-solid" [ngClass]="loadStatusIcon"></i></span>
-    <div class="status-copy">
-      <span class="status-badge">{{ loadStatusBadge }}</span>
-      <p>{{ loadStatus }}</p>
-    </div>
+@if (loading && charities.length === 0) {
+  <div class="loading-state" aria-live="polite">
+    <mat-spinner diameter="28"></mat-spinner>
+    <p>fetching charities from Nostr</p>
   </div>
 }
 
-<div class="charities" *ngIf="!loading">
-  @for (charity of charities; track charity.pubkey) {
-    <div class="charity" (click)="goToCharity(charity.pubkey)" matRipple>
-      <div class="top">
-        <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
-        <div class="spacer"></div>
-        <div class="title">
-          <h2>{{ charity.name }}</h2>
-          <span class="charity-meta" *ngIf="charity.charity.category">
-            <i class="fa-solid fa-tag"></i>
-            {{ charity.charity.category }}
-          </span>
-          <span class="charity-meta" *ngIf="charity.charity.country">
-            <i class="fa-solid fa-location-dot"></i>
-            {{ charity.charity.country }}
-          </span>
-          <span class="charity-meta">
-            <i class="fa-solid fa-users"></i>
-            {{ enrichmentLoaded ? charity.followers : '...' }} followers
-          </span>
+@if (charities.length > 0) {
+  <div class="charities">
+    @for (charity of charities; track charity.pubkey) {
+      <div class="charity" (click)="goToCharity(charity.pubkey)" matRipple>
+        <div class="top">
+          <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
+          <div class="spacer"></div>
+          <div class="title">
+            <h2>{{ charity.name }}</h2>
+            <span class="charity-meta" *ngIf="charity.charity.category">
+              <i class="fa-solid fa-tag"></i>
+              {{ charity.charity.category }}
+            </span>
+            <span class="charity-meta" *ngIf="charity.charity.country">
+              <i class="fa-solid fa-location-dot"></i>
+              {{ charity.charity.country }}
+            </span>
+            <span class="charity-meta" [attr.aria-label]="charity.followersLoaded ? (charity.followers | number) + ' followers' : 'Followers loading'">
+              <i class="fa-solid fa-users"></i>
+              @if (charity.followersLoaded) {
+                <span>{{ charity.followers | number }} followers</span>
+              } @else {
+                <span>...</span>
+              }
+            </span>
+          </div>
+        </div>
+        <div class="middle">
+          <p>{{ charity.charity.shortDescription || charity.charity.description || charity.about || 'No charity description yet.' }}</p>
+        </div>
+        <div class="bottom">
+          <button class="primary" mat-stroked-button>
+              <i class="fa-brands fa-bitcoin"></i>
+              Donate bitcoin
+          </button>
         </div>
       </div>
-      <div class="middle">
-        <p>{{ charity.charity.shortDescription || charity.charity.description || charity.about || 'No charity description yet.' }}</p>
-      </div>
-      <div class="bottom">
-        <button class="primary" mat-stroked-button>
-            <i class="fa-brands fa-bitcoin"></i>
-            Open profile
-        </button>
-      </div>
-    </div>
-  } @empty {
-    <span>No charities found</span>
-  }
-</div>
+    }
+  </div>
+} @else if (!loading) {
+  <span>No charities found</span>
+}
 
