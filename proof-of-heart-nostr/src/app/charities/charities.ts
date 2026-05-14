@@ -84,6 +84,9 @@ export class CharitiesComponent implements OnInit, OnDestroy {
         : 'loaded charities from nostr relays.';
       this.loadStatusTone = fastResult.fromCache ? 'cache' : 'success';
       this.nostr.setCharityFeedStatus(this.loadStatusTone, this.loadStatus);
+      if (fastResult.fromCache) {
+        void this.nostr.ensureCharityRefresh(200).catch((e) => console.warn('Background charity cache refresh failed', e));
+      }
 
       // Background enrichment: hydrate followers/ratings/flags/zaps after first paint.
       this.nostr.loadCharities(200)

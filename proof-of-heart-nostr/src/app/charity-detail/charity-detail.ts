@@ -214,6 +214,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.loadStatus = 'restored charity profile from local cache; checking relays...';
       this.loadStatusTone = 'cache';
       await applyCharity(cachedDetail);
+      void this.nostr.ensureCharityRefresh(300).catch((e) => console.warn('Background charity cache refresh failed', e));
     }
 
     // Fast path: load minimal data first so detail page appears quickly.
@@ -227,6 +228,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         : 'loaded charity profile from nostr relays.';
       this.loadStatusTone = fast.fromCache ? 'cache' : 'success';
       this.nostr.setCharityFeedStatus(this.loadStatusTone, this.loadStatus);
+      if (fast.fromCache) {
+        void this.nostr.ensureCharityRefresh(300).catch((e) => console.warn('Background charity cache refresh failed', e));
+      }
       await applyCharity(fastFound);
     }
 

@@ -1,4 +1,4 @@
-import { mergeCharityProfiles, CharityProfile } from './nostr.service';
+import { mergeCharityProfiles, sortCharityProfiles, CharityProfile, NostrService } from './nostr.service';
 
 describe('mergeCharityProfiles', () => {
   it('preserves cached visual and follower fields when live refresh omits them', () => {
@@ -65,4 +65,137 @@ describe('mergeCharityProfiles', () => {
     expect(merged.charity.donationMessage).toBe('cached donate');
     expect(merged.charity.lightningAddress).toBe('cached@example.com');
   });
+
+  it('sorts by profile recency and keeps Proof of Heart last', () => {
+    const sorted = sortCharityProfiles([
+      {
+        pubkey: 'c',
+        npub: 'npub1c',
+        name: 'Zebra Relief',
+        about: '',
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        profileUpdatedAt: 100,
+        charity: {}
+      },
+      {
+        pubkey: 'a',
+        npub: 'npub1a',
+        name: 'Alpha Aid',
+        about: '',
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        profileUpdatedAt: 200,
+        charity: {}
+      },
+      {
+        pubkey: 'poh',
+        npub: 'npub1poh',
+        name: 'Proof of Heart',
+        about: '',
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        profileUpdatedAt: 999,
+        charity: {}
+      }
+    ] as CharityProfile[]);
+
+    expect(sorted.map((c) => c.name)).toEqual(['Alpha Aid', 'Zebra Relief', 'Proof of Heart']);
+  });
+
+  it('keeps equal-recency charities in their existing order instead of alphabetizing them', () => {
+    const sorted = sortCharityProfiles([
+      {
+        pubkey: 'zebra',
+        npub: 'npub1zebra',
+        name: 'Zebra Relief',
+        about: '',
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        profileUpdatedAt: 100,
+        charity: {}
+      },
+      {
+        pubkey: 'alpha',
+        npub: 'npub1alpha',
+        name: 'Alpha Aid',
+        about: '',
+        followers: 0,
+        flags: 0,
+        hidden: false,
+        ratingAvg: 0,
+        ratingCount: 0,
+        zappedSats: 0,
+        profileUpdatedAt: 100,
+        charity: {}
+      }
+    ] as CharityProfile[]);
+
+    expect(sorted.map((c) => c.name)).toEqual(['Zebra Relief', 'Alpha Aid']);
+  });
 });
+
+
+describe('NostrService charity refresh', () => {
+  it('deduplicates in-flight relay refreshes until the current one completes', async () => {
+    const service = new NostrService();
+    const refreshSpy = spyOn(service as any, 'refreshCharityCache').and.returnValue(Promise.resolve());
+
+    const first = service.ensureCharityRefresh(25);
+    const second = service.ensureCharityRefresh(200);
+
+    expect(second).toBe(first);
+    await first;
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).toHaveBeenCalledWith(25);
+
+    const third = service.ensureCharityRefresh(300);
+    expect(third).not.toBe(first);
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
+    expect(refreshSpy).toHaveBeenCalledWith(300);
+  });
+
+  it('clears cached list and detail entries for a profile after save', () => {
+    const service = new NostrService();
+    const pubkey = 'saved-profile-pubkey';
+    const otherPubkey = 'other-pubkey';
+
+    localStorage.setItem('poh_charities_cache_v2', JSON.stringify({
+      v: 2,
+      ts: Date.now(),
+      charities: [
+        { pubkey, npub: 'npub1saved', name: 'Old profile', followers: 10, followersLoaded: true, charity: { isVisible: true } },
+        { pubkey: otherPubkey, npub: 'npub1other', name: 'Other profile', followers: 20, followersLoaded: true, charity: { isVisible: true } }
+      ]
+    }));
+    localStorage.setItem(`poh_charity_detail_cache_v1:${pubkey}`, JSON.stringify({
+      v: 2,
+      ts: Date.now(),
+      charity: { pubkey, npub: 'npub1saved', name: 'Old profile', followers: 10, followersLoaded: true, charity: { isVisible: true } }
+    }));
+
+    service.clearCharityCache(pubkey);
+
+    const parsed = JSON.parse(localStorage.getItem('poh_charities_cache_v2') || '{}');
+    expect(parsed.charities.length).toBe(1);
+    expect(parsed.charities[0].pubkey).toBe(otherPubkey);
+    expect(localStorage.getItem(`poh_charity_detail_cache_v1:${pubkey}`)).toBeNull();
+  });
+});
+

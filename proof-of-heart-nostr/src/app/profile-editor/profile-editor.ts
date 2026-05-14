@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule, MatAnchor } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -30,7 +31,7 @@ export class DisconnectConfirmDialogComponent {}
 @Component({
   selector: 'app-profile-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule, MatAnchor],
+  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule, MatAnchor, MatProgressSpinnerModule],
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
@@ -125,8 +126,17 @@ export class ProfileEditorComponent implements OnInit {
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
 
-      this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
-      const id = await this.nostr.publishCharityProfile(payload);
+      const publishPromise = this.nostr.publishCharityProfile(payload);
+      queueMicrotask(() => {
+        if (this.saving) {
+          this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
+        }
+      });
+      const id = await publishPromise;
+      const pubkey = await this.nostr.getCurrentPubkey();
+      if (pubkey) {
+        this.nostr.clearCharityCache(pubkey);
+      }
       this.existingModel = { ...payload };
       this.model = { ...payload };
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);

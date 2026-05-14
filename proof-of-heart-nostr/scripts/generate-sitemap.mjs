@@ -40,6 +40,23 @@ const pickFirstNonEmpty = (...values) => {
   return '';
 };
 
+const isProofOfHeartCharity = (record) => {
+  const normalizedName = (record?.name || '').trim().toLowerCase();
+  return normalizedName === 'proof of heart' || normalizedName.includes('proof of heart');
+};
+
+const compareCharityRecords = (a, b) => {
+  const aProofOfHeart = isProofOfHeartCharity(a);
+  const bProofOfHeart = isProofOfHeartCharity(b);
+  if (aProofOfHeart !== bProofOfHeart) return aProofOfHeart ? 1 : -1;
+
+  const aUpdatedAt = Date.parse(a.updatedAt || '') || 0;
+  const bUpdatedAt = Date.parse(b.updatedAt || '') || 0;
+  if (bUpdatedAt !== aUpdatedAt) return bUpdatedAt - aUpdatedAt;
+
+  return a.pubkey.localeCompare(b.pubkey);
+};
+
 const toIsoDay = (unixSeconds) => {
   if (!unixSeconds) return undefined;
   return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
@@ -210,7 +227,7 @@ async function fetchCharityRecords() {
       });
     }
 
-    records.sort((a, b) => a.url.localeCompare(b.url));
+    records.sort(compareCharityRecords);
     return records;
   } finally {
     pool.close(RELAYS);
