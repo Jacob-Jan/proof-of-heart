@@ -1,0 +1,92 @@
+<section class="mat-card">
+  <div class="relay-card">
+    <div class="eyebrow">Advanced charity settings</div>
+    <h1>Relay settings</h1>
+    <p class="subtitle">
+      Manage the relays that store and read your charity profile. Proof of Heart follows the NIP-65 pattern: keep the list small,
+      prefer a few reliable relays, and publish the list so other Nostr clients can discover it too.
+    </p>
+
+    @if (loading) {
+      <p class="subtitle loading-subtitle">
+        <mat-spinner diameter="14"></mat-spinner>
+        <span>Loading your relay list…</span>
+      </p>
+    } @else if (needsSignerForLoad) {
+      <p class="subtitle">Could not load relay settings yet. Connect your signer and try again.</p>
+      <button mat-stroked-button type="button" (click)="loadExisting()">Reconnect signer</button>
+    }
+
+    <div class="summary-row">
+      <div class="summary-pill">
+        <span class="summary-label">Active</span>
+        <strong>{{ activeRelayCount }}</strong>
+      </div>
+      <div class="summary-pill">
+        <span class="summary-label">Read</span>
+        <strong>{{ readRelayCount }}</strong>
+      </div>
+      <div class="summary-pill">
+        <span class="summary-label">Write</span>
+        <strong>{{ writeRelayCount }}</strong>
+      </div>
+    </div>
+
+    <p class="helper-text">
+      Recommended starting points: <code>wss://relay.damus.io</code>, <code>wss://relay.primal.net</code>, <code>wss://nostr.wine</code>, and <code>wss://relay.snort.social</code>.
+      Use 2-4 relays for each role if you can.
+    </p>
+
+    <div class="add-relay">
+      <label for="relayUrl">Add relay URL</label>
+      <div class="add-relay-row">
+        <input id="relayUrl" [(ngModel)]="newRelayUrl" placeholder="wss://relay.example.com" />
+        <label class="inline-toggle">
+          <input type="checkbox" [(ngModel)]="newRelayRead" />
+          <span>Read</span>
+        </label>
+        <label class="inline-toggle">
+          <input type="checkbox" [(ngModel)]="newRelayWrite" />
+          <span>Write</span>
+        </label>
+        <button mat-flat-button type="button" (click)="addRelay()">Add</button>
+      </div>
+    </div>
+
+    @if (relaySettings.relays.length === 0) {
+      <div class="empty-state">
+        <p>No relays saved yet.</p>
+        <button mat-stroked-button type="button" (click)="resetRecommended()">Use recommended relays</button>
+      </div>
+    } @else {
+      <div class="relay-list">
+        @for (relay of relaySettings.relays; track relay.url; let i = $index) {
+          <div class="relay-row">
+            <input class="relay-url" [(ngModel)]="relay.url" [name]="'relay-url-' + i" placeholder="wss://relay.example.com" />
+            <label class="inline-toggle">
+              <input type="checkbox" [(ngModel)]="relay.read" [name]="'relay-read-' + i" />
+              <span>Read</span>
+            </label>
+            <label class="inline-toggle">
+              <input type="checkbox" [(ngModel)]="relay.write" [name]="'relay-write-' + i" />
+              <span>Write</span>
+            </label>
+            <button mat-stroked-button type="button" (click)="removeRelay(i)">Remove</button>
+          </div>
+        }
+      </div>
+    }
+
+    <div class="action-row">
+      <button mat-flat-button type="button" [disabled]="saving || loading" (click)="save()">
+        {{ saving ? 'Saving…' : 'Save relay list' }}
+      </button>
+      <button mat-stroked-button type="button" (click)="resetRecommended()">Reset recommended</button>
+      <a mat-stroked-button routerLink="/charity/profile">Back to profile</a>
+    </div>
+
+    <p class="fineprint">
+      This list is stored locally for fast startup and also published as a NIP-65 relay list event when you save.
+    </p>
+  </div>
+</section>

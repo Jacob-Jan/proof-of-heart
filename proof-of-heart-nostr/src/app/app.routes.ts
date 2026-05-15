@@ -28,6 +28,16 @@ export const routes: Routes = [
     title: 'Edit Charity Profile | Proof of Heart'
   },
   {
+    path: 'charity/relays',
+    loadComponent: () => import('./relay-settings/relay-settings').then(m => m.RelaySettingsComponent),
+    title: 'Relay Settings | Proof of Heart'
+  },
+  {
+    path: 'profile/relays',
+    loadComponent: () => import('./relay-settings/relay-settings').then(m => m.RelaySettingsComponent),
+    title: 'Relay Settings | Proof of Heart'
+  },
+  {
     path: 'charity/onboard',
     loadComponent: () => import('./charity-onboard/charity-onboard').then(m => m.CharityOnboardComponent),
     title: 'For charities | Proof of Heart',

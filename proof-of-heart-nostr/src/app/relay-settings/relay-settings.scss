@@ -1,0 +1,163 @@
+.mat-card {
+  max-width: 42rem;
+  margin: 40px auto;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+
+  .relay-card {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+
+    @media (max-width: 767px) {
+      padding: 12px;
+    }
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #f2f1eb;
+    color: #775a00;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.7rem;
+  }
+
+  .subtitle {
+    margin-top: 8px;
+    color: #666;
+    margin-bottom: 18px;
+  }
+
+  .loading-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-spinner {
+      flex: 0 0 auto;
+    }
+  }
+
+  .summary-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 18px 0 14px;
+  }
+
+  .summary-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #f8f7f1;
+    border: 1px solid #e0d9c2;
+  }
+
+  .summary-label {
+    color: #666;
+    font-size: 0.85rem;
+  }
+
+  .helper-text,
+  .fineprint {
+    color: #666;
+    line-height: 1.45;
+  }
+
+  .helper-text {
+    margin-bottom: 18px;
+  }
+
+  code {
+    padding: 0 0.25rem;
+    border-radius: 0.35rem;
+    background: #f3f1e8;
+    color: #5d4600;
+  }
+
+  .fineprint {
+    margin-top: 18px;
+    font-size: 0.92rem;
+  }
+
+  .add-relay,
+  .relay-list,
+  .action-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .add-relay {
+    margin-bottom: 16px;
+
+    label {
+      font-weight: 600;
+    }
+  }
+
+  .add-relay-row,
+  .relay-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .relay-row {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #eee;
+    background: #fcfbf7;
+  }
+
+  input[type='text'],
+  .relay-url,
+  .add-relay-row input:not([type='checkbox']) {
+    min-width: 15rem;
+    flex: 1 1 15rem;
+  }
+
+  .inline-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #444;
+    white-space: nowrap;
+  }
+
+  .empty-state {
+    padding: 14px;
+    border: 1px dashed #d9d3bf;
+    border-radius: 12px;
+    background: #fbfaf5;
+    margin-top: 8px;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .action-row {
+    margin-top: 18px;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  a[mat-stroked-button] {
+    text-decoration: none;
+    align-self: flex-start;
+  }
+}
