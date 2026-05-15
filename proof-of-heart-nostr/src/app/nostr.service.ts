@@ -8,6 +8,7 @@ export interface CharityProfile {
   npub: string;
   name: string;
   about: string;
+  profileUpdatedAt?: number;
   picture?: string;
   website?: string;
   lud16?: string;
@@ -57,6 +58,12 @@ export function mergeCharityProfiles(existing: CharityProfile[], incoming: Chari
   return incoming.map((fresh) => {
     const cached = existingByPubkey.get(fresh.pubkey);
     if (!cached) return fresh;
+
+    const freshUpdatedAt = Number.isFinite(Number(fresh.profileUpdatedAt)) ? Number(fresh.profileUpdatedAt) : 0;
+    const cachedUpdatedAt = Number.isFinite(Number(cached.profileUpdatedAt)) ? Number(cached.profileUpdatedAt) : 0;
+    if (cachedUpdatedAt > 0 && freshUpdatedAt > 0 && freshUpdatedAt < cachedUpdatedAt) {
+      return cached;
+    }
 
     return {
       ...cached,
@@ -115,6 +122,27 @@ const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
 const KIND_REPORT = 1984; // NIP-56 report
 const FLAG_HIDE_THRESHOLD = 3;
+const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
+
+function isProofOfHeartCharity(charity: CharityProfile): boolean {
+  return charity?.pubkey === PROOF_OF_HEART_PUBKEY;
+}
+
+function compareCharityProfiles(a: CharityProfile, b: CharityProfile): number {
+  const aProofOfHeart = isProofOfHeartCharity(a);
+  const bProofOfHeart = isProofOfHeartCharity(b);
+  if (aProofOfHeart !== bProofOfHeart) return aProofOfHeart ? 1 : -1;
+
+  const aUpdatedAt = Number.isFinite(a.profileUpdatedAt) ? (a.profileUpdatedAt as number) : 0;
+  const bUpdatedAt = Number.isFinite(b.profileUpdatedAt) ? (b.profileUpdatedAt as number) : 0;
+  if (bUpdatedAt !== aUpdatedAt) return bUpdatedAt - aUpdatedAt;
+
+  return 0;
+}
+
+export function sortCharityProfiles(charities: CharityProfile[]): CharityProfile[] {
+  return [...charities].sort(compareCharityProfiles);
+}
 
 @Injectable({ providedIn: 'root' })
 export class NostrService {
@@ -183,10 +211,9 @@ export class NostrService {
   }
 
   /**
-   * Safety guard: on localhost we never publish to production relays.
+   * Writes follow the selected relay mode, including the localhost toggle.
    */
   private getWriteRelays(): string[] {
-    if (this.isLocalhostRuntime()) return TEST_RELAYS;
     return this.getActiveRelays();
   }
 
@@ -559,7 +586,7 @@ export class NostrService {
         .map((record: any) => this.coerceCachedCharity(record))
         .filter((value: CharityProfile | null): value is CharityProfile => !!value)
         .slice(0, limit);
-      return this.hydrateCachedFollowerCounts(charities, true);
+      return sortCharityProfiles(this.hydrateCachedFollowerCounts(charities, true));
     } catch {
       try {
         window.localStorage.removeItem(CHARITIES_CACHE_KEY);
@@ -682,6 +709,7 @@ export class NostrService {
         ratingAvg: 0,
         ratingCount: 0,
         zappedSats: 0,
+        profileUpdatedAt: Number((charityEvent as any).created_at) || 0,
         charity: {
           shortDescription: extra?.shortDescription,
           description: extra?.description,
@@ -689,12 +717,13 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
-          isVisible: extra?.isVisible ?? true
+          isVisible: extra?.isVisible ?? true,
+
         }
       });
     }
 
-    this.writeCharityCache(charities.sort((a, b) => a.name.localeCompare(b.name)));
+    this.writeCharityCache(sortCharityProfiles(charities));
   }
 
   private charityDetailCacheKey(pubkey: string): string {
@@ -709,6 +738,35 @@ export class NostrService {
     } catch {
       // ignore quota / storage errors
     }
+  }
+
+  refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields): CharityProfile | null {
+    if (typeof window === 'undefined' || !pubkey) return null;
+
+    const current =
+      this.readCharityDetailCache(pubkey, CHARITIES_CACHE_TTL_DETAIL_MS) ||
+      this.readStoredCharityCache(500).find((charity) => charity.pubkey === pubkey) ||
+      null;
+    if (!current) return null;
+
+    const updated: CharityProfile = {
+      ...current,
+      profileUpdatedAt: Math.max(Number(current.profileUpdatedAt) || 0, Math.floor(Date.now() / 1000)),
+      charity: {
+        ...current.charity,
+        shortDescription: fields.shortDescription ?? current.charity.shortDescription,
+        description: fields.description ?? current.charity.description,
+        country: fields.country ?? current.charity.country,
+        category: fields.category ?? current.charity.category,
+        donationMessage: fields.donationMessage ?? current.charity.donationMessage,
+        lightningAddress: fields.lightningAddress ?? current.charity.lightningAddress,
+        isVisible: typeof fields.isVisible === 'boolean' ? fields.isVisible : current.charity.isVisible
+      }
+    };
+
+    this.cacheCharityDetail(updated);
+    this.writeCharityCache([updated]);
+    return updated;
   }
 
   readCharityDetailCache(pubkey: string, maxAgeMs = CHARITIES_CACHE_TTL_DETAIL_MS): CharityProfile | null {
@@ -785,6 +843,7 @@ export class NostrService {
       ratingAvg: Number.isFinite(Number(record.ratingAvg)) ? Number(record.ratingAvg) : 0,
       ratingCount: Number.isFinite(Number(record.ratingCount)) ? Number(record.ratingCount) : 0,
       zappedSats: Number.isFinite(Number(record.zappedSats)) ? Number(record.zappedSats) : 0,
+      profileUpdatedAt: Number.isFinite(Number(record.profileUpdatedAt)) ? Number(record.profileUpdatedAt) : undefined,
       charity: {
         shortDescription: typeof record.charity?.shortDescription === 'string' ? record.charity.shortDescription : undefined,
         description: typeof record.charity?.description === 'string' ? record.charity.description : undefined,
@@ -1048,6 +1107,7 @@ export class NostrService {
         ratingAvg: 0,
         ratingCount: 0,
         zappedSats: 0,
+        profileUpdatedAt: Number((charityEvent as any).created_at) || 0,
         charity: {
           shortDescription: extra?.shortDescription,
           description: extra?.description,
@@ -1055,12 +1115,13 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
-          isVisible: extra?.isVisible ?? true
+          isVisible: extra?.isVisible ?? true,
+
         }
       });
     }
 
-    const sorted = charities.sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = sortCharityProfiles(charities);
     this.writeCharityCache(sorted);
     return { charities: sorted, fromCache: false };
   }
@@ -1224,6 +1285,7 @@ export class NostrService {
         ratingAvg: rating.count ? rating.total / rating.count : 0,
         ratingCount: rating.count,
         zappedSats: zapMap.get(pubkey) || 0,
+        profileUpdatedAt: Number((charityEvent as any).created_at) || 0,
         charity: {
           shortDescription: extra?.shortDescription,
           description: extra?.description,
@@ -1231,16 +1293,13 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
-          isVisible: extra?.isVisible ?? true
+          isVisible: extra?.isVisible ?? true,
+
         }
       });
     }
 
-    const sorted = charities.sort((a, b) => {
-      if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
-      if (b.followers !== a.followers) return b.followers - a.followers;
-      return b.ratingAvg - a.ratingAvg;
-    });
+    const sorted = sortCharityProfiles(charities);
     this.writeCharityCache(sorted);
     return sorted;
   }

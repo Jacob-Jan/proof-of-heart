@@ -13,6 +13,7 @@ const SITE_URL = process.env.SITE_URL || 'https://proofofheart.org';
 const KIND_CHARITY_PROFILE = 30078;
 const KIND_PROFILE_METADATA = 0;
 const D_TAG = 'proofofheart-charity-profile-v1';
+const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
 
 const RELAYS = (process.env.SITEMAP_RELAYS
   ? process.env.SITEMAP_RELAYS.split(',').map(s => s.trim()).filter(Boolean)
@@ -43,6 +44,18 @@ const pickFirstNonEmpty = (...values) => {
 const toIsoDay = (unixSeconds) => {
   if (!unixSeconds) return undefined;
   return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
+};
+
+const compareCharityRecords = (a, b) => {
+  const aProofOfHeart = a.pubkey === PROOF_OF_HEART_PUBKEY;
+  const bProofOfHeart = b.pubkey === PROOF_OF_HEART_PUBKEY;
+  if (aProofOfHeart !== bProofOfHeart) return aProofOfHeart ? 1 : -1;
+
+  const aUpdatedAt = Date.parse(a.updatedAt || '') || 0;
+  const bUpdatedAt = Date.parse(b.updatedAt || '') || 0;
+  if (bUpdatedAt !== aUpdatedAt) return bUpdatedAt - aUpdatedAt;
+
+  return 0;
 };
 
 const escapeXml = (value) =>
@@ -210,7 +223,7 @@ async function fetchCharityRecords() {
       });
     }
 
-    records.sort((a, b) => a.url.localeCompare(b.url));
+    records.sort(compareCharityRecords);
     return records;
   } finally {
     pool.close(RELAYS);
