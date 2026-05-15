@@ -40,9 +40,10 @@ const pickFirstNonEmpty = (...values) => {
   return '';
 };
 
+const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
+
 const isProofOfHeartCharity = (record) => {
-  const normalizedName = (record?.name || '').trim().toLowerCase();
-  return normalizedName === 'proof of heart' || normalizedName.includes('proof of heart');
+  return record?.pubkey === PROOF_OF_HEART_PUBKEY;
 };
 
 const compareCharityRecords = (a, b) => {

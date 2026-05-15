@@ -52,9 +52,10 @@ export interface CharityFeedStatus {
   text: string;
 }
 
+const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
+
 function isProofOfHeartCharity(charity: CharityProfile): boolean {
-  const normalizedName = (charity?.name || '').trim().toLowerCase();
-  return normalizedName === 'proof of heart' || normalizedName.includes('proof of heart');
+  return charity?.pubkey === PROOF_OF_HEART_PUBKEY;
 }
 
 function compareCharityProfiles(a: CharityProfile, b: CharityProfile): number {

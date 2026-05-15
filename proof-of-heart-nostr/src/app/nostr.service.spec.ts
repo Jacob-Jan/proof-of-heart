@@ -97,7 +97,7 @@ describe('mergeCharityProfiles', () => {
         charity: {}
       },
       {
-        pubkey: 'poh',
+        pubkey: '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d',
         npub: 'npub1poh',
         name: 'Proof of Heart',
         about: '',
