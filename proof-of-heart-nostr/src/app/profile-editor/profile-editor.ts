@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule, MatAnchor } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -30,7 +31,7 @@ export class DisconnectConfirmDialogComponent {}
 @Component({
   selector: 'app-profile-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule, MatAnchor],
+  imports: [CommonModule, FormsModule, RouterLink, MatCheckboxModule, MatAnchor, MatProgressSpinnerModule],
   templateUrl: './profile-editor.html',
   styleUrl: './profile-editor.scss'
 })
@@ -56,6 +57,7 @@ export class ProfileEditorComponent implements OnInit {
   loadingExisting = false;
   saving = false;
   needsSignerForLoad = false;
+  ownPubkey: string | null = null;
   ownNpub: string | null = null;
   readonly categories = CHARITY_CATEGORIES;
   readonly countries = COUNTRIES;
@@ -83,6 +85,7 @@ export class ProfileEditorComponent implements OnInit {
         return;
       }
 
+      this.ownPubkey = pubkey;
       this.ownNpub = npub;
 
       const [existing, kind0] = await Promise.all([
@@ -129,6 +132,9 @@ export class ProfileEditorComponent implements OnInit {
       const id = await this.nostr.publishCharityProfile(payload);
       this.existingModel = { ...payload };
       this.model = { ...payload };
+      if (this.ownPubkey) {
+        this.nostr.refreshCharityProfileCache(this.ownPubkey, payload);
+      }
       this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
       console.error('[PoH] profile-editor:save-failed', e);

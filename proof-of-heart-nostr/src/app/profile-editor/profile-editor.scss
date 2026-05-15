@@ -51,6 +51,16 @@
       margin-bottom: 20px;
     }
 
+    .loading-subtitle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      mat-spinner {
+        flex: 0 0 auto;
+      }
+    }
+
     .appear-in-register {
       display: flex;
       justify-content: flex-start;
