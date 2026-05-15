@@ -40,6 +40,24 @@ const pickFirstNonEmpty = (...values) => {
   return '';
 };
 
+const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
+
+const isProofOfHeartCharity = (record) => {
+  return record?.pubkey === PROOF_OF_HEART_PUBKEY;
+};
+
+const compareCharityRecords = (a, b) => {
+  const aProofOfHeart = isProofOfHeartCharity(a);
+  const bProofOfHeart = isProofOfHeartCharity(b);
+  if (aProofOfHeart !== bProofOfHeart) return aProofOfHeart ? 1 : -1;
+
+  const aUpdatedAt = Date.parse(a.updatedAt || '') || 0;
+  const bUpdatedAt = Date.parse(b.updatedAt || '') || 0;
+  if (bUpdatedAt !== aUpdatedAt) return bUpdatedAt - aUpdatedAt;
+
+  return a.pubkey.localeCompare(b.pubkey);
+};
+
 const toIsoDay = (unixSeconds) => {
   if (!unixSeconds) return undefined;
   return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
@@ -210,7 +228,7 @@ async function fetchCharityRecords() {
       });
     }
 
-    records.sort((a, b) => a.url.localeCompare(b.url));
+    records.sort(compareCharityRecords);
     return records;
   } finally {
     pool.close(RELAYS);
