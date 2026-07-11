@@ -12,9 +12,20 @@ import { bech32 } from '@scure/base';
 
 const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
 const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
+const PENDING_ZAP_PAYMENT_KEY = 'poh:pending-zap-payment';
 const ANDROID_SIGNER_ZAP_DEBUG_KEY = 'poh:nip55-debug-log';
 const ANDROID_SIGNER_ZAP_DEBUG_FLAG = 'poh:nip55-debug-enabled';
 const ANDROID_SIGNER_ZAP_HASH_PREFIX = '#pohAndroidSignerZap=';
+
+interface PendingZapPayment {
+  charityPubkey: string;
+  invoice: string;
+  donorPubkey: string;
+  sats: number;
+  since: number;
+  zapRequestId?: string;
+  createdAt: number;
+}
 
 function encodeLnurl(url: string): string {
   return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
@@ -97,6 +108,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private lightningThanksTimer?: ReturnType<typeof setTimeout>;
   private zapCelebrationTimer?: ReturnType<typeof setTimeout>;
   private androidSignerResumeInFlight = false;
+  private activeZapPaymentWatchKey = '';
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   private readonly androidSignerResumeHandler = () => {
@@ -105,6 +117,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown'
     });
     void this.resumeAndroidSignerZapIfPresent();
+    this.resumePendingZapPaymentIfPresent();
   };
 
   get loadStatusBadge(): string {
@@ -250,6 +263,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (this.charity) {
         this.updateSeo(this.charity);
         this.loadRecentZapReceipts(this.charity.pubkey, isCurrent);
+        this.resumePendingZapPaymentIfPresent();
         this.loading = false;
 
         if (this.visitorPubkey) {
@@ -483,8 +497,19 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     try {
       const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
-      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.');
-      void this.watchForZapReceipt(donorPubkey, sats, since, zapRequestId);
+      const payment: PendingZapPayment = {
+        charityPubkey: this.charity!.pubkey,
+        invoice,
+        donorPubkey,
+        sats,
+        since,
+        zapRequestId,
+        createdAt: Date.now()
+      };
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+        this.writePendingZapPayment(payment);
+        void this.watchForZapReceipt(payment);
+      });
     } catch (e: any) {
       this.donationStatus = this.donationErrorMessage(e);
     } finally {
@@ -554,36 +579,98 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }, 8_000);
   }
 
-  private async presentInvoice(invoice: string, readyMessage: string) {
+  private async presentInvoice(invoice: string, readyMessage: string, beforeWalletLaunch?: () => void) {
     this.lastInvoice = invoice;
     await this.generateQr(invoice);
 
+    this.donationStatus = `${readyMessage} Opening wallet… If nothing opens, use the options below.`;
+    beforeWalletLaunch?.();
+
     const launched = await this.tryLaunchInvoice(invoice);
     this.donationStatus = launched
-      ? `${readyMessage} Wallet open attempted. If nothing opened, use the options below.`
-      : `${readyMessage} Use Open wallet or Copy invoice.`;
+      ? `${readyMessage} Wallet open attempted. Checking relays for the verified NIP-57 receipt…`
+      : `${readyMessage} Use Open wallet or Copy invoice. Checking relays for the verified NIP-57 receipt…`;
     if (!launched) {
       this.toast('Could not open wallet automatically. Use QR or copy invoice.', 'info', 3500);
     }
   }
 
-  private async watchForZapReceipt(donorPubkey: string, sats: number, since: number, zapRequestId?: string) {
+  private writePendingZapPayment(payment: PendingZapPayment): void {
+    try {
+      window.localStorage.setItem(PENDING_ZAP_PAYMENT_KEY, JSON.stringify(payment));
+    } catch {
+      // ignore storage failures; the in-memory watcher below still runs while the page is alive
+    }
+  }
+
+  private readPendingZapPayment(): PendingZapPayment | null {
+    try {
+      const raw = window.localStorage.getItem(PENDING_ZAP_PAYMENT_KEY) || '';
+      if (!raw) return null;
+      return JSON.parse(raw) as PendingZapPayment;
+    } catch {
+      return null;
+    }
+  }
+
+  private clearPendingZapPayment(payment?: PendingZapPayment): void {
+    try {
+      if (!payment) {
+        window.localStorage.removeItem(PENDING_ZAP_PAYMENT_KEY);
+        return;
+      }
+
+      const current = this.readPendingZapPayment();
+      if (!current || this.zapPaymentWatchKey(current) === this.zapPaymentWatchKey(payment)) {
+        window.localStorage.removeItem(PENDING_ZAP_PAYMENT_KEY);
+      }
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  private zapPaymentWatchKey(payment: PendingZapPayment): string {
+    return `${payment.charityPubkey}:${payment.zapRequestId || payment.donorPubkey}:${payment.since}:${payment.sats}`;
+  }
+
+  private resumePendingZapPaymentIfPresent(): void {
+    if (typeof window === 'undefined' || !this.charity) return;
+    const payment = this.readPendingZapPayment();
+    if (!payment || payment.charityPubkey !== this.charity.pubkey) return;
+
+    this.donationFlow = 'zap';
+    this.showDonateModal = true;
+    this.lastInvoice = payment.invoice;
+    this.donationStatus = 'Payment sent to wallet. Checking relays for the verified NIP-57 zap receipt…';
+    void this.generateQr(payment.invoice);
+    void this.watchForZapReceipt(payment);
+  }
+
+  private async watchForZapReceipt(payment: PendingZapPayment) {
     if (!this.charity) return;
-    const charityPubkey = this.charity.pubkey;
+    const watchKey = this.zapPaymentWatchKey(payment);
+    if (this.activeZapPaymentWatchKey === watchKey) return;
+    this.activeZapPaymentWatchKey = watchKey;
+
     const receipt = await this.nostr.waitForNip57ZapReceipt({
-      charityPubkey,
-      donorPubkey,
-      amountSats: sats,
-      since,
-      zapRequestId,
+      charityPubkey: payment.charityPubkey,
+      donorPubkey: payment.donorPubkey,
+      amountSats: payment.sats,
+      since: payment.since,
+      zapRequestId: payment.zapRequestId,
       timeoutMs: 300_000
     });
 
-    if (!receipt || !this.charity || this.charity.pubkey !== charityPubkey) {
+    if (this.activeZapPaymentWatchKey === watchKey) {
+      this.activeZapPaymentWatchKey = '';
+    }
+
+    if (!receipt || !this.charity || this.charity.pubkey !== payment.charityPubkey) {
       this.donationStatus = 'Payment may still be settling. The verified zap will appear after the standard NIP-57 receipt reaches relays.';
       return;
     }
 
+    this.clearPendingZapPayment(payment);
     this.donationStatus = 'Verified NIP-57 zap receipt found on relays.';
     this.celebrateZapReceipt();
     this.recentZapReceipts = [receipt, ...this.recentZapReceipts.filter((r) => r.receiptId !== receipt.receiptId)].slice(0, 8);
@@ -1115,8 +1202,25 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',
         zapRequestId: zapRequestId || ''
       });
-      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.');
-      void this.watchForZapReceipt(donorPubkey, Number(pending.sats || 0), Number(pending.since || Math.floor(Date.now() / 1000) - 10), zapRequestId);
+      const payment: PendingZapPayment = {
+        charityPubkey: this.charity!.pubkey,
+        invoice,
+        donorPubkey,
+        sats: Number(pending.sats || 0),
+        since: Number(pending.since || Math.floor(Date.now() / 1000) - 10),
+        zapRequestId,
+        createdAt: Date.now()
+      };
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+        this.writePendingZapPayment(payment);
+        this.debugNip55('zap receipt watch started before wallet launch', {
+          donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',
+          sats: payment.sats,
+          since: payment.since,
+          zapRequestId: zapRequestId || ''
+        });
+        void this.watchForZapReceipt(payment);
+      });
     } catch (e: any) {
       this.debugNip55('resume failed', { message: e?.message || String(e) });
       this.donationStatus = this.donationErrorMessage(e);
