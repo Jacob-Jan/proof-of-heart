@@ -221,6 +221,24 @@
         <h3>{{ donationModalTitle }}</h3>
         <p class="qr-help">{{ donationStatus || 'Preparing payment…' }}</p>
 
+        @if (nip55DebugMode) {
+          <div class="nip55-debug-panel" aria-live="polite">
+            <div class="nip55-debug-header">
+              <strong>NIP-55 debug</strong>
+              <button type="button" (click)="clearNip55DebugLog()">Clear</button>
+            </div>
+            @if (nip55DebugLog.length) {
+              <ol>
+                @for (entry of nip55DebugLog; track entry) {
+                  <li>{{ entry }}</li>
+                }
+              </ol>
+            } @else {
+              <p>No NIP-55 debug events yet.</p>
+            }
+          </div>
+        }
+
         @if (showZapCelebration) {
           <div class="zap-celebration" aria-live="polite">
             <div class="celebration-icon">
