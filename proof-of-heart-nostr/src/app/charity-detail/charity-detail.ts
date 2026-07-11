@@ -822,10 +822,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     });
 
     // Amber/NIP-55 decodes the whole nostrsigner URI before parsing query params.
-    // If callbackUrl contains its own ? or &, those get mistaken for signer params
-    // and the signed event is appended to the wrong URL. Keep the callback suffix
-    // free of query separators and parse the signed event from the fragment instead.
-    const callbackUrl = `${window.location.origin}${window.location.pathname}${ANDROID_SIGNER_ZAP_HASH_PREFIX}${encodeURIComponent(requestId)}:`;
+    // Keep callbackUrl to one query parameter: Amber appends the encoded signed event
+    // directly after the colon, and we unpack androidSignerZap=<requestId>:<event>.
+    const callbackUrl = `${window.location.origin}${window.location.pathname}?androidSignerZap=${encodeURIComponent(requestId)}:`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -909,14 +908,27 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
     const url = new URL(window.location.href);
-    const legacyRequestId = url.searchParams.get('androidSignerZap') || '';
+    const queryCallbackRaw = url.searchParams.get('androidSignerZap') || '';
     const legacySignedZapRaw = url.searchParams.get('signedZap') || '';
-    if (legacyRequestId && legacySignedZapRaw) {
+    if (queryCallbackRaw && legacySignedZapRaw) {
       this.debugNip55('legacy query callback detected', {
-        requestId: legacyRequestId,
+        requestId: queryCallbackRaw,
         signedZapLength: legacySignedZapRaw.length
       });
-      return { requestId: legacyRequestId, signedZapRaw: legacySignedZapRaw };
+      return { requestId: queryCallbackRaw, signedZapRaw: legacySignedZapRaw };
+    }
+
+    const querySeparator = queryCallbackRaw.indexOf(':');
+    if (querySeparator > 0) {
+      const parsed = {
+        requestId: queryCallbackRaw.slice(0, querySeparator),
+        signedZapRaw: queryCallbackRaw.slice(querySeparator + 1)
+      };
+      this.debugNip55('packed query callback parsed', {
+        requestId: parsed.requestId,
+        signedZapLength: parsed.signedZapRaw.length
+      });
+      return parsed;
     }
 
     const hash = window.location.hash || '';
