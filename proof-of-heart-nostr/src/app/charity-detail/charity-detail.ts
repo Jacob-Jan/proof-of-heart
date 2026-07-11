@@ -94,6 +94,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
   private lightningThanksTimer?: ReturnType<typeof setTimeout>;
   private zapCelebrationTimer?: ReturnType<typeof setTimeout>;
+  private androidSignerResumeInFlight = false;
+  private readonly androidSignerResumeHandler = () => {
+    void this.resumeAndroidSignerZapIfPresent();
+  };
 
   get loadStatusBadge(): string {
     if (this.loadStatusTone === 'cache') return 'Cache';
@@ -170,6 +174,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
+    this.installAndroidSignerResumeListeners();
+
     this.visitorPubkey = await this.nostr.getCurrentPubkey();
     this.signerConnected = await this.nostr.hasSigner();
     this.localCharitySignedIn = this.signerConnected && this.nostr.hasLocalOnboarding(this.visitorPubkey);
@@ -182,6 +188,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.uninstallAndroidSignerResumeListeners();
     this.nostr.clearCharityFeedStatus();
     this.clearDonationTimers();
     if (this.jsonLdScriptElement) {
@@ -833,6 +840,22 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private installAndroidSignerResumeListeners(): void {
+    if (typeof window === 'undefined' || !isAndroidBrowser()) return;
+    window.addEventListener('hashchange', this.androidSignerResumeHandler);
+    window.addEventListener('focus', this.androidSignerResumeHandler);
+    window.addEventListener('pageshow', this.androidSignerResumeHandler);
+    document.addEventListener('visibilitychange', this.androidSignerResumeHandler);
+  }
+
+  private uninstallAndroidSignerResumeListeners(): void {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('hashchange', this.androidSignerResumeHandler);
+    window.removeEventListener('focus', this.androidSignerResumeHandler);
+    window.removeEventListener('pageshow', this.androidSignerResumeHandler);
+    document.removeEventListener('visibilitychange', this.androidSignerResumeHandler);
+  }
+
   private writePendingAndroidSignerZap(pending: any): void {
     const value = JSON.stringify(pending);
     try {
@@ -862,10 +885,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private async resumeAndroidSignerZapIfPresent(): Promise<void> {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || this.androidSignerResumeInFlight) return;
 
     const signerCallback = this.readAndroidSignerZapCallback();
     if (!signerCallback) return;
+
+    this.androidSignerResumeInFlight = true;
     const { requestId, signedZapRaw } = signerCallback;
 
     const cleanUrl = new URL(window.location.href);
@@ -877,6 +902,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const pending = this.takePendingAndroidSignerZap();
 
     if (!pending || pending.requestId !== requestId) {
+      this.androidSignerResumeInFlight = false;
       this.toast('Android signer response did not match this zap attempt.', 'error', 4000);
       return;
     }
@@ -895,6 +921,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.toast(this.donationStatus, 'error', 4500);
     } finally {
       this.donating = false;
+      this.androidSignerResumeInFlight = false;
     }
   }
 
