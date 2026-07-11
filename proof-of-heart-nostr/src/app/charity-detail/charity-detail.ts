@@ -1,15 +1,20 @@
 import { Component, DOCUMENT, Inject, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { CharityProfile, NostrService } from '../nostr.service';
+import { CharityProfile, Nip57ZapReceipt, NostrService } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Meta, Title } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { bech32 } from '@scure/base';
 
 const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
+
+function encodeLnurl(url: string): string {
+  return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
+}
 
 @Component({
   selector: 'app-charity-detail',
@@ -71,11 +76,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   btcUsdRate = 0;
   donating = false;
   donationStatus = '';
+  donationFlow: 'lightning' | 'zap' = 'lightning';
   lastInvoice = '';
   showDonateModal = false;
+  showLightningThanksCard = false;
+  showZapCelebration = false;
   qrDataUrl = '';
+  recentZapReceipts: Nip57ZapReceipt[] = [];
+  recentZapsLoading = false;
   loadStatus = 'fetching charity profile from nostr relays...';
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
+  private lightningThanksTimer?: ReturnType<typeof setTimeout>;
+  private zapCelebrationTimer?: ReturnType<typeof setTimeout>;
 
   get loadStatusBadge(): string {
     if (this.loadStatusTone === 'cache') return 'Cache';
@@ -100,7 +112,30 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
   }
 
-  // single CTA flow uses canDonate directly
+  get canZapWithNostr(): boolean {
+    return this.canDonate && this.signerConnected;
+  }
+
+  get donationModalTitle(): string {
+    return this.donationFlow === 'zap' ? 'Complete your Nostr zap' : 'Complete your Lightning donation';
+  }
+
+  donorLabel(pubkey: string): string {
+    if (!pubkey) return 'Unknown donor';
+    try {
+      const npub = nip19.npubEncode(pubkey);
+      return `${npub.slice(0, 12)}…${npub.slice(-6)}`;
+    } catch {
+      return `${pubkey.slice(0, 8)}…${pubkey.slice(-6)}`;
+    }
+  }
+
+  formatZapDate(createdAt: number): string {
+    if (!createdAt) return '';
+    return new Date(createdAt * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  // donation flows intentionally separate plain Lightning from verified NIP-57 zaps
 
   get donationSats(): number {
     if (!this.donationInput || this.donationInput <= 0) return 0;
@@ -141,6 +176,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.nostr.clearCharityFeedStatus();
+    this.clearDonationTimers();
     if (this.jsonLdScriptElement) {
       this.doc.head.removeChild(this.jsonLdScriptElement);
       this.jsonLdScriptElement = undefined;
@@ -185,6 +221,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
       if (this.charity) {
         this.updateSeo(this.charity);
+        this.loadRecentZapReceipts(this.charity.pubkey, isCurrent);
         this.loading = false;
 
         if (this.visitorPubkey) {
@@ -340,6 +377,24 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
   }
 
+  private loadRecentZapReceipts(pubkey: string, isCurrent: () => boolean) {
+    if (!pubkey) return;
+    this.recentZapsLoading = true;
+    this.nostr.loadNip57ZapReceiptsForCharity(pubkey, 8)
+      .then((receipts) => {
+        if (!isCurrent()) return;
+        this.recentZapReceipts = receipts;
+      })
+      .catch((err) => {
+        if (!isCurrent()) return;
+        console.warn('[PoH] recent zap receipts failed', err);
+      })
+      .finally(() => {
+        if (!isCurrent()) return;
+        this.recentZapsLoading = false;
+      });
+  }
+
   private donationErrorMessage(err: any): string {
     const raw = String(err?.message || err || '').toLowerCase();
 
@@ -351,45 +406,148 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   async donate() {
-    if (!this.charity) return;
+    await this.donateWithLightning();
+  }
+
+  async donateWithLightning() {
+    if (!this.prepareDonation('lightning')) return;
 
     const sats = this.donationSats;
-    if (!sats || sats <= 0) {
-      this.toast('Enter a valid donation amount.', 'error', 3000);
-      return;
-    }
-
     const lightningAddress = this.donationAddress;
-    if (!lightningAddress.includes('@')) {
-      this.toast('No valid lightning address found for this charity.', 'error', 3500);
-      return;
-    }
-
-    this.showDonateModal = true;
-    this.lastInvoice = '';
-    this.qrDataUrl = '';
-    this.donating = true;
-    this.donationStatus = 'Connecting to signer and creating zap invoice…';
+    this.donationStatus = 'Creating plain Lightning invoice…';
 
     try {
-      const invoice = await this.createZapInvoice(lightningAddress, sats, true);
-      this.lastInvoice = invoice;
-      await this.generateQr(invoice);
-
-      const launched = await this.tryLaunchInvoice(invoice);
-      this.donationStatus = launched
-        ? 'Invoice ready. Wallet open attempted. If nothing opened, use the options below.'
-        : 'Invoice ready. Use Open wallet or Copy invoice.';
-      if (!launched) {
-        this.toast('Could not open wallet automatically. Use QR or copy invoice.', 'info', 3500);
-      }
-
-      setTimeout(() => this.refreshCharity(), 4000);
+      const invoice = await this.createLightningInvoice(lightningAddress, sats);
+      await this.presentInvoice(invoice, 'Lightning invoice ready. Pay with your wallet; this does not publish a Nostr zap receipt.');
+      this.scheduleLightningThanksCard();
     } catch (e: any) {
       this.donationStatus = this.donationErrorMessage(e);
     } finally {
       this.donating = false;
     }
+  }
+
+  async zapWithNostr() {
+    if (!this.prepareDonation('zap')) return;
+    if (!window.nostr) {
+      this.donationStatus = 'A Nostr signer is required for verified zaps.';
+      this.toast('Connect a Nostr signer to zap.', 'error', 3500);
+      this.donating = false;
+      return;
+    }
+
+    const sats = this.donationSats;
+    const lightningAddress = this.donationAddress;
+    const since = Math.floor(Date.now() / 1000) - 10;
+    this.donationStatus = 'Preparing standard NIP-57 zap request…';
+
+    try {
+      const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.');
+      void this.watchForZapReceipt(donorPubkey, sats, since, zapRequestId);
+    } catch (e: any) {
+      this.donationStatus = this.donationErrorMessage(e);
+    } finally {
+      this.donating = false;
+    }
+  }
+
+  private prepareDonation(flow: 'lightning' | 'zap'): boolean {
+    if (!this.charity) return false;
+
+    const sats = this.donationSats;
+    if (!sats || sats <= 0) {
+      this.toast('Enter a valid donation amount.', 'error', 3000);
+      return false;
+    }
+
+    const lightningAddress = this.donationAddress;
+    if (!lightningAddress.includes('@')) {
+      this.toast('No valid lightning address found for this charity.', 'error', 3500);
+      return false;
+    }
+
+    this.donationFlow = flow;
+    this.showDonateModal = true;
+    this.lastInvoice = '';
+    this.qrDataUrl = '';
+    this.showLightningThanksCard = false;
+    this.showZapCelebration = false;
+    this.clearDonationTimers();
+    this.donating = true;
+    return true;
+  }
+
+  private clearDonationTimers() {
+    if (this.lightningThanksTimer) {
+      clearTimeout(this.lightningThanksTimer);
+      this.lightningThanksTimer = undefined;
+    }
+    if (this.zapCelebrationTimer) {
+      clearTimeout(this.zapCelebrationTimer);
+      this.zapCelebrationTimer = undefined;
+    }
+  }
+
+  private scheduleLightningThanksCard() {
+    if (this.lightningThanksTimer) clearTimeout(this.lightningThanksTimer);
+    this.lightningThanksTimer = setTimeout(() => {
+      if (this.showDonateModal && this.donationFlow === 'lightning' && this.lastInvoice) {
+        this.showLightningThanksCard = true;
+      }
+      this.lightningThanksTimer = undefined;
+    }, 5_000);
+  }
+
+  private celebrateZapReceipt() {
+    this.showZapCelebration = true;
+    if (this.zapCelebrationTimer) clearTimeout(this.zapCelebrationTimer);
+    this.zapCelebrationTimer = setTimeout(() => {
+      this.zapCelebrationTimer = undefined;
+
+      if (this.showDonateModal && this.donationFlow === 'zap') {
+        this.closeQrModal();
+        return;
+      }
+
+      this.showZapCelebration = false;
+    }, 8_000);
+  }
+
+  private async presentInvoice(invoice: string, readyMessage: string) {
+    this.lastInvoice = invoice;
+    await this.generateQr(invoice);
+
+    const launched = await this.tryLaunchInvoice(invoice);
+    this.donationStatus = launched
+      ? `${readyMessage} Wallet open attempted. If nothing opened, use the options below.`
+      : `${readyMessage} Use Open wallet or Copy invoice.`;
+    if (!launched) {
+      this.toast('Could not open wallet automatically. Use QR or copy invoice.', 'info', 3500);
+    }
+  }
+
+  private async watchForZapReceipt(donorPubkey: string, sats: number, since: number, zapRequestId?: string) {
+    if (!this.charity) return;
+    const charityPubkey = this.charity.pubkey;
+    const receipt = await this.nostr.waitForNip57ZapReceipt({
+      charityPubkey,
+      donorPubkey,
+      amountSats: sats,
+      since,
+      zapRequestId,
+      timeoutMs: 300_000
+    });
+
+    if (!receipt || !this.charity || this.charity.pubkey !== charityPubkey) {
+      this.donationStatus = 'Payment may still be settling. The verified zap will appear after the standard NIP-57 receipt reaches relays.';
+      return;
+    }
+
+    this.donationStatus = 'Verified NIP-57 zap receipt found on relays.';
+    this.celebrateZapReceipt();
+    this.recentZapReceipts = [receipt, ...this.recentZapReceipts.filter((r) => r.receiptId !== receipt.receiptId)].slice(0, 8);
+    await this.refreshCharity();
   }
 
   async copyInvoice() {
@@ -443,6 +601,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   closeQrModal() {
     this.showDonateModal = false;
+    this.showLightningThanksCard = false;
+    this.showZapCelebration = false;
+    this.clearDonationTimers();
   }
 
   async openWalletAgain() {
@@ -545,85 +706,76 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async createZapInvoice(lightningAddress: string, sats: number, preferZap: boolean): Promise<string> {
+  private async createLightningInvoice(lightningAddress: string, sats: number): Promise<string> {
+    const { payParams } = await this.loadLnurlPayParams(lightningAddress);
+    const amountMsat = sats * 1000;
+    this.assertLnurlAmountAllowed(payParams, amountMsat);
+    return this.requestInvoice(payParams.callback, amountMsat);
+  }
+
+  private async createNip57ZapInvoice(lightningAddress: string, sats: number): Promise<{ invoice: string; donorPubkey: string; zapRequestId?: string }> {
+    const { payParams, name, domain } = await this.loadLnurlPayParams(lightningAddress);
+
+    const amountMsat = sats * 1000;
+    this.assertLnurlAmountAllowed(payParams, amountMsat);
+
+    const allowsZap = payParams?.allowsNostr === true && typeof payParams?.nostrPubkey === 'string' && payParams.nostrPubkey.length > 0;
+    if (!allowsZap) {
+      throw new Error('This Lightning address does not advertise NIP-57 zap support. Use Donate with Lightning instead.');
+    }
+
+    if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
+
+    const relays = this.nostr.getActiveRelays();
+    const lnurl = encodeLnurl(`https://${domain}/.well-known/lnurlp/${name}`);
+    const zapRequest = {
+      kind: 9734,
+      created_at: Math.floor(Date.now() / 1000),
+      content: `Proof of Heart zap for ${this.charity?.name || 'this charity'}`,
+      tags: [
+        ['relays', ...relays],
+        ['amount', String(amountMsat)],
+        ['lnurl', lnurl],
+        ['p', this.charity!.pubkey]
+      ]
+    } as any;
+
+    this.donationStatus = 'Approve the standard NIP-57 zap request in your Nostr signer…';
+    const signedZap = await this.withTimeout(window.nostr.signEvent(zapRequest), 15_000, 'Signer approval');
+    const donorPubkey = signedZap?.pubkey || '';
+    if (!donorPubkey) throw new Error('Signer did not return a donor pubkey on the zap request.');
+    this.visitorPubkey = donorPubkey;
+    this.signerConnected = true;
+    const invoice = await this.requestInvoice(payParams.callback, amountMsat, signedZap);
+    return { invoice, donorPubkey, zapRequestId: signedZap?.id };
+  }
+
+  private async loadLnurlPayParams(lightningAddress: string): Promise<{ payParams: any; name: string; domain: string }> {
     const [name, domain] = lightningAddress.split('@');
     if (!name || !domain) throw new Error('Invalid lightning address format.');
 
     const payParams = await this.loadPayParams(lightningAddress, name, domain);
-
     if (!payParams?.callback) {
       throw new Error('Lightning address does not expose a valid LNURL callback.');
     }
 
-    const amountMsat = sats * 1000;
+    return { payParams, name, domain };
+  }
+
+  private assertLnurlAmountAllowed(payParams: any, amountMsat: number) {
     if (amountMsat < Number(payParams.minSendable || 0) || amountMsat > Number(payParams.maxSendable || Number.MAX_SAFE_INTEGER)) {
       throw new Error('Amount is outside allowed range for this lightning address.');
     }
+  }
 
-    const fetchLnurlInvoice = async (): Promise<string> => {
-      const callbackUrl = new URL(payParams.callback);
-      callbackUrl.searchParams.set('amount', String(amountMsat));
-      const lnurlInvoice = await this.fetchInvoiceFromCallback(callbackUrl);
-      if (!lnurlInvoice?.pr) throw new Error('No invoice returned by lightning endpoint.');
-      return lnurlInvoice.pr;
-    };
+  private async requestInvoice(callback: string, amountMsat: number, signedZap?: any): Promise<string> {
+    const callbackUrl = new URL(callback);
+    callbackUrl.searchParams.set('amount', String(amountMsat));
+    if (signedZap) callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
 
-    let donorPubkey = this.visitorPubkey;
-    if (!donorPubkey && window.nostr) {
-      try {
-        donorPubkey = await this.withTimeout(window.nostr.getPublicKey(), 2_500, 'Signer public key');
-        this.visitorPubkey = donorPubkey;
-      } catch {
-        // signer unavailable/slow; continue with plain lnurl invoice
-      }
-    }
-
-    const allowsZap = payParams?.allowsNostr === true && typeof payParams?.nostrPubkey === 'string' && payParams.nostrPubkey.length > 0;
-
-    if (preferZap && donorPubkey && window.nostr && allowsZap) {
-      const signer = window.nostr;
-      const fetchSignedZapInvoice = async (): Promise<string> => {
-        const relays = this.nostr.getActiveRelays();
-        const zapRequest = {
-          kind: 9734,
-          created_at: Math.floor(Date.now() / 1000),
-          content: `Proof of Heart zap request (optional): sign to attach Nostr zap metadata for ${sats} sats to ${this.charity?.name || 'this charity'}. Payment itself happens in your Lightning wallet via invoice/QR.`,
-          pubkey: donorPubkey,
-          tags: [
-            ['relays', ...relays],
-            ['amount', String(amountMsat)],
-            ['p', this.charity!.pubkey]
-          ]
-        } as any;
-
-        this.donationStatus = 'Approve zap signature in your Nostr signer (optional social proof)…';
-        console.info('[PoH] donate:signer-request', {
-          hasSigner: !!window.nostr,
-          donorPubkey,
-          userActivationActive: (navigator as any)?.userActivation?.isActive ?? null,
-          amountMsat
-        });
-
-        const signedZap = await this.withTimeout(signer.signEvent(zapRequest), 8_000, 'Signer approval');
-
-        const callbackUrl = new URL(payParams.callback);
-        callbackUrl.searchParams.set('amount', String(amountMsat));
-        callbackUrl.searchParams.set('nostr', JSON.stringify(signedZap));
-
-        const zapInvoice = await this.fetchInvoiceFromCallback(callbackUrl);
-        if (!zapInvoice?.pr) throw new Error('No invoice returned by zap callback.');
-        return zapInvoice.pr;
-      };
-
-      try {
-        return await fetchSignedZapInvoice();
-      } catch (e) {
-        console.warn('[PoH] donate:zap-path-failed, fallback to lnurl', e);
-        this.donationStatus = 'Zap signature was not completed. You can still donate via regular invoice.';
-      }
-    }
-
-    return fetchLnurlInvoice();
+    const invoiceResponse = await this.fetchInvoiceFromCallback(callbackUrl);
+    if (!invoiceResponse?.pr) throw new Error('No invoice returned by lightning endpoint.');
+    return invoiceResponse.pr;
   }
 
   private updateSeo(charity: CharityProfile) {

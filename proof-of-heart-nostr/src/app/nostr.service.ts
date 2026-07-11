@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { SimplePool } from 'nostr-tools/pool';
-import { nip19 } from 'nostr-tools';
+import { nip19, nip57 } from 'nostr-tools';
 
 export interface CharityProfile {
   pubkey: string;
@@ -44,6 +44,16 @@ export interface CharityExtraFields {
 export interface CharityLoadResult {
   charities: CharityProfile[];
   fromCache: boolean;
+}
+
+export interface Nip57ZapReceipt {
+  receiptId: string;
+  zapRequestId?: string;
+  donorPubkey: string;
+  recipientPubkey: string;
+  sats: number;
+  createdAt: number;
+  comment?: string;
 }
 
 export interface CharityFeedStatus {
@@ -95,11 +105,16 @@ export function mergeCharityProfiles(existing: CharityProfile[], incoming: Chari
   });
 }
 
+// Shared app rendezvous relays for Proof of Heart app-specific records.
+// NIP-78/kind 30078 records are discovered from relays, not from the SEO JSON feed.
+// New charity records are published to every relay here; reads fan out across all of them.
 const PROD_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://nostr.wine',
-  'wss://relay.snort.social'
+  'wss://relay.snort.social',
+  'wss://nos.lol',
+  'wss://nostr.mom'
 ];
 
 const TEST_RELAYS = [
@@ -120,6 +135,7 @@ const CHARITY_DETAIL_CACHE_PREFIX = 'poh_charity_detail_cache_v1:';
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
+const KIND_RELAY_LIST_METADATA = 10002; // NIP-65 relay list metadata
 const KIND_REPORT = 1984; // NIP-56 report
 const FLAG_HIDE_THRESHOLD = 3;
 const PROOF_OF_HEART_PUBKEY = '1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d';
@@ -142,6 +158,83 @@ function compareCharityProfiles(a: CharityProfile, b: CharityProfile): number {
 
 export function sortCharityProfiles(charities: CharityProfile[]): CharityProfile[] {
   return [...charities].sort(compareCharityProfiles);
+}
+
+export function zapReceiptSats(event: any): number {
+  const amountMsat = Number(event?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
+  if (Number.isFinite(amountMsat) && amountMsat > 0) return Math.floor(amountMsat / 1000);
+
+  const bolt11 = event?.tags?.find((t: string[]) => t[0] === 'bolt11')?.[1];
+  if (typeof bolt11 === 'string' && bolt11) {
+    const sats = Number(nip57.getSatoshisAmountFromBolt11(bolt11));
+    if (Number.isFinite(sats) && sats > 0) return Math.floor(sats);
+  }
+
+  const description = event?.tags?.find((t: string[]) => t[0] === 'description')?.[1];
+  if (typeof description === 'string' && description) {
+    try {
+      const zapRequest = JSON.parse(description);
+      const requestAmountMsat = Number(zapRequest?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
+      if (Number.isFinite(requestAmountMsat) && requestAmountMsat > 0) return Math.floor(requestAmountMsat / 1000);
+    } catch {
+      // ignore malformed zap descriptions
+    }
+  }
+
+  return 0;
+}
+
+export function parseNip57ZapReceipt(event: any): Nip57ZapReceipt | null {
+  if (!event || event.kind !== 9735) return null;
+
+  const recipientPubkey = event.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+  if (!recipientPubkey) return null;
+
+  const sats = zapReceiptSats(event);
+  if (!sats || sats <= 0) return null;
+
+  const description = event.tags?.find((t: string[]) => t[0] === 'description')?.[1];
+  let zapRequest: any;
+  if (typeof description === 'string' && description) {
+    try {
+      zapRequest = JSON.parse(description);
+    } catch {
+      zapRequest = undefined;
+    }
+  }
+
+  const donorPubkey = typeof zapRequest?.pubkey === 'string' && zapRequest.pubkey
+    ? zapRequest.pubkey
+    : event.pubkey;
+  if (!donorPubkey) return null;
+
+  const comment = typeof zapRequest?.content === 'string' ? zapRequest.content.trim() : '';
+
+  return {
+    receiptId: event.id || '',
+    zapRequestId: zapRequest?.id,
+    donorPubkey,
+    recipientPubkey,
+    sats,
+    createdAt: Number(event.created_at) || 0,
+    comment: comment || undefined
+  };
+}
+
+export function totalZapSatsByRecipient(zapReceipts: any[], recipients: string[]): Map<string, number> {
+  const recipientSet = new Set(recipients);
+  const zapMap = new Map<string, number>();
+
+  for (const ev of zapReceipts || []) {
+    const p = ev?.tags?.find((t: string[]) => t[0] === 'p' && recipientSet.has(t[1]))?.[1];
+    if (!p) continue;
+
+    const sats = zapReceiptSats(ev);
+    if (!sats || sats <= 0) continue;
+    zapMap.set(p, (zapMap.get(p) || 0) + sats);
+  }
+
+  return zapMap;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -224,6 +317,89 @@ export class NostrService {
   private getKind0ReadRelays(): string[] {
     if (this.isLocalhostRuntime()) return PROD_RELAYS;
     return this.getActiveRelays();
+  }
+
+  private uniqueRelays(relays: string[]): string[] {
+    return [...new Set(relays.filter((relay) => typeof relay === 'string' && relay.startsWith('ws')))];
+  }
+
+  private async loadAuthorWriteRelays(pubkey: string): Promise<string[]> {
+    if (!pubkey) return [];
+    const events = await this.pool.querySync(PROD_RELAYS, {
+      kinds: [KIND_RELAY_LIST_METADATA],
+      authors: [pubkey],
+      limit: 20
+    });
+
+    const latest = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0))[0] as any;
+    if (!latest?.tags) return [];
+
+    return this.uniqueRelays(
+      latest.tags
+        .filter((tag: string[]) => tag[0] === 'r' && (!tag[2] || tag[2] === 'write'))
+        .map((tag: string[]) => tag[1])
+    );
+  }
+
+  private async getAuthorAwareRelays(pubkey: string): Promise<string[]> {
+    try {
+      return this.uniqueRelays([...this.getActiveRelays(), ...(await this.loadAuthorWriteRelays(pubkey))]);
+    } catch {
+      return this.getActiveRelays();
+    }
+  }
+
+  async loadNip57ZapReceiptsForCharity(pubkey: string, limit = 12, since?: number): Promise<Nip57ZapReceipt[]> {
+    if (!pubkey) return [];
+
+    const filter: any = {
+      kinds: [9735],
+      '#p': [pubkey],
+      limit
+    };
+    if (Number.isFinite(since) && (since as number) > 0) filter.since = since;
+
+    const events = await this.pool.querySync(this.getActiveRelays(), filter);
+
+    const byId = new Map<string, Nip57ZapReceipt>();
+    for (const receipt of (events as any[])
+      .map(parseNip57ZapReceipt)
+      .filter((receipt): receipt is Nip57ZapReceipt => !!receipt && receipt.recipientPubkey === pubkey)) {
+      byId.set(receipt.receiptId || `${receipt.donorPubkey}:${receipt.createdAt}:${receipt.sats}`, receipt);
+    }
+
+    return [...byId.values()]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  }
+
+  async waitForNip57ZapReceipt(options: {
+    charityPubkey: string;
+    donorPubkey: string;
+    amountSats: number;
+    since: number;
+    zapRequestId?: string;
+    timeoutMs?: number;
+  }): Promise<Nip57ZapReceipt | null> {
+    const timeoutMs = options.timeoutMs ?? 60_000;
+    const startedAt = Date.now();
+    const toleranceSats = Math.max(1, Math.floor(options.amountSats * 0.01));
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const receipts = await this.loadNip57ZapReceiptsForCharity(options.charityPubkey, 100, options.since);
+      const match = receipts.find((receipt) => {
+        if (options.zapRequestId && receipt.zapRequestId === options.zapRequestId) return true;
+        const amountMatches = Math.abs(receipt.sats - options.amountSats) <= toleranceSats;
+        return receipt.donorPubkey === options.donorPubkey
+          && receipt.createdAt >= options.since
+          && amountMatches;
+      });
+      if (match) return match;
+
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+    }
+
+    return null;
   }
 
   async connectSigner(): Promise<{ pubkey: string; npub: string }> {
@@ -318,7 +494,7 @@ export class NostrService {
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
     if (!window.nostr) throw new Error('No Nostr signer found.');
-    const relays = this.getWriteRelays();
+    const appRelays = this.getWriteRelays();
 
     const localPubkey = typeof window !== 'undefined'
       ? (window.localStorage.getItem(LAST_PUBKEY_KEY) || undefined)
@@ -333,7 +509,7 @@ export class NostrService {
     };
 
     console.info('[PoH] publishCharityProfile:start', {
-      relays,
+      appRelays,
       event,
       userActivationActive: (navigator as any)?.userActivation?.isActive ?? null
     });
@@ -351,16 +527,33 @@ export class NostrService {
       throw new Error(`Signer could not sign charity profile event. ${e?.message || ''}`.trim());
     }
 
+    // NIP-65: when we know the author, also publish to the author's advertised write relays.
+    // The app relays remain the rendezvous set used for directory discovery.
+    const relays = this.uniqueRelays([...appRelays, ...(await this.loadAuthorWriteRelays(signed.pubkey).catch(() => []))]);
+
+    let acceptedRelays: string[] = [];
     try {
-      await this.withTimeout(
-        Promise.any(this.pool.publish(relays, signed as any)),
+      const publishResults = await this.withTimeout(
+        Promise.allSettled(this.pool.publish(relays, signed as any)),
         15_000,
-        'Relay publish acknowledgement'
+        'Relay publish acknowledgements'
       );
-      console.info('[PoH] publishCharityProfile:publish-accepted', { id: signed.id, relays });
+      acceptedRelays = publishResults
+        .map((result, index) => result.status === 'fulfilled' ? relays[index] : null)
+        .filter((relay): relay is string => !!relay);
+
+      if (!acceptedRelays.length) {
+        throw new Error('No relay accepted the event.');
+      }
+
+      console.info('[PoH] publishCharityProfile:publish-accepted', {
+        id: signed.id,
+        acceptedRelays,
+        rejectedRelays: relays.filter((relay) => !acceptedRelays.includes(relay))
+      });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:publish-failed', e);
-      throw new Error('Signed profile event, but relays did not accept it. Try another relay/signer and retry.');
+      throw new Error('Signed profile event, but app relays did not accept it. Try another relay/signer and retry.');
     }
 
     // Read-after-write verification to surface signer/relay issues explicitly.
@@ -390,7 +583,7 @@ export class NostrService {
   }
 
   async loadOwnCharityProfile(pubkey: string): Promise<CharityExtraFields | null> {
-    const relays = this.getActiveRelays();
+    const relays = await this.getAuthorAwareRelays(pubkey);
     const events = await this.pool.querySync(relays, {
       kinds: [KIND_CHARITY_PROFILE],
       authors: [pubkey],
@@ -405,7 +598,7 @@ export class NostrService {
   }
 
   async ensureCharityProfile(pubkey: string): Promise<void> {
-    const relays = this.getActiveRelays();
+    const relays = await this.getAuthorAwareRelays(pubkey);
     const existing = await this.pool.querySync(relays, {
       kinds: [KIND_CHARITY_PROFILE],
       authors: [pubkey],
@@ -614,10 +807,17 @@ export class NostrService {
     }
   }
 
-  private writeCharityCache(charities: CharityProfile[]): void {
+  private writeCharityCache(charities: CharityProfile[], mode: 'replace' | 'upsert' = 'replace'): void {
     if (typeof window === 'undefined') return;
     try {
-      const merged = mergeCharityProfiles(this.readStoredCharityCache(Math.max(charities.length, 100)), charities);
+      const stored = this.readStoredCharityCache(Math.max(charities.length, 100));
+      const mergedIncoming = mergeCharityProfiles(stored, charities);
+      const merged = mode === 'upsert'
+        ? sortCharityProfiles([
+          ...mergedIncoming,
+          ...stored.filter((cached) => !charities.some((incoming) => incoming.pubkey === cached.pubkey))
+        ])
+        : sortCharityProfiles(mergedIncoming);
       const payload = { v: CHARITIES_CACHE_VERSION, ts: Date.now(), charities: merged };
       window.localStorage.setItem(CHARITIES_CACHE_KEY, JSON.stringify(payload));
     } catch {
@@ -765,7 +965,7 @@ export class NostrService {
     };
 
     this.cacheCharityDetail(updated);
-    this.writeCharityCache([updated]);
+    this.writeCharityCache([updated], 'upsert');
     return updated;
   }
 
@@ -855,6 +1055,7 @@ export class NostrService {
       }
     };
   }
+
 
   private extractFollowersCount(payload: any): number | null {
     if (!payload || typeof payload !== 'object') return null;
@@ -1039,7 +1240,9 @@ export class NostrService {
     });
 
     const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
-    if (!pubkeys.length) return { charities: [], fromCache: false };
+    if (!pubkeys.length) {
+      return { charities: [], fromCache: false };
+    }
 
     const cachedFollowerCounts = this.readCachedFollowerCounts(pubkeys);
 
@@ -1121,7 +1324,7 @@ export class NostrService {
       });
     }
 
-    const sorted = sortCharityProfiles(charities);
+    const sorted = sortCharityProfiles(charities).slice(0, limit);
     this.writeCharityCache(sorted);
     return { charities: sorted, fromCache: false };
   }
@@ -1139,7 +1342,9 @@ export class NostrService {
     });
 
     const pubkeys = [...new Set(charityEvents.map((e: any) => e.pubkey))];
-    if (!pubkeys.length) return [];
+    if (!pubkeys.length) {
+      return [];
+    }
 
     const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
@@ -1245,14 +1450,7 @@ export class NostrService {
       ratingMap.set(p, current);
     }
 
-    const zapMap = new Map<string, number>();
-    for (const ev of zapReceipts as any[]) {
-      const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
-      const amountMsat = Number(ev.tags.find((t: string[]) => t[0] === 'amount')?.[1] || 0);
-      if (!p || Number.isNaN(amountMsat) || amountMsat <= 0) continue;
-      const sats = Math.floor(amountMsat / 1000);
-      zapMap.set(p, (zapMap.get(p) || 0) + sats);
-    }
+    const zapMap = totalZapSatsByRecipient(zapReceipts as any[], pubkeys);
 
     const charities: CharityProfile[] = [];
 
@@ -1299,7 +1497,7 @@ export class NostrService {
       });
     }
 
-    const sorted = sortCharityProfiles(charities);
+    const sorted = sortCharityProfiles(charities).slice(0, limit);
     this.writeCharityCache(sorted);
     return sorted;
   }

@@ -1,15 +1,15 @@
 [
   {
-    "pubkey": "f609d58b4253458768d9baf1b28ab4dfb5f6e690d99bb2760c83de3a840c3ea2",
-    "npub": "npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
-    "url": "https://proofofheart.org/charities/npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
-    "name": "My First Bitcoin",
-    "country": null,
-    "category": null,
-    "shortDescription": "Education That Empowers!",
-    "image": "https://cdn.satlantis.io/17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3-1770773385243-d15c439f-412f-487d-9cc1-56d3fa30f00d_17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3-1770773360234-3d2114c6-eb57-41af-ac4d-28887effc72c_f9d8cdd2565de0e284761cd1879987b476ea2aac0d1af44f2dee6f21990e8893.jpg",
-    "updatedAt": "2026-03-02T22:02:42.000Z",
-    "updatedDay": "2026-03-02"
+    "pubkey": "1586fd57ac81b66177b0087bb0c0fa465f30b9895949c8936836ec5e6cd13132",
+    "npub": "npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
+    "url": "https://proofofheart.org/charities/npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
+    "name": "BitcoinEkasi",
+    "country": "South Africa",
+    "category": "Education & Youth Development",
+    "shortDescription": "Building a Bitcoin circular economy in a South African township | Partnering with The Surfer Kids | Inspired by Bitcoin Beach.",
+    "image": "https://bitcoinekasi.files.wordpress.com/2022/02/cropped-bitcoin-africa-black-circle-small-1.png",
+    "updatedAt": "2026-03-10T17:06:36.000Z",
+    "updatedDay": "2026-03-10"
   },
   {
     "pubkey": "bf82afa43acd19d1afd84093ab38acad4b9db86db3013c093698ddae597ad1ba",
@@ -24,6 +24,18 @@
     "updatedDay": "2026-03-10"
   },
   {
+    "pubkey": "f609d58b4253458768d9baf1b28ab4dfb5f6e690d99bb2760c83de3a840c3ea2",
+    "npub": "npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
+    "url": "https://proofofheart.org/charities/npub17cyatz6z2dzcw6xehtcm9z45m76lde5smxdmyasvs00r4pqv863qrs4ml3",
+    "name": "My First Bitcoin",
+    "country": null,
+    "category": null,
+    "shortDescription": "Empowering The World Through Decentralized Bitcoin Education",
+    "image": "https://blossom.primal.net/41c44c97ed9e756991165312bb4df5576aa8bed4bca170d5a81fc26e020f769d.jpg",
+    "updatedAt": "2026-03-02T22:02:42.000Z",
+    "updatedDay": "2026-03-02"
+  },
+  {
     "pubkey": "1839e595671de0af8cb8a217f2aa579bb84c14a5d6f50ac466ef78676ec94b2d",
     "npub": "npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0",
     "url": "https://proofofheart.org/charities/npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0",
@@ -34,17 +46,5 @@
     "image": "https://blossom.primal.net/922d23923854fe995dd2fe46d175e12152c629ea3e71ed1383617608c1975986.png",
     "updatedAt": "2026-03-02T21:51:19.000Z",
     "updatedDay": "2026-03-02"
-  },
-  {
-    "pubkey": "1586fd57ac81b66177b0087bb0c0fa465f30b9895949c8936836ec5e6cd13132",
-    "npub": "npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
-    "url": "https://proofofheart.org/charities/npub1zkr064avsxmxzaasppamps86ge0npwvft9yu3ymgxmk9umx3xyeq9sk6ec",
-    "name": "BitcoinEkasi",
-    "country": "South Africa",
-    "category": "Education & Youth Development",
-    "shortDescription": "Building a Bitcoin circular economy in a South African township | Partnering with The Surfer Kids | Inspired by Bitcoin Beach.",
-    "image": "https://bitcoinekasi.files.wordpress.com/2022/02/cropped-bitcoin-africa-black-circle-small-1.png",
-    "updatedAt": "2026-03-10T17:06:36.000Z",
-    "updatedDay": "2026-03-10"
   }
 ]
