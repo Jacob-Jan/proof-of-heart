@@ -12,6 +12,7 @@ import { bech32 } from '@scure/base';
 
 const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
 const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
+const ANDROID_SIGNER_ZAP_HASH_PREFIX = '#pohAndroidSignerZap=';
 
 function encodeLnurl(url: string): string {
   return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
@@ -791,28 +792,58 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       createdAt: Date.now()
     }));
 
-    const callbackUrl = new URL(window.location.href);
-    callbackUrl.searchParams.set('androidSignerZap', requestId);
-    callbackUrl.searchParams.set('signedZap', '');
+    // Amber/NIP-55 decodes the whole nostrsigner URI before parsing query params.
+    // If callbackUrl contains its own ? or &, those get mistaken for signer params
+    // and the signed event is appended to the wrong URL. Keep the callback suffix
+    // free of query separators and parse the signed event from the fragment instead.
+    const callbackUrl = `${window.location.origin}${window.location.pathname}${ANDROID_SIGNER_ZAP_HASH_PREFIX}${encodeURIComponent(requestId)}:`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
-      + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl.toString())}`;
+      + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-    this.donationStatus = 'Opening Amber to approve the standard NIP-57 zap request…';
+    this.donationStatus = 'Opening Android signer to approve the standard NIP-57 zap request…';
     window.location.href = signerUrl;
+  }
+
+  private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
+    const url = new URL(window.location.href);
+    const legacyRequestId = url.searchParams.get('androidSignerZap') || '';
+    const legacySignedZapRaw = url.searchParams.get('signedZap') || '';
+    if (legacyRequestId && legacySignedZapRaw) {
+      return { requestId: legacyRequestId, signedZapRaw: legacySignedZapRaw };
+    }
+
+    const hash = window.location.hash || '';
+    if (!hash.startsWith(ANDROID_SIGNER_ZAP_HASH_PREFIX)) return null;
+
+    const raw = hash.slice(ANDROID_SIGNER_ZAP_HASH_PREFIX.length);
+    const separator = raw.indexOf(':');
+    if (separator < 1) return null;
+
+    try {
+      return {
+        requestId: decodeURIComponent(raw.slice(0, separator)),
+        signedZapRaw: decodeURIComponent(raw.slice(separator + 1))
+      };
+    } catch {
+      return {
+        requestId: raw.slice(0, separator),
+        signedZapRaw: raw.slice(separator + 1)
+      };
+    }
   }
 
   private async resumeAndroidSignerZapIfPresent(): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    const url = new URL(window.location.href);
-    const requestId = url.searchParams.get('androidSignerZap') || '';
-    const signedZapRaw = url.searchParams.get('signedZap') || '';
-    if (!requestId || !signedZapRaw) return;
+    const signerCallback = this.readAndroidSignerZapCallback();
+    if (!signerCallback) return;
+    const { requestId, signedZapRaw } = signerCallback;
 
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('androidSignerZap');
     cleanUrl.searchParams.delete('signedZap');
+    cleanUrl.hash = '';
     window.history.replaceState({}, '', cleanUrl.toString());
 
     let pending: any;
