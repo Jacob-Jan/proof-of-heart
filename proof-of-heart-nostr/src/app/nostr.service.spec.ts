@@ -1,4 +1,4 @@
-import { mergeCharityProfiles, sortCharityProfiles, CharityProfile } from './nostr.service';
+import { mergeCharityProfiles, parseNip57ZapReceipt, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
 
 describe('mergeCharityProfiles', () => {
   it('preserves cached visual and follower fields when live refresh omits them', () => {
@@ -120,6 +120,45 @@ describe('mergeCharityProfiles', () => {
     expect(merged.charity.country).toBe('GB');
     expect(merged.charity.isVisible).toBeFalse();
   });
+
+  it('does not keep cached charities that are missing from an authoritative relay refresh', () => {
+    const cachedMissing: CharityProfile = {
+      pubkey: 'missing-pubkey',
+      npub: 'npub1missing',
+      name: 'Temporarily Missing Charity',
+      about: 'cached about',
+      followers: 0,
+      followersLoaded: false,
+      flags: 0,
+      hidden: false,
+      ratingAvg: 0,
+      ratingCount: 0,
+      zappedSats: 0,
+      profileUpdatedAt: 100,
+      charity: { shortDescription: 'cached short', isVisible: true }
+    };
+
+    const freshOnly: CharityProfile = {
+      pubkey: 'fresh-pubkey',
+      npub: 'npub1fresh',
+      name: 'Fresh Charity',
+      about: '',
+      followers: 0,
+      followersLoaded: false,
+      flags: 0,
+      hidden: false,
+      ratingAvg: 0,
+      ratingCount: 0,
+      zappedSats: 0,
+      profileUpdatedAt: 200,
+      charity: { isVisible: true }
+    };
+
+    const merged = mergeCharityProfiles([cachedMissing], [freshOnly]);
+
+    expect(merged.map((charity) => charity.pubkey)).not.toContain('missing-pubkey');
+    expect(merged.map((charity) => charity.pubkey)).toContain('fresh-pubkey');
+  });
 });
 
 describe('sortCharityProfiles', () => {
@@ -170,5 +209,85 @@ describe('sortCharityProfiles', () => {
     ] as CharityProfile[]);
 
     expect(sorted.map((c) => c.name)).toEqual(['Newer Charity', 'Older Charity', 'Proof of Heart']);
+  });
+});
+
+describe('zap receipt stats', () => {
+  it('counts standard zap receipts from bolt11 tags', () => {
+    const receipts = [
+      {
+        kind: 9735,
+        tags: [
+          ['p', 'recipient-a'],
+          ['bolt11', 'lnbc10u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']
+        ]
+      },
+      {
+        kind: 9735,
+        tags: [
+          ['p', 'recipient-a'],
+          ['bolt11', 'lnbc5u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']
+        ]
+      },
+      {
+        kind: 9735,
+        tags: [
+          ['p', 'other-recipient'],
+          ['bolt11', 'lnbc1u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']
+        ]
+      }
+    ];
+
+    const totals = totalZapSatsByRecipient(receipts, ['recipient-a']);
+
+    expect(totals.get('recipient-a')).toBe(1500);
+    expect(totals.has('other-recipient')).toBeFalse();
+  });
+
+  it('falls back to the zap request amount in the description tag', () => {
+    const sats = zapReceiptSats({
+      kind: 9735,
+      tags: [
+        ['p', 'recipient-a'],
+        ['description', JSON.stringify({
+          kind: 9734,
+          tags: [['amount', '21000']]
+        })]
+      ]
+    });
+
+    expect(sats).toBe(21);
+  });
+
+  it('parses display records only from standard NIP-57 zap receipts', () => {
+    const receipt = parseNip57ZapReceipt({
+      id: 'receipt-1',
+      kind: 9735,
+      created_at: 123456,
+      pubkey: 'lnurl-server',
+      tags: [
+        ['p', 'recipient-a'],
+        ['amount', '21000'],
+        ['description', JSON.stringify({
+          id: 'zap-request-1',
+          kind: 9734,
+          pubkey: 'donor-a',
+          content: 'great work',
+          tags: [['amount', '21000'], ['p', 'recipient-a']]
+        })]
+      ]
+    });
+
+    expect(receipt).toEqual({
+      receiptId: 'receipt-1',
+      zapRequestId: 'zap-request-1',
+      donorPubkey: 'donor-a',
+      recipientPubkey: 'recipient-a',
+      sats: 21,
+      createdAt: 123456,
+      comment: 'great work'
+    });
+
+    expect(parseNip57ZapReceipt({ kind: 30079, tags: [['p', 'recipient-a']] })).toBeNull();
   });
 });

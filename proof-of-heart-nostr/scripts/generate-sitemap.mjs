@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SimplePool } from 'nostr-tools/pool';
@@ -21,7 +21,9 @@ const RELAYS = (process.env.SITEMAP_RELAYS
       'wss://relay.damus.io',
       'wss://relay.primal.net',
       'wss://nostr.wine',
-      'wss://relay.snort.social'
+      'wss://relay.snort.social',
+      'wss://nos.lol',
+      'wss://nostr.mom'
     ]);
 
 const STATIC_ROUTES = [
@@ -57,6 +59,27 @@ const compareCharityRecords = (a, b) => {
 
   return 0;
 };
+
+async function readExistingCharityRecords() {
+  try {
+    const raw = await readFile(path.join(PUBLIC_DIR, 'charities.json'), 'utf8');
+    const records = JSON.parse(raw);
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeStaticAndLiveRecords(existingRecords, liveRecords) {
+  const byPubkey = new Map();
+  for (const record of existingRecords) {
+    if (record?.pubkey) byPubkey.set(record.pubkey, record);
+  }
+  for (const record of liveRecords) {
+    if (record?.pubkey) byPubkey.set(record.pubkey, record);
+  }
+  return [...byPubkey.values()].sort(compareCharityRecords);
+}
 
 const escapeXml = (value) =>
   String(value)
@@ -223,8 +246,7 @@ async function fetchCharityRecords() {
       });
     }
 
-    records.sort(compareCharityRecords);
-    return records;
+    return mergeStaticAndLiveRecords(await readExistingCharityRecords(), records);
   } finally {
     pool.close(RELAYS);
   }
