@@ -11,9 +11,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { bech32 } from '@scure/base';
 
 const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
+const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
 
 function encodeLnurl(url: string): string {
   return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
+}
+
+function isAndroidBrowser(): boolean {
+  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
 @Component({
@@ -169,6 +174,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.localCharitySignedIn = this.signerConnected && this.nostr.hasLocalOnboarding(this.visitorPubkey);
 
     await this.refreshCharity();
+    await this.resumeAndroidSignerZapIfPresent();
 
     // Non-blocking: rate fetch should never delay profile rendering.
     this.loadBtcUsdRate();
@@ -429,16 +435,28 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   async zapWithNostr() {
     if (!this.prepareDonation('zap')) return;
+    const sats = this.donationSats;
+    const lightningAddress = this.donationAddress;
+    const since = Math.floor(Date.now() / 1000) - 10;
+
     if (!window.nostr) {
-      this.donationStatus = 'A Nostr signer is required for verified zaps.';
+      if (isAndroidBrowser()) {
+        try {
+          await this.startAndroidSignerZap(lightningAddress, sats, since);
+          return;
+        } catch (e: any) {
+          this.donationStatus = this.donationErrorMessage(e);
+          this.donating = false;
+          return;
+        }
+      }
+
+      this.donationStatus = 'A Nostr signer is required for verified zaps. On Android, use Amber or another NIP-55 signer; on desktop, use a NIP-07 extension.';
       this.toast('Connect a Nostr signer to zap.', 'error', 3500);
       this.donating = false;
       return;
     }
 
-    const sats = this.donationSats;
-    const lightningAddress = this.donationAddress;
-    const since = Math.floor(Date.now() / 1000) - 10;
     this.donationStatus = 'Preparing standard NIP-57 zap request…';
 
     try {
@@ -714,6 +732,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private async createNip57ZapInvoice(lightningAddress: string, sats: number): Promise<{ invoice: string; donorPubkey: string; zapRequestId?: string }> {
+    const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
+
+    if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
+
+    this.donationStatus = 'Approve the standard NIP-57 zap request in your Nostr signer…';
+    const signedZap = await this.withTimeout(window.nostr.signEvent(zapRequest), 15_000, 'Signer approval');
+    return this.createInvoiceFromSignedZap(payParams.callback, amountMsat, signedZap);
+  }
+
+  private async prepareNip57ZapRequest(lightningAddress: string, sats: number): Promise<{ payParams: any; amountMsat: number; zapRequest: any }> {
     const { payParams, name, domain } = await this.loadLnurlPayParams(lightningAddress);
 
     const amountMsat = sats * 1000;
@@ -723,8 +751,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     if (!allowsZap) {
       throw new Error('This Lightning address does not advertise NIP-57 zap support. Use Donate with Lightning instead.');
     }
-
-    if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
 
     const relays = this.nostr.getActiveRelays();
     const lnurl = encodeLnurl(`https://${domain}/.well-known/lnurlp/${name}`);
@@ -740,14 +766,83 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       ]
     } as any;
 
-    this.donationStatus = 'Approve the standard NIP-57 zap request in your Nostr signer…';
-    const signedZap = await this.withTimeout(window.nostr.signEvent(zapRequest), 15_000, 'Signer approval');
+    return { payParams, amountMsat, zapRequest };
+  }
+
+  private async createInvoiceFromSignedZap(callback: string, amountMsat: number, signedZap: any): Promise<{ invoice: string; donorPubkey: string; zapRequestId?: string }> {
     const donorPubkey = signedZap?.pubkey || '';
     if (!donorPubkey) throw new Error('Signer did not return a donor pubkey on the zap request.');
     this.visitorPubkey = donorPubkey;
     this.signerConnected = true;
-    const invoice = await this.requestInvoice(payParams.callback, amountMsat, signedZap);
+    const invoice = await this.requestInvoice(callback, amountMsat, signedZap);
     return { invoice, donorPubkey, zapRequestId: signedZap?.id };
+  }
+
+  private async startAndroidSignerZap(lightningAddress: string, sats: number, since: number): Promise<void> {
+    const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    window.sessionStorage.setItem(ANDROID_SIGNER_ZAP_KEY, JSON.stringify({
+      requestId,
+      callback: payParams.callback,
+      amountMsat,
+      sats,
+      since,
+      createdAt: Date.now()
+    }));
+
+    const callbackUrl = new URL(window.location.href);
+    callbackUrl.searchParams.set('androidSignerZap', requestId);
+    callbackUrl.searchParams.set('signedZap', '');
+
+    const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
+      + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl.toString())}`;
+
+    this.donationStatus = 'Opening Amber to approve the standard NIP-57 zap request…';
+    window.location.href = signerUrl;
+  }
+
+  private async resumeAndroidSignerZapIfPresent(): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    const requestId = url.searchParams.get('androidSignerZap') || '';
+    const signedZapRaw = url.searchParams.get('signedZap') || '';
+    if (!requestId || !signedZapRaw) return;
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('androidSignerZap');
+    cleanUrl.searchParams.delete('signedZap');
+    window.history.replaceState({}, '', cleanUrl.toString());
+
+    let pending: any;
+    try {
+      pending = JSON.parse(window.sessionStorage.getItem(ANDROID_SIGNER_ZAP_KEY) || '{}');
+    } catch {
+      pending = undefined;
+    }
+    window.sessionStorage.removeItem(ANDROID_SIGNER_ZAP_KEY);
+
+    if (!pending || pending.requestId !== requestId) {
+      this.toast('Android signer response did not match this zap attempt.', 'error', 4000);
+      return;
+    }
+
+    try {
+      const signedZap = JSON.parse(signedZapRaw);
+      this.donationFlow = 'zap';
+      this.showDonateModal = true;
+      this.donating = true;
+      this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
+      const { invoice, donorPubkey, zapRequestId } = await this.createInvoiceFromSignedZap(pending.callback, pending.amountMsat, signedZap);
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.');
+      void this.watchForZapReceipt(donorPubkey, Number(pending.sats || 0), Number(pending.since || Math.floor(Date.now() / 1000) - 10), zapRequestId);
+    } catch (e: any) {
+      this.donationStatus = this.donationErrorMessage(e);
+      this.toast(this.donationStatus, 'error', 4500);
+    } finally {
+      this.donating = false;
+    }
   }
 
   private async loadLnurlPayParams(lightningAddress: string): Promise<{ payParams: any; name: string; domain: string }> {
