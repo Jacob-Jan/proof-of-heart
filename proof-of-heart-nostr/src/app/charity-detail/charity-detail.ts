@@ -783,14 +783,14 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    window.sessionStorage.setItem(ANDROID_SIGNER_ZAP_KEY, JSON.stringify({
+    this.writePendingAndroidSignerZap({
       requestId,
       callback: payParams.callback,
       amountMsat,
       sats,
       since,
       createdAt: Date.now()
-    }));
+    });
 
     // Amber/NIP-55 decodes the whole nostrsigner URI before parsing query params.
     // If callbackUrl contains its own ? or &, those get mistaken for signer params
@@ -833,6 +833,34 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private writePendingAndroidSignerZap(pending: any): void {
+    const value = JSON.stringify(pending);
+    try {
+      window.localStorage.setItem(ANDROID_SIGNER_ZAP_KEY, value);
+    } catch {
+      // ignore storage quota / privacy mode failures; sessionStorage fallback below may still work
+    }
+    try {
+      window.sessionStorage.setItem(ANDROID_SIGNER_ZAP_KEY, value);
+    } catch {
+      // ignore storage quota / privacy mode failures
+    }
+  }
+
+  private takePendingAndroidSignerZap(): any {
+    let pending: any;
+    for (const store of [window.sessionStorage, window.localStorage]) {
+      try {
+        const raw = store.getItem(ANDROID_SIGNER_ZAP_KEY) || '';
+        if (!pending && raw) pending = JSON.parse(raw);
+        store.removeItem(ANDROID_SIGNER_ZAP_KEY);
+      } catch {
+        // keep trying the next store
+      }
+    }
+    return pending;
+  }
+
   private async resumeAndroidSignerZapIfPresent(): Promise<void> {
     if (typeof window === 'undefined') return;
 
@@ -846,13 +874,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     cleanUrl.hash = '';
     window.history.replaceState({}, '', cleanUrl.toString());
 
-    let pending: any;
-    try {
-      pending = JSON.parse(window.sessionStorage.getItem(ANDROID_SIGNER_ZAP_KEY) || '{}');
-    } catch {
-      pending = undefined;
-    }
-    window.sessionStorage.removeItem(ANDROID_SIGNER_ZAP_KEY);
+    const pending = this.takePendingAndroidSignerZap();
 
     if (!pending || pending.requestId !== requestId) {
       this.toast('Android signer response did not match this zap attempt.', 'error', 4000);
