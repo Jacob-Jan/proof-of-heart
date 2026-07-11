@@ -821,10 +821,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       sessionStorage: this.storageHas(window.sessionStorage, ANDROID_SIGNER_ZAP_KEY)
     });
 
-    // Amber/NIP-55 decodes the whole nostrsigner URI before parsing query params.
-    // Keep callbackUrl to one query parameter: Amber appends the encoded signed event
-    // directly after the colon, and we unpack androidSignerZap=<requestId>:<event>.
-    const callbackUrl = `${window.location.origin}${window.location.pathname}?androidSignerZap=${encodeURIComponent(requestId)}:`;
+    // Amber/NIP-55 decodes the whole nostrsigner URI before parsing params, then splits on "?" and "&".
+    // Keep callbackUrl free of query/hash separators. Amber appends the encoded signed event
+    // directly after the colon, and we unpack ;androidSignerZap=<requestId>:<event> from the path.
+    const callbackPath = `${window.location.pathname};androidSignerZap=${encodeURIComponent(requestId)}:`;
+    const callbackUrl = `${window.location.origin}${callbackPath}`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -906,8 +907,51 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private readPackedAndroidSignerZapCallbackFromPath(pathname: string): { requestId: string; signedZapRaw: string } | null {
+    const marker = ';androidSignerZap=';
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+
+    const packed = pathname.slice(markerIndex + marker.length);
+    const separator = packed.indexOf(':');
+    if (separator < 1) {
+      this.debugNip55('path callback missing separator', { pathLength: pathname.length });
+      return null;
+    }
+
+    try {
+      const parsed = {
+        requestId: decodeURIComponent(packed.slice(0, separator)),
+        signedZapRaw: decodeURIComponent(packed.slice(separator + 1))
+      };
+      this.debugNip55('path callback parsed', {
+        requestId: parsed.requestId,
+        signedZapLength: parsed.signedZapRaw.length
+      });
+      return parsed;
+    } catch {
+      const fallback = {
+        requestId: packed.slice(0, separator),
+        signedZapRaw: packed.slice(separator + 1)
+      };
+      this.debugNip55('path callback parsed without decoding', {
+        requestId: fallback.requestId,
+        signedZapLength: fallback.signedZapRaw.length
+      });
+      return fallback;
+    }
+  }
+
+  private stripAndroidSignerZapPathCallback(pathname: string): string {
+    const markerIndex = pathname.indexOf(';androidSignerZap=');
+    return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
+  }
+
   private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
     const url = new URL(window.location.href);
+    const pathCallback = this.readPackedAndroidSignerZapCallbackFromPath(url.pathname);
+    if (pathCallback) return pathCallback;
+
     const queryCallbackRaw = url.searchParams.get('androidSignerZap') || '';
     const legacySignedZapRaw = url.searchParams.get('signedZap') || '';
     if (queryCallbackRaw && legacySignedZapRaw) {
@@ -1028,6 +1072,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.debugNip55('resume callback found', { requestId, signedZapLength: signedZapRaw.length });
 
     const cleanUrl = new URL(window.location.href);
+    cleanUrl.pathname = this.stripAndroidSignerZapPathCallback(cleanUrl.pathname);
     cleanUrl.searchParams.delete('androidSignerZap');
     cleanUrl.searchParams.delete('signedZap');
     cleanUrl.hash = '';
