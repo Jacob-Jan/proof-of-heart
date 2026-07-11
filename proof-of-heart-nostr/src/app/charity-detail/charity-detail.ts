@@ -12,6 +12,8 @@ import { bech32 } from '@scure/base';
 
 const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
 const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
+const ANDROID_SIGNER_ZAP_DEBUG_KEY = 'poh:nip55-debug-log';
+const ANDROID_SIGNER_ZAP_DEBUG_FLAG = 'poh:nip55-debug-enabled';
 const ANDROID_SIGNER_ZAP_HASH_PREFIX = '#pohAndroidSignerZap=';
 
 function encodeLnurl(url: string): string {
@@ -95,7 +97,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private lightningThanksTimer?: ReturnType<typeof setTimeout>;
   private zapCelebrationTimer?: ReturnType<typeof setTimeout>;
   private androidSignerResumeInFlight = false;
+  nip55DebugMode = false;
+  nip55DebugLog: string[] = [];
   private readonly androidSignerResumeHandler = () => {
+    this.debugNip55('resume event', {
+      hash: this.safeLocationHash(),
+      visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown'
+    });
     void this.resumeAndroidSignerZapIfPresent();
   };
 
@@ -174,7 +182,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
 
+    this.initNip55DebugMode();
     this.installAndroidSignerResumeListeners();
+    this.debugNip55('component init', {
+      android: isAndroidBrowser(),
+      path: typeof window !== 'undefined' ? window.location.pathname : '',
+      hash: this.safeLocationHash()
+    });
 
     this.visitorPubkey = await this.nostr.getCurrentPubkey();
     this.signerConnected = await this.nostr.hasSigner();
@@ -787,6 +801,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private async startAndroidSignerZap(lightningAddress: string, sats: number, since: number): Promise<void> {
+    this.debugNip55('startAndroidSignerZap', { lightningAddress, sats, since });
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -798,6 +813,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       since,
       createdAt: Date.now()
     });
+    this.debugNip55('pending zap stored', {
+      requestId,
+      amountMsat,
+      callbackHost: this.safeHost(payParams.callback),
+      localStorage: this.storageHas(window.localStorage, ANDROID_SIGNER_ZAP_KEY),
+      sessionStorage: this.storageHas(window.sessionStorage, ANDROID_SIGNER_ZAP_KEY)
+    });
 
     // Amber/NIP-55 decodes the whole nostrsigner URI before parsing query params.
     // If callbackUrl contains its own ? or &, those get mistaken for signer params
@@ -808,8 +830,81 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
+    this.debugNip55('opening signer', {
+      callbackUrl,
+      signerUrlLength: signerUrl.length,
+      zapKind: zapRequest.kind,
+      tagCount: zapRequest.tags?.length || 0
+    });
     this.donationStatus = 'Opening Android signer to approve the standard NIP-57 zap request…';
     window.location.href = signerUrl;
+  }
+
+  private initNip55DebugMode(): void {
+    if (typeof window === 'undefined') return;
+    const enabled = new URL(window.location.href).searchParams.get('debugNip55') === '1'
+      || window.localStorage.getItem(ANDROID_SIGNER_ZAP_DEBUG_FLAG) === '1';
+    this.nip55DebugMode = enabled;
+    if (!enabled) return;
+    window.localStorage.setItem(ANDROID_SIGNER_ZAP_DEBUG_FLAG, '1');
+    try {
+      this.nip55DebugLog = JSON.parse(window.localStorage.getItem(ANDROID_SIGNER_ZAP_DEBUG_KEY) || '[]');
+    } catch {
+      this.nip55DebugLog = [];
+    }
+  }
+
+  clearNip55DebugLog(): void {
+    this.nip55DebugLog = [];
+    try {
+      window.localStorage.removeItem(ANDROID_SIGNER_ZAP_DEBUG_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  private debugNip55(label: string, data: Record<string, any> = {}): void {
+    if (!this.nip55DebugMode || typeof window === 'undefined') return;
+    const safeData = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, this.safeDebugValue(value)]));
+    const entry = `${new Date().toISOString()} ${label} ${JSON.stringify(safeData)}`;
+    this.nip55DebugLog = [...this.nip55DebugLog.slice(-29), entry];
+    try {
+      window.localStorage.setItem(ANDROID_SIGNER_ZAP_DEBUG_KEY, JSON.stringify(this.nip55DebugLog));
+      console.info('[PoH NIP55]', label, safeData);
+    } catch {
+      // ignore logging failures
+    }
+  }
+
+  private safeDebugValue(value: any): any {
+    if (typeof value !== 'string') return value;
+    if (value.length <= 180) return value;
+    return `${value.slice(0, 100)}…(${value.length} chars)`;
+  }
+
+  private safeLocationHash(): string {
+    if (typeof window === 'undefined') return '';
+    const hash = window.location.hash || '';
+    if (!hash) return '';
+    return hash.startsWith(ANDROID_SIGNER_ZAP_HASH_PREFIX)
+      ? `${ANDROID_SIGNER_ZAP_HASH_PREFIX}(len ${hash.length})`
+      : `${hash.slice(0, 40)}(len ${hash.length})`;
+  }
+
+  private safeHost(url: string): string {
+    try {
+      return new URL(url).host;
+    } catch {
+      return 'invalid-url';
+    }
+  }
+
+  private storageHas(store: Storage, key: string): boolean {
+    try {
+      return !!store.getItem(key);
+    } catch {
+      return false;
+    }
   }
 
   private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
@@ -817,26 +912,46 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const legacyRequestId = url.searchParams.get('androidSignerZap') || '';
     const legacySignedZapRaw = url.searchParams.get('signedZap') || '';
     if (legacyRequestId && legacySignedZapRaw) {
+      this.debugNip55('legacy query callback detected', {
+        requestId: legacyRequestId,
+        signedZapLength: legacySignedZapRaw.length
+      });
       return { requestId: legacyRequestId, signedZapRaw: legacySignedZapRaw };
     }
 
     const hash = window.location.hash || '';
-    if (!hash.startsWith(ANDROID_SIGNER_ZAP_HASH_PREFIX)) return null;
+    if (!hash.startsWith(ANDROID_SIGNER_ZAP_HASH_PREFIX)) {
+      this.debugNip55('no NIP55 callback in URL', { hash: this.safeLocationHash() });
+      return null;
+    }
 
     const raw = hash.slice(ANDROID_SIGNER_ZAP_HASH_PREFIX.length);
     const separator = raw.indexOf(':');
-    if (separator < 1) return null;
+    if (separator < 1) {
+      this.debugNip55('callback hash missing separator', { hashLength: hash.length });
+      return null;
+    }
 
     try {
-      return {
+      const parsed = {
         requestId: decodeURIComponent(raw.slice(0, separator)),
         signedZapRaw: decodeURIComponent(raw.slice(separator + 1))
       };
+      this.debugNip55('hash callback parsed', {
+        requestId: parsed.requestId,
+        signedZapLength: parsed.signedZapRaw.length
+      });
+      return parsed;
     } catch {
-      return {
+      const fallback = {
         requestId: raw.slice(0, separator),
         signedZapRaw: raw.slice(separator + 1)
       };
+      this.debugNip55('hash callback parsed without decoding', {
+        requestId: fallback.requestId,
+        signedZapLength: fallback.signedZapRaw.length
+      });
+      return fallback;
     }
   }
 
@@ -885,13 +1000,20 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private async resumeAndroidSignerZapIfPresent(): Promise<void> {
-    if (typeof window === 'undefined' || this.androidSignerResumeInFlight) return;
+    if (typeof window === 'undefined' || this.androidSignerResumeInFlight) {
+      this.debugNip55('resume skipped', {
+        inFlight: this.androidSignerResumeInFlight,
+        hasWindow: typeof window !== 'undefined'
+      });
+      return;
+    }
 
     const signerCallback = this.readAndroidSignerZapCallback();
     if (!signerCallback) return;
 
     this.androidSignerResumeInFlight = true;
     const { requestId, signedZapRaw } = signerCallback;
+    this.debugNip55('resume callback found', { requestId, signedZapLength: signedZapRaw.length });
 
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('androidSignerZap');
@@ -900,23 +1022,46 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     window.history.replaceState({}, '', cleanUrl.toString());
 
     const pending = this.takePendingAndroidSignerZap();
+    this.debugNip55('pending zap loaded', {
+      exists: !!pending,
+      pendingRequestId: pending?.requestId || '',
+      callbackHost: pending?.callback ? this.safeHost(pending.callback) : '',
+      amountMsat: pending?.amountMsat || 0
+    });
 
     if (!pending || pending.requestId !== requestId) {
       this.androidSignerResumeInFlight = false;
+      this.debugNip55('pending mismatch', { callbackRequestId: requestId, pendingRequestId: pending?.requestId || '' });
       this.toast('Android signer response did not match this zap attempt.', 'error', 4000);
       return;
     }
 
     try {
       const signedZap = JSON.parse(signedZapRaw);
+      this.debugNip55('signed zap parsed', {
+        kind: signedZap?.kind,
+        id: signedZap?.id || '',
+        pubkey: signedZap?.pubkey ? `${signedZap.pubkey.slice(0, 8)}…` : '',
+        sigPresent: !!signedZap?.sig
+      });
       this.donationFlow = 'zap';
       this.showDonateModal = true;
       this.donating = true;
       this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
+      this.debugNip55('requesting invoice', {
+        callbackHost: this.safeHost(pending.callback),
+        amountMsat: pending.amountMsat
+      });
       const { invoice, donorPubkey, zapRequestId } = await this.createInvoiceFromSignedZap(pending.callback, pending.amountMsat, signedZap);
+      this.debugNip55('invoice created', {
+        invoicePrefix: invoice ? invoice.slice(0, 12) : '',
+        donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',
+        zapRequestId: zapRequestId || ''
+      });
       await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.');
       void this.watchForZapReceipt(donorPubkey, Number(pending.sats || 0), Number(pending.since || Math.floor(Date.now() / 1000) - 10), zapRequestId);
     } catch (e: any) {
+      this.debugNip55('resume failed', { message: e?.message || String(e) });
       this.donationStatus = this.donationErrorMessage(e);
       this.toast(this.donationStatus, 'error', 4500);
     } finally {
