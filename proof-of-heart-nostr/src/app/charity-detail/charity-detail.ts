@@ -14,8 +14,10 @@ const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
 const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
 const PENDING_ZAP_PAYMENT_KEY = 'poh:pending-zap-payment';
 const ANDROID_SIGNER_ZAP_DEBUG_KEY = 'poh:nip55-debug-log';
+const ANDROID_SIGNER_ZAP_CONSOLE_KEY = 'poh:nip55-console-log';
 const ANDROID_SIGNER_ZAP_DEBUG_FLAG = 'poh:nip55-debug-enabled';
 const ANDROID_SIGNER_ZAP_HASH_PREFIX = '#pohAndroidSignerZap=';
+type ConsoleMethod = 'log' | 'info' | 'warn' | 'error' | 'debug';
 
 interface PendingZapPayment {
   charityPubkey: string;
@@ -115,6 +117,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   lastAndroidSignerUrl = '';
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
+  consoleLog: string[] = [];
+  private originalConsoleMethods?: Partial<Record<ConsoleMethod, (...args: any[]) => void>>;
+  private consoleErrorHandler?: (event: ErrorEvent) => void;
+  private unhandledRejectionHandler?: (event: PromiseRejectionEvent) => void;
   private readonly androidSignerResumeHandler = () => {
     this.debugNip55('resume event', {
       hash: this.safeLocationHash(),
@@ -220,6 +226,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.uninstallAndroidSignerResumeListeners();
+    this.uninstallConsoleCapture();
     this.nostr.clearCharityFeedStatus();
     this.clearDonationTimers();
     if (this.jsonLdScriptElement) {
@@ -1073,12 +1080,27 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch {
       this.nip55DebugLog = [];
     }
+    try {
+      this.consoleLog = JSON.parse(window.localStorage.getItem(ANDROID_SIGNER_ZAP_CONSOLE_KEY) || '[]');
+    } catch {
+      this.consoleLog = [];
+    }
+    this.installConsoleCapture();
   }
 
   clearNip55DebugLog(): void {
     this.nip55DebugLog = [];
     try {
       window.localStorage.removeItem(ANDROID_SIGNER_ZAP_DEBUG_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  clearConsoleLog(): void {
+    this.consoleLog = [];
+    try {
+      window.localStorage.removeItem(ANDROID_SIGNER_ZAP_CONSOLE_KEY);
     } catch {
       // ignore
     }
@@ -1094,6 +1116,71 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       console.info('[PoH NIP55]', label, safeData);
     } catch {
       // ignore logging failures
+    }
+  }
+
+  private installConsoleCapture(): void {
+    if (!this.nip55DebugMode || typeof window === 'undefined' || this.originalConsoleMethods) return;
+
+    const methods: ConsoleMethod[] = ['log', 'info', 'warn', 'error', 'debug'];
+    this.originalConsoleMethods = {};
+
+    for (const method of methods) {
+      const original = (console as any)[method]?.bind(console) || (() => undefined);
+      this.originalConsoleMethods[method] = original;
+      (console as any)[method] = (...args: any[]) => {
+        this.captureConsoleLog(method, args);
+        original(...args);
+      };
+    }
+
+    this.consoleErrorHandler = (event: ErrorEvent) => {
+      this.captureConsoleLog('error', [event.message, event.filename, event.lineno, event.colno, event.error?.stack || event.error]);
+    };
+    this.unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
+      this.captureConsoleLog('error', ['Unhandled promise rejection', event.reason?.stack || event.reason]);
+    };
+    window.addEventListener('error', this.consoleErrorHandler);
+    window.addEventListener('unhandledrejection', this.unhandledRejectionHandler);
+  }
+
+  private uninstallConsoleCapture(): void {
+    if (typeof window !== 'undefined') {
+      if (this.consoleErrorHandler) window.removeEventListener('error', this.consoleErrorHandler);
+      if (this.unhandledRejectionHandler) window.removeEventListener('unhandledrejection', this.unhandledRejectionHandler);
+    }
+
+    if (!this.originalConsoleMethods) return;
+    for (const [method, original] of Object.entries(this.originalConsoleMethods)) {
+      if (original) (console as any)[method] = original;
+    }
+    this.originalConsoleMethods = undefined;
+    this.consoleErrorHandler = undefined;
+    this.unhandledRejectionHandler = undefined;
+  }
+
+  private captureConsoleLog(method: ConsoleMethod, args: any[]): void {
+    if (!this.nip55DebugMode || typeof window === 'undefined') return;
+    const time = new Date().toLocaleTimeString();
+    const message = args.map((arg) => this.formatConsoleArg(arg)).join(' ');
+    const entry = `${time} [${method}] ${message}`.slice(0, 1200);
+    this.consoleLog = [...this.consoleLog.slice(-49), entry];
+    try {
+      window.localStorage.setItem(ANDROID_SIGNER_ZAP_CONSOLE_KEY, JSON.stringify(this.consoleLog));
+    } catch {
+      // ignore storage quota/privacy-mode errors
+    }
+  }
+
+  private formatConsoleArg(arg: any): string {
+    if (arg instanceof Error) return arg.stack || arg.message;
+    if (typeof arg === 'string') return arg;
+    if (arg === undefined) return 'undefined';
+    if (arg === null) return 'null';
+    try {
+      return JSON.stringify(arg);
+    } catch {
+      return String(arg);
     }
   }
 

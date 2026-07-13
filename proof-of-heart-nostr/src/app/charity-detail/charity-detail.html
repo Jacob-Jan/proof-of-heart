@@ -82,6 +82,21 @@
           <p>No NIP-55 debug events yet.</p>
         }
       </div>
+      <div class="nip55-debug-panel browser-console-panel" aria-live="polite">
+        <div class="nip55-debug-header">
+          <strong>Console logs</strong>
+          <button type="button" (click)="clearConsoleLog()">Clear</button>
+        </div>
+        @if (consoleLog.length) {
+          <ol>
+            @for (entry of consoleLog; track entry) {
+              <li>{{ entry }}</li>
+            }
+          </ol>
+        } @else {
+          <p>No console logs captured yet.</p>
+        }
+      </div>
     }
 
 <div class="middle">
@@ -253,6 +268,21 @@
               </ol>
             } @else {
               <p>No NIP-55 debug events yet.</p>
+            }
+          </div>
+          <div class="nip55-debug-panel browser-console-panel" aria-live="polite">
+            <div class="nip55-debug-header">
+              <strong>Console logs</strong>
+              <button type="button" (click)="clearConsoleLog()">Clear</button>
+            </div>
+            @if (consoleLog.length) {
+              <ol>
+                @for (entry of consoleLog; track entry) {
+                  <li>{{ entry }}</li>
+                }
+              </ol>
+            } @else {
+              <p>No console logs captured yet.</p>
             }
           </div>
         }
