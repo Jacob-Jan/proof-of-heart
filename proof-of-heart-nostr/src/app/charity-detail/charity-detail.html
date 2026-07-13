@@ -74,7 +74,7 @@
         </div>
         @if (nip55DebugLog.length) {
           <ol>
-            @for (entry of nip55DebugLog; track entry) {
+            @for (entry of nip55DebugLog; track $index) {
               <li>{{ entry }}</li>
             }
           </ol>
@@ -89,7 +89,7 @@
         </div>
         @if (consoleLog.length) {
           <ol>
-            @for (entry of consoleLog; track entry) {
+            @for (entry of consoleLog; track $index) {
               <li>{{ entry }}</li>
             }
           </ol>
@@ -262,7 +262,7 @@
             </div>
             @if (nip55DebugLog.length) {
               <ol>
-                @for (entry of nip55DebugLog; track entry) {
+                @for (entry of nip55DebugLog; track $index) {
                   <li>{{ entry }}</li>
                 }
               </ol>
@@ -277,7 +277,7 @@
             </div>
             @if (consoleLog.length) {
               <ol>
-                @for (entry of consoleLog; track entry) {
+                @for (entry of consoleLog; track $index) {
                   <li>{{ entry }}</li>
                 }
               </ol>

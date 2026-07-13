@@ -118,6 +118,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   consoleLog: string[] = [];
+  private consoleCaptureQueue: string[] = [];
+  private consoleCaptureFlushTimer?: ReturnType<typeof setTimeout>;
   private originalConsoleMethods?: Partial<Record<ConsoleMethod, (...args: any[]) => void>>;
   private consoleErrorHandler?: (event: ErrorEvent) => void;
   private unhandledRejectionHandler?: (event: PromiseRejectionEvent) => void;
@@ -1099,6 +1101,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   clearConsoleLog(): void {
     this.consoleLog = [];
+    this.consoleCaptureQueue = [];
     try {
       window.localStorage.removeItem(ANDROID_SIGNER_ZAP_CONSOLE_KEY);
     } catch {
@@ -1150,6 +1153,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (this.unhandledRejectionHandler) window.removeEventListener('unhandledrejection', this.unhandledRejectionHandler);
     }
 
+    if (this.consoleCaptureFlushTimer) {
+      clearTimeout(this.consoleCaptureFlushTimer);
+      this.consoleCaptureFlushTimer = undefined;
+    }
+    this.consoleCaptureQueue = [];
+
     if (!this.originalConsoleMethods) return;
     for (const [method, original] of Object.entries(this.originalConsoleMethods)) {
       if (original) (console as any)[method] = original;
@@ -1164,7 +1173,17 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const time = new Date().toLocaleTimeString();
     const message = args.map((arg) => this.formatConsoleArg(arg)).join(' ');
     const entry = `${time} [${method}] ${message}`.slice(0, 1200);
-    this.consoleLog = [...this.consoleLog.slice(-49), entry];
+    this.consoleCaptureQueue = [...this.consoleCaptureQueue, entry].slice(-50);
+    if (this.consoleCaptureFlushTimer) return;
+    this.consoleCaptureFlushTimer = setTimeout(() => this.flushConsoleCaptureQueue(), 0);
+  }
+
+  private flushConsoleCaptureQueue(): void {
+    this.consoleCaptureFlushTimer = undefined;
+    if (!this.consoleCaptureQueue.length || typeof window === 'undefined') return;
+    const nextEntries = this.consoleCaptureQueue;
+    this.consoleCaptureQueue = [];
+    this.consoleLog = [...this.consoleLog, ...nextEntries].slice(-50);
     try {
       window.localStorage.setItem(ANDROID_SIGNER_ZAP_CONSOLE_KEY, JSON.stringify(this.consoleLog));
     } catch {
