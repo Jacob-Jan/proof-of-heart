@@ -283,10 +283,15 @@
           } @else {
             <p>QR preview unavailable in this browser. Use copy invoice.</p>
           }
-          <small>{{ lastInvoice.slice(0, 40) }}…</small>
+          <small>{{ lastInvoice }}</small>
           <div class="qr-actions">
             <button type="button" (click)="openWalletAgain()">Open wallet</button>
             <button type="button" (click)="copyInvoice()">Copy invoice</button>
+          </div>
+        } @else if (lastAndroidSignerUrl) {
+          <div class="qr-actions">
+            <button type="button" (click)="openAndroidSignerAgain()">Open signer</button>
+            <button type="button" disabled>Copy invoice</button>
           </div>
         } @else {
           <div class="qr-actions">

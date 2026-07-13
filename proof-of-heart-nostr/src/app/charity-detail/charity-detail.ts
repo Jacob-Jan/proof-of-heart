@@ -107,8 +107,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
   private lightningThanksTimer?: ReturnType<typeof setTimeout>;
   private zapCelebrationTimer?: ReturnType<typeof setTimeout>;
+  private androidSignerLaunchFallbackTimer?: ReturnType<typeof setTimeout>;
   private androidSignerResumeInFlight = false;
   private activeZapPaymentWatchKey = '';
+  private donationAttemptToken = 0;
+  private autoWalletLaunchPaymentKey = '';
+  lastAndroidSignerUrl = '';
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   private readonly androidSignerResumeHandler = () => {
@@ -193,7 +197,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
-    this.currentIdParam = this.route.snapshot.paramMap.get('pubkey') || '';
+    this.currentIdParam = this.cleanCharityIdParam(this.route.snapshot.paramMap.get('pubkey') || '');
 
     this.initNip55DebugMode();
     this.installAndroidSignerResumeListeners();
@@ -453,6 +457,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   async donateWithLightning() {
     if (!this.prepareDonation('lightning')) return;
+    const token = this.donationAttemptToken;
 
     const sats = this.donationSats;
     const lightningAddress = this.donationAddress;
@@ -460,17 +465,20 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     try {
       const invoice = await this.createLightningInvoice(lightningAddress, sats);
-      await this.presentInvoice(invoice, 'Lightning invoice ready. Pay with your wallet; this does not publish a Nostr zap receipt.');
+      if (!this.isCurrentDonationAttempt(token)) return;
+      await this.presentInvoice(invoice, 'Lightning invoice ready. Pay with your wallet; this does not publish a Nostr zap receipt.', undefined, token);
       this.scheduleLightningThanksCard();
     } catch (e: any) {
+      if (!this.isCurrentDonationAttempt(token)) return;
       this.donationStatus = this.donationErrorMessage(e);
     } finally {
-      this.donating = false;
+      if (this.isCurrentDonationAttempt(token)) this.donating = false;
     }
   }
 
   async zapWithNostr() {
     if (!this.prepareDonation('zap')) return;
+    const token = this.donationAttemptToken;
     const sats = this.donationSats;
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
@@ -481,6 +489,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           await this.startAndroidSignerZap(lightningAddress, sats, since);
           return;
         } catch (e: any) {
+          if (!this.isCurrentDonationAttempt(token)) return;
           this.donationStatus = this.donationErrorMessage(e);
           this.donating = false;
           return;
@@ -497,6 +506,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     try {
       const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
+      if (!this.isCurrentDonationAttempt(token)) return;
       const payment: PendingZapPayment = {
         charityPubkey: this.charity!.pubkey,
         invoice,
@@ -509,11 +519,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
         this.writePendingZapPayment(payment);
         void this.watchForZapReceipt(payment);
-      });
+      }, token, false);
     } catch (e: any) {
+      if (!this.isCurrentDonationAttempt(token)) return;
       this.donationStatus = this.donationErrorMessage(e);
     } finally {
-      this.donating = false;
+      if (this.isCurrentDonationAttempt(token)) this.donating = false;
     }
   }
 
@@ -538,9 +549,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.qrDataUrl = '';
     this.showLightningThanksCard = false;
     this.showZapCelebration = false;
+    this.lastAndroidSignerUrl = '';
     this.clearDonationTimers();
     this.donating = true;
+    this.donationAttemptToken += 1;
     return true;
+  }
+
+  private isCurrentDonationAttempt(token: number): boolean {
+    return token === this.donationAttemptToken && this.showDonateModal;
   }
 
   private clearDonationTimers() {
@@ -551,6 +568,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     if (this.zapCelebrationTimer) {
       clearTimeout(this.zapCelebrationTimer);
       this.zapCelebrationTimer = undefined;
+    }
+    if (this.androidSignerLaunchFallbackTimer) {
+      clearTimeout(this.androidSignerLaunchFallbackTimer);
+      this.androidSignerLaunchFallbackTimer = undefined;
     }
   }
 
@@ -579,14 +600,22 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }, 8_000);
   }
 
-  private async presentInvoice(invoice: string, readyMessage: string, beforeWalletLaunch?: () => void) {
+  private async presentInvoice(invoice: string, readyMessage: string, beforeWalletLaunch?: () => void, token?: number, autoLaunchWallet = true) {
     this.lastInvoice = invoice;
     await this.generateQr(invoice);
+    if (token !== undefined && !this.isCurrentDonationAttempt(token)) return;
 
-    this.donationStatus = `${readyMessage} Opening wallet… If nothing opens, use the options below.`;
     beforeWalletLaunch?.();
 
+    if (!autoLaunchWallet) {
+      this.donationStatus = `${readyMessage} Use Open wallet or scan/copy the invoice below. Checking relays for the verified NIP-57 receipt…`;
+      return;
+    }
+
+    this.donationStatus = `${readyMessage} Opening wallet… If nothing opens, use the options below.`;
+
     const launched = await this.tryLaunchInvoice(invoice);
+    if (token !== undefined && !this.isCurrentDonationAttempt(token)) return;
     this.donationStatus = launched
       ? `${readyMessage} Wallet open attempted. Checking relays for the verified NIP-57 receipt…`
       : `${readyMessage} Use Open wallet or Copy invoice. Checking relays for the verified NIP-57 receipt…`;
@@ -633,17 +662,30 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return `${payment.charityPubkey}:${payment.zapRequestId || payment.donorPubkey}:${payment.since}:${payment.sats}`;
   }
 
-  private resumePendingZapPaymentIfPresent(): void {
+  private resumePendingZapPaymentIfPresent(options: { autoOpenWallet?: boolean } = {}): void {
     if (typeof window === 'undefined' || !this.charity) return;
     const payment = this.readPendingZapPayment();
     if (!payment || payment.charityPubkey !== this.charity.pubkey) return;
 
+    const watchKey = this.zapPaymentWatchKey(payment);
     this.donationFlow = 'zap';
     this.showDonateModal = true;
     this.lastInvoice = payment.invoice;
-    this.donationStatus = 'Payment sent to wallet. Checking relays for the verified NIP-57 zap receipt…';
+    this.donationStatus = 'Zap invoice ready. Tap Open wallet, scan the QR, or copy the invoice. Checking relays for the verified NIP-57 receipt…';
     void this.generateQr(payment.invoice);
     void this.watchForZapReceipt(payment);
+
+    if (options.autoOpenWallet && this.autoWalletLaunchPaymentKey !== watchKey) {
+      this.autoWalletLaunchPaymentKey = watchKey;
+      this.donationStatus = 'Restored pending zap invoice. Tap Open wallet, scan the QR, or copy the invoice.';
+      void this.tryLaunchInvoice(payment.invoice).then((launched) => {
+        const current = this.readPendingZapPayment();
+        if (!current || this.zapPaymentWatchKey(current) !== watchKey || !this.showDonateModal) return;
+        this.donationStatus = launched
+          ? 'Wallet open attempted. Checking relays for the verified NIP-57 zap receipt…'
+          : 'Use Open wallet or Copy invoice. Checking relays for the verified NIP-57 zap receipt…';
+      });
+    }
   }
 
   private async watchForZapReceipt(payment: PendingZapPayment) {
@@ -661,9 +703,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       timeoutMs: 300_000
     });
 
-    if (this.activeZapPaymentWatchKey === watchKey) {
-      this.activeZapPaymentWatchKey = '';
-    }
+    if (this.activeZapPaymentWatchKey !== watchKey) return;
+    this.activeZapPaymentWatchKey = '';
 
     if (!receipt || !this.charity || this.charity.pubkey !== payment.charityPubkey) {
       this.donationStatus = 'Payment may still be settling. The verified zap will appear after the standard NIP-57 receipt reaches relays.';
@@ -679,13 +720,42 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   async copyInvoice() {
     if (!this.lastInvoice) return;
-    try {
-      await navigator.clipboard.writeText(this.lastInvoice);
+    const copied = await this.copyTextToClipboard(this.lastInvoice);
+    if (copied) {
       this.donationStatus = 'Invoice copied to clipboard.';
       this.toast('Invoice copied to clipboard.', 'success', 2500);
+    } else {
+      this.donationStatus = 'Could not copy automatically. Long-press/select the invoice text below, or scan the QR.';
+      this.toast('Could not copy automatically. Long-press the invoice text.', 'info', 4500);
+    }
+  }
+
+  private async copyTextToClipboard(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
     } catch {
-      this.donationStatus = 'Could not copy invoice from browser context.';
-      this.toast(this.donationStatus, 'error', 3500);
+      // Fall back to execCommand below; Android LAN/http contexts often block clipboard.writeText.
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, text.length);
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      return copied;
+    } catch {
+      return false;
     }
   }
 
@@ -727,17 +797,44 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   closeQrModal() {
+    this.cancelDonationFlow();
     this.showDonateModal = false;
     this.showLightningThanksCard = false;
     this.showZapCelebration = false;
     this.clearDonationTimers();
   }
 
+  private cancelDonationFlow(): void {
+    this.donationAttemptToken += 1;
+    this.donating = false;
+    this.donationStatus = '';
+    this.lastInvoice = '';
+    this.lastAndroidSignerUrl = '';
+    this.qrDataUrl = '';
+    this.activeZapPaymentWatchKey = '';
+    this.autoWalletLaunchPaymentKey = '';
+    this.clearPendingZapPayment();
+    this.clearPendingAndroidSignerZap();
+    this.debugNip55('donation flow cancelled by user');
+  }
+
   async openWalletAgain() {
     if (!this.lastInvoice) return;
     const launched = await this.tryLaunchInvoice(this.lastInvoice);
+    this.donationStatus = launched ? 'Wallet open attempted. Checking for payment…' : 'Could not open wallet automatically. Copy or scan the invoice instead.';
+  }
+
+  openAndroidSignerAgain() {
+    if (!this.lastAndroidSignerUrl) return;
+    this.debugNip55('manual signer reopen', { signerUrlLength: this.lastAndroidSignerUrl.length });
+    this.donating = true;
+    this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
+    this.armAndroidSignerLaunchFallback();
+    const launched = this.launchExternalUri(this.lastAndroidSignerUrl);
+    this.debugNip55('manual signer launch attempted', { launched });
     if (!launched) {
-      this.toast('Could not trigger a lightning app. Use QR or copy invoice.', 'info', 3500);
+      this.donating = false;
+      this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
     }
   }
 
@@ -775,11 +872,27 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       // ignore webln failures and fallback to URI launch
     }
 
+    return this.launchExternalUri(lightningUri);
+  }
+
+  private launchExternalUri(uri: string): boolean {
     try {
-      window.location.href = lightningUri;
+      const link = document.createElement('a');
+      link.href = uri;
+      link.target = '_self';
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      window.setTimeout(() => link.remove(), 1_000);
       return true;
     } catch {
-      return false;
+      try {
+        window.location.href = uri;
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
@@ -892,30 +1005,34 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+    // Amber appends the encoded signed event directly to callbackUrl. On Android it may
+    // strip query/hash parts from callbackUrl before appending, so keep the callback prefix
+    // as the plain charity path and recover the signed event from the path suffix + the
+    // pending request stored above.
+    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+
+    const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
+      + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    this.lastAndroidSignerUrl = signerUrl;
+
     this.writePendingAndroidSignerZap({
       requestId,
       callback: payParams.callback,
       amountMsat,
       sats,
       since,
+      signerUrl,
+      callbackUrl,
       createdAt: Date.now()
     });
     this.debugNip55('pending zap stored', {
       requestId,
       amountMsat,
       callbackHost: this.safeHost(payParams.callback),
+      callbackUrl,
       localStorage: this.storageHas(window.localStorage, ANDROID_SIGNER_ZAP_KEY),
       sessionStorage: this.storageHas(window.sessionStorage, ANDROID_SIGNER_ZAP_KEY)
     });
-
-    // Amber/NIP-55 decodes the whole nostrsigner URI before parsing params, then splits on "?" and "&".
-    // Keep callbackUrl free of query/hash separators. Amber appends the encoded signed event
-    // directly after the colon, and we unpack ;androidSignerZap=<requestId>:<event> from the path.
-    const callbackPath = `${window.location.pathname};androidSignerZap=${encodeURIComponent(requestId)}:`;
-    const callbackUrl = `${window.location.origin}${callbackPath}`;
-
-    const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
-      + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
     this.debugNip55('opening signer', {
       callbackUrl,
@@ -923,13 +1040,30 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       zapKind: zapRequest.kind,
       tagCount: zapRequest.tags?.length || 0
     });
-    this.donationStatus = 'Opening Android signer to approve the standard NIP-57 zap request…';
-    window.location.href = signerUrl;
+    this.donating = false;
+    this.donationStatus = 'Signer request ready. Tap Open signer to approve the standard NIP-57 zap request in Amber.';
+    this.debugNip55('signer request ready for manual launch', { signerUrlLength: signerUrl.length });
+  }
+
+  private armAndroidSignerLaunchFallback(): void {
+    if (this.androidSignerLaunchFallbackTimer) {
+      clearTimeout(this.androidSignerLaunchFallbackTimer);
+    }
+    this.androidSignerLaunchFallbackTimer = setTimeout(() => {
+      if (!this.lastAndroidSignerUrl || this.lastInvoice || !this.showDonateModal) return;
+      this.donating = false;
+      this.donationStatus = 'Still waiting for Android signer. Tap Open signer to retry; this reuses the same standard NIP-57 zap request.';
+      this.debugNip55('signer launch fallback visible');
+    }, 7_000);
   }
 
   private initNip55DebugMode(): void {
     if (typeof window === 'undefined') return;
-    const enabled = new URL(window.location.href).searchParams.get('debugNip55') === '1'
+    const href = window.location.href;
+    const params = new URL(href).searchParams;
+    const enabled = params.get('debugNip55') === '1'
+      || params.get('debugnip55') === '1'
+      || href.toLowerCase().includes('debugnip55=1')
       || window.localStorage.getItem(ANDROID_SIGNER_ZAP_DEBUG_FLAG) === '1';
     this.nip55DebugMode = enabled;
     if (!enabled) return;
@@ -994,6 +1128,45 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private cleanCharityIdParam(idParam: string): string {
+    // Amber can reopen Edge as /charities/<64hex><encoded-signed-event-json> when it
+    // appends the signed event directly to a query-stripped callbackUrl. Keep the route
+    // resolvable by treating the first 64 hex chars as the actual charity pubkey.
+    const hexMatch = idParam.match(/^([0-9a-f]{64})(?:\{|%7B|%7b).*/);
+    return hexMatch ? hexMatch[1] : idParam;
+  }
+
+  private cleanCharityPathname(pathname: string): string {
+    const match = pathname.match(/^(\/charities\/)([0-9a-f]{64})(?:\{|%7B|%7b).*/);
+    if (match) return `${match[1]}${match[2]}`;
+    const markerIndex = pathname.indexOf(';androidSignerZap=');
+    return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
+  }
+
+  private readDirectAppendedAndroidSignerZapCallback(pathname: string): { requestId: string; signedZapRaw: string } | null {
+    const match = pathname.match(/^\/charities\/([0-9a-f]{64})((?:\{|%7B|%7b).*)$/);
+    if (!match) return null;
+
+    const pending = this.peekPendingAndroidSignerZap();
+    if (!pending?.requestId) {
+      this.debugNip55('direct path callback found without pending zap', { pathLength: pathname.length });
+      return null;
+    }
+
+    let signedZapRaw = match[2];
+    try {
+      signedZapRaw = decodeURIComponent(signedZapRaw);
+    } catch {
+      // Keep raw; JSON.parse later will produce the user-visible error if it is invalid.
+    }
+
+    this.debugNip55('direct path callback parsed', {
+      requestId: pending.requestId,
+      signedZapLength: signedZapRaw.length
+    });
+    return { requestId: pending.requestId, signedZapRaw };
+  }
+
   private readPackedAndroidSignerZapCallbackFromPath(pathname: string): { requestId: string; signedZapRaw: string } | null {
     const marker = ';androidSignerZap=';
     const markerIndex = pathname.indexOf(marker);
@@ -1036,6 +1209,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
     const url = new URL(window.location.href);
+    const directPathCallback = this.readDirectAppendedAndroidSignerZapCallback(url.pathname);
+    if (directPathCallback) return directPathCallback;
+
     const pathCallback = this.readPackedAndroidSignerZapCallbackFromPath(url.pathname);
     if (pathCallback) return pathCallback;
 
@@ -1142,6 +1318,46 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return pending;
   }
 
+  private peekPendingAndroidSignerZap(): any {
+    for (const store of [window.sessionStorage, window.localStorage]) {
+      try {
+        const raw = store.getItem(ANDROID_SIGNER_ZAP_KEY) || '';
+        if (raw) return JSON.parse(raw);
+      } catch {
+        // keep trying the next store
+      }
+    }
+    return undefined;
+  }
+
+  private clearPendingAndroidSignerZap(): void {
+    for (const store of [window.sessionStorage, window.localStorage]) {
+      try {
+        store.removeItem(ANDROID_SIGNER_ZAP_KEY);
+      } catch {
+        // keep trying the next store
+      }
+    }
+  }
+
+  private restorePendingAndroidSignerZapIfPresent(): void {
+    const pending = this.peekPendingAndroidSignerZap();
+    if (!pending?.signerUrl || this.lastInvoice || !this.charity) return;
+    const ageMs = Date.now() - Number(pending.createdAt || 0);
+    if (ageMs > 10 * 60 * 1000) return;
+
+    this.donationFlow = 'zap';
+    this.showDonateModal = true;
+    this.donating = false;
+    this.lastAndroidSignerUrl = pending.signerUrl;
+    this.donationStatus = 'Returned from Android signer without a signed zap event. Tap Open signer to retry the same standard NIP-57 request.';
+    this.debugNip55('pending signer zap restored without callback', {
+      requestId: pending.requestId || '',
+      callbackUrl: pending.callbackUrl || '',
+      ageMs
+    });
+  }
+
   private async resumeAndroidSignerZapIfPresent(): Promise<void> {
     if (typeof window === 'undefined' || this.androidSignerResumeInFlight) {
       this.debugNip55('resume skipped', {
@@ -1152,14 +1368,17 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     const signerCallback = this.readAndroidSignerZapCallback();
-    if (!signerCallback) return;
+    if (!signerCallback) {
+      this.restorePendingAndroidSignerZapIfPresent();
+      return;
+    }
 
     this.androidSignerResumeInFlight = true;
     const { requestId, signedZapRaw } = signerCallback;
     this.debugNip55('resume callback found', { requestId, signedZapLength: signedZapRaw.length });
 
     const cleanUrl = new URL(window.location.href);
-    cleanUrl.pathname = this.stripAndroidSignerZapPathCallback(cleanUrl.pathname);
+    cleanUrl.pathname = this.cleanCharityPathname(cleanUrl.pathname);
     cleanUrl.searchParams.delete('androidSignerZap');
     cleanUrl.searchParams.delete('signedZap');
     cleanUrl.hash = '';
@@ -1191,12 +1410,23 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.donationFlow = 'zap';
       this.showDonateModal = true;
       this.donating = true;
+      this.lastAndroidSignerUrl = '';
+      if (this.androidSignerLaunchFallbackTimer) {
+        clearTimeout(this.androidSignerLaunchFallbackTimer);
+        this.androidSignerLaunchFallbackTimer = undefined;
+      }
+      const token = ++this.donationAttemptToken;
       this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
       this.debugNip55('requesting invoice', {
         callbackHost: this.safeHost(pending.callback),
         amountMsat: pending.amountMsat
       });
-      const { invoice, donorPubkey, zapRequestId } = await this.createInvoiceFromSignedZap(pending.callback, pending.amountMsat, signedZap);
+      const { invoice, donorPubkey, zapRequestId } = await this.withTimeout(
+        this.createInvoiceFromSignedZap(pending.callback, pending.amountMsat, signedZap),
+        15_000,
+        'Creating zap invoice'
+      );
+      if (!this.isCurrentDonationAttempt(token)) return;
       this.debugNip55('invoice created', {
         invoicePrefix: invoice ? invoice.slice(0, 12) : '',
         donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',
@@ -1220,13 +1450,14 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           zapRequestId: zapRequestId || ''
         });
         void this.watchForZapReceipt(payment);
-      });
+      }, token, false);
     } catch (e: any) {
+      if (!this.showDonateModal) return;
       this.debugNip55('resume failed', { message: e?.message || String(e) });
       this.donationStatus = this.donationErrorMessage(e);
       this.toast(this.donationStatus, 'error', 4500);
     } finally {
-      this.donating = false;
+      if (this.showDonateModal) this.donating = false;
       this.androidSignerResumeInFlight = false;
     }
   }

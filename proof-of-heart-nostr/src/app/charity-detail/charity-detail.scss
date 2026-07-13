@@ -489,6 +489,9 @@
     padding: 20px;
     text-align: center;
     position: relative;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
 
     .qr-close {
       position: absolute;
@@ -611,4 +614,15 @@
       }
     }
   }
+}
+
+.nip55-debug-panel {
+  max-height: 160px;
+  overflow: auto;
+  margin: 8px 0;
+  font-size: 11px;
+  text-align: left;
+
+  ol { margin: 0; padding-left: 18px; }
+  li { overflow-wrap: anywhere; }
 }
