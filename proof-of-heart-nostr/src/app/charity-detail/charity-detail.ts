@@ -835,7 +835,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   openAndroidSignerAgain() {
     if (!this.lastAndroidSignerUrl) return;
-    this.debugNip55('manual signer reopen', { signerUrlLength: this.lastAndroidSignerUrl.length });
+    this.debugNip55('manual signer reopen', {
+      signerUrlLength: this.lastAndroidSignerUrl.length,
+      userActivation: this.currentUserActivationState()
+    });
     this.donating = true;
     this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
     this.armAndroidSignerLaunchFallback();
@@ -885,6 +888,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private launchExternalUri(uri: string): boolean {
+    if (uri.startsWith('nostrsigner:')) {
+      try {
+        // Android browsers are more reliable when custom signer schemes are assigned
+        // directly from the tap handler. A synthetic hidden-anchor click can return
+        // without actually foregrounding Amber.
+        window.location.href = uri;
+        return true;
+      } catch {
+        // Fall through to the anchor fallback below.
+      }
+    }
+
     try {
       const link = document.createElement('a');
       link.href = uri;
@@ -903,6 +918,14 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         return false;
       }
     }
+  }
+
+  private currentUserActivationState(): Record<string, boolean | string> {
+    const activation = typeof navigator !== 'undefined' ? (navigator as any).userActivation : undefined;
+    return {
+      isActive: activation?.isActive ?? 'unknown',
+      hasBeenActive: activation?.hasBeenActive ?? 'unknown'
+    };
   }
 
   private async fetchJsonOrThrow(url: string): Promise<any> {
