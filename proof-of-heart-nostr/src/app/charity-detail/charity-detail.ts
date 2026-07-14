@@ -1037,11 +1037,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    // Amber appends the encoded signed event directly to callbackUrl. On Android it may
-    // strip query/hash parts from callbackUrl before appending, so keep the callback prefix
-    // as the plain charity path and recover the signed event from the path suffix + the
-    // pending request stored above.
-    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+    // NIP-55 web callbacks append the result to callbackUrl, so the callback URL must
+    // end with a receiving key/prefix. Keep the requestId in that prefix so we can match
+    // the returned signed event to the pending standard NIP-57 zap request.
+    const callbackBaseUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+    const callbackUrl = `${callbackBaseUrl}?androidSignerZap=${encodeURIComponent(`${requestId}:`)}`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
