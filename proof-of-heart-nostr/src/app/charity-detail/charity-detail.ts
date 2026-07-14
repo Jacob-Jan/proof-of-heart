@@ -14,7 +14,7 @@ const LNURL_PROXY_BASE = 'https://poh-lnurl-proxy.proofofheart.workers.dev';
 const ANDROID_SIGNER_ZAP_KEY = 'poh:pending-android-signer-zap';
 const PENDING_ZAP_PAYMENT_KEY = 'poh:pending-zap-payment';
 const ANDROID_SIGNER_ZAP_DEBUG_KEY = 'poh:nip55-debug-log';
-const ANDROID_SIGNER_ZAP_CONSOLE_KEY = 'poh:nip55-console-log';
+const ANDROID_SIGNER_ZAP_CONSOLE_KEY = 'poh:nip55-console-log-v2';
 const ANDROID_SIGNER_ZAP_DEBUG_FLAG = 'poh:nip55-debug-enabled';
 const ANDROID_SIGNER_ZAP_HASH_PREFIX = '#pohAndroidSignerZap=';
 type ConsoleMethod = 'log' | 'info' | 'warn' | 'error' | 'debug';
@@ -1170,8 +1170,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private captureConsoleLog(method: ConsoleMethod, args: any[]): void {
     if (!this.nip55DebugMode || typeof window === 'undefined') return;
-    const time = new Date().toLocaleTimeString();
     const message = args.map((arg) => this.formatConsoleArg(arg)).join(' ');
+    if (this.shouldSkipConsoleCapture(message)) return;
+
+    const time = new Date().toLocaleTimeString();
     const entry = `${time} [${method}] ${message}`.slice(0, 1200);
     this.consoleCaptureQueue = [...this.consoleCaptureQueue, entry].slice(-50);
     if (this.consoleCaptureFlushTimer) return;
@@ -1189,6 +1191,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch {
       // ignore storage quota/privacy-mode errors
     }
+  }
+
+  private shouldSkipConsoleCapture(message: string): boolean {
+    // Do not let the visible debug console capture its own Angular rendering noise.
+    // The old version produced a self-amplifying loop of NG0955/NG0100 entries, which
+    // buried the actual NIP-55 signer trace on mobile.
+    return message.includes('NG0955: The provided track expression resulted in duplicated keys')
+      || message.includes('NG0100: ExpressionChangedAfterItHasBeenCheckedError')
+      || message.includes('Expression location: _CharityDetailComponent');
   }
 
   private formatConsoleArg(arg: any): string {
