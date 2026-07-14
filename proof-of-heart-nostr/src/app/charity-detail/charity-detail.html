@@ -321,6 +321,10 @@
         } @else if (lastAndroidSignerUrl) {
           <div class="qr-actions">
             <button type="button" (click)="openAndroidSignerAgain()">Open signer</button>
+            @if (nip55DebugMode) {
+              <button type="button" (click)="openAndroidSignerAnchorDebug()">Signer link</button>
+              <button type="button" (click)="openAndroidSignerLocationDebug()">Signer location</button>
+            }
             <button type="button" disabled>Copy invoice</button>
           </div>
         } @else {

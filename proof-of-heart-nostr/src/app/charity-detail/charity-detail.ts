@@ -124,10 +124,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private consoleErrorHandler?: (event: ErrorEvent) => void;
   private unhandledRejectionHandler?: (event: PromiseRejectionEvent) => void;
   private readonly androidSignerResumeHandler = () => {
-    this.debugNip55('resume event', {
-      hash: this.safeLocationHash(),
-      visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown'
-    });
+    this.debugNip55('resume event', this.currentNip55HandoffState());
     void this.resumeAndroidSignerZapIfPresent();
     this.resumePendingZapPaymentIfPresent();
   };
@@ -211,8 +208,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.installAndroidSignerResumeListeners();
     this.debugNip55('component init', {
       android: isAndroidBrowser(),
-      path: typeof window !== 'undefined' ? window.location.pathname : '',
-      hash: this.safeLocationHash()
+      ...this.currentNip55HandoffState()
     });
 
     this.visitorPubkey = await this.nostr.getCurrentPubkey();
@@ -834,16 +830,34 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   openAndroidSignerAgain() {
+    this.openAndroidSignerWithLaunchMethod('default');
+  }
+
+  openAndroidSignerAnchorDebug() {
+    this.openAndroidSignerWithLaunchMethod('anchor');
+  }
+
+  openAndroidSignerLocationDebug() {
+    this.openAndroidSignerWithLaunchMethod('location');
+  }
+
+  private openAndroidSignerWithLaunchMethod(method: 'default' | 'anchor' | 'location') {
     if (!this.lastAndroidSignerUrl) return;
     this.debugNip55('manual signer reopen', {
+      method,
       signerUrlLength: this.lastAndroidSignerUrl.length,
-      userActivation: this.currentUserActivationState()
+      userActivation: this.currentUserActivationState(),
+      handoffState: this.currentNip55HandoffState()
     });
     this.donating = true;
     this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
     this.armAndroidSignerLaunchFallback();
-    const launched = this.launchExternalUri(this.lastAndroidSignerUrl);
-    this.debugNip55('manual signer launch attempted', { launched });
+    const launched = this.launchExternalUri(this.lastAndroidSignerUrl, method);
+    this.debugNip55('manual signer launch attempted', {
+      method,
+      launched,
+      handoffState: this.currentNip55HandoffState()
+    });
     if (!launched) {
       this.donating = false;
       this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
@@ -887,8 +901,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return this.launchExternalUri(lightningUri);
   }
 
-  private launchExternalUri(uri: string): boolean {
-    if (uri.startsWith('nostrsigner:')) {
+  private launchExternalUri(uri: string, method: 'default' | 'anchor' | 'location' = 'default'): boolean {
+    if (uri.startsWith('nostrsigner:') && method !== 'anchor') {
       try {
         // Android browsers are more reliable when custom signer schemes are assigned
         // directly from the tap handler. A synthetic hidden-anchor click can return
@@ -925,6 +939,42 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return {
       isActive: activation?.isActive ?? 'unknown',
       hasBeenActive: activation?.hasBeenActive ?? 'unknown'
+    };
+  }
+
+  private currentNip55HandoffState(): Record<string, any> {
+    if (typeof window === 'undefined') return { window: 'unavailable' };
+
+    const url = new URL(window.location.href);
+    const params = Array.from(url.searchParams.keys());
+    const androidSignerZap = url.searchParams.get('androidSignerZap') || '';
+    const pending = this.peekPendingAndroidSignerZap();
+    let navType = 'unknown';
+    try {
+      navType = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type || 'unknown';
+    } catch {
+      // ignore
+    }
+
+    return {
+      hrefLength: window.location.href.length,
+      path: url.pathname,
+      search: url.search ? `${url.search.slice(0, 120)}${url.search.length > 120 ? '…' : ''}` : '',
+      queryKeys: params.join(','),
+      hasAndroidSignerZap: !!androidSignerZap,
+      androidSignerZapLength: androidSignerZap.length,
+      hash: this.safeLocationHash(),
+      visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+      hasFocus: typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : 'unknown',
+      historyLength: window.history?.length ?? 'unknown',
+      navType,
+      referrer: document.referrer ? document.referrer.slice(0, 120) : '',
+      userAgent: navigator.userAgent.slice(0, 160),
+      platform: (navigator as any).userAgentData?.platform || navigator.platform || '',
+      pendingRequestId: pending?.requestId || '',
+      pendingAgeMs: pending?.createdAt ? Date.now() - pending.createdAt : null,
+      pendingCallbackUrl: pending?.callbackUrl || '',
+      pendingSignerUrlLength: pending?.signerUrl?.length || 0
     };
   }
 
@@ -1068,6 +1118,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     this.debugNip55('opening signer', {
       callbackUrl,
+      callbackUrlLength: callbackUrl.length,
+      callbackQueryKeys: Array.from(new URL(callbackUrl).searchParams.keys()).join(','),
+      callbackAndroidSignerZapLength: new URL(callbackUrl).searchParams.get('androidSignerZap')?.length || 0,
       signerUrlLength: signerUrl.length,
       zapKind: zapRequest.kind,
       tagCount: zapRequest.tags?.length || 0
@@ -1136,7 +1189,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     if (!this.nip55DebugMode || typeof window === 'undefined') return;
     const safeData = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, this.safeDebugValue(value)]));
     const entry = `${new Date().toISOString()} ${label} ${JSON.stringify(safeData)}`;
-    this.nip55DebugLog = [...this.nip55DebugLog.slice(-29), entry];
+    this.nip55DebugLog = [...this.nip55DebugLog.slice(-79), entry];
     try {
       window.localStorage.setItem(ANDROID_SIGNER_ZAP_DEBUG_KEY, JSON.stringify(this.nip55DebugLog));
       console.info('[PoH NIP55]', label, safeData);
@@ -1380,7 +1433,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     const hash = window.location.hash || '';
     if (!hash.startsWith(ANDROID_SIGNER_ZAP_HASH_PREFIX)) {
-      this.debugNip55('no NIP55 callback in URL', { hash: this.safeLocationHash() });
+      this.debugNip55('no NIP55 callback in URL', this.currentNip55HandoffState());
       return null;
     }
 
