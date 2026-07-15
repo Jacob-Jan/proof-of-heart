@@ -588,17 +588,17 @@
       p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.4; color: #4e644f; }
     }
 
-    small {
+    .invoice-chip {
       display: block;
+      width: 100%;
       margin: 0 0 10px;
       padding: 8px 10px;
       border-radius: 10px;
       border: 1px solid #efefef;
-      background: #fafafa;
       color: #606060;
-      font-size: 11px;
-      overflow-wrap: anywhere;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      font: 11px/1.2 monospace;
+
+      span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     }
 
     .qr-actions {

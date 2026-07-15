@@ -535,7 +535,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
         this.writePendingZapPayment(payment);
         void this.watchForZapReceipt(payment);
-      }, token, false);
+      }, token, true);
     } catch (e: any) {
       if (!this.isCurrentDonationAttempt(token)) return;
       this.donationStatus = this.donationErrorMessage(e);
@@ -571,7 +571,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
       this.writePendingZapPayment(payment);
       void this.watchForZapReceipt(payment);
-    }, token, false);
+    }, token, true);
     this.donating = false;
   }
 
@@ -789,6 +789,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.celebrateZapReceipt();
     this.recentZapReceipts = [receipt, ...this.recentZapReceipts.filter((r) => r.receiptId !== receipt.receiptId)].slice(0, 8);
     await this.refreshCharity();
+  }
+
+  get compactInvoice(): string {
+    if (!this.lastInvoice) return '';
+    if (this.lastInvoice.length <= 36) return this.lastInvoice;
+    return `${this.lastInvoice.slice(0, 18)}…${this.lastInvoice.slice(-14)}`;
   }
 
   async copyInvoice() {
@@ -1129,7 +1135,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const zapRequest = {
       kind: 9734,
       created_at: Math.floor(Date.now() / 1000),
-      content: `Proof of Heart zap for ${this.charity?.name || 'this charity'}`,
+      content: `Proof of Heart zap for ${this.charity?.name || 'this charity'} ❤️`,
       tags: [
         ['relays', ...relays],
         ['amount', String(amountMsat)],
@@ -1193,9 +1199,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       zapKind: zapRequest.kind,
       tagCount: zapRequest.tags?.length || 0
     });
-    this.donating = false;
-    this.donationStatus = 'Signer request ready. Tap Open signer to approve the standard NIP-57 zap request in Amber.';
-    this.debugNip55('signer request ready for manual launch', { signerUrlLength: signerUrl.length });
+    this.donationStatus = 'Opening signer to approve the standard NIP-57 zap request…';
+    this.armAndroidSignerLaunchFallback();
+    const launched = this.launchExternalUri(signerUrl);
+    this.debugNip55('auto signer launch attempted', { launched, signerUrlLength: signerUrl.length });
   }
 
   private armAndroidSignerLaunchFallback(): void {
@@ -1711,7 +1718,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           zapRequestId: zapRequestId || ''
         });
         void this.watchForZapReceipt(payment);
-      }, token, false);
+      }, token, true);
     } catch (e: any) {
       if (!this.showDonateModal) return;
       this.debugNip55('resume failed', { message: e?.message || String(e) });

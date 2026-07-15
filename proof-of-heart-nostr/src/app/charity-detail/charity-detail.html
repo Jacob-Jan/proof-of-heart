@@ -313,7 +313,9 @@
           } @else {
             <p>QR preview unavailable in this browser. Use copy invoice.</p>
           }
-          <small>{{ lastInvoice }}</small>
+          <button type="button" class="invoice-chip" (click)="copyInvoice()" [title]="lastInvoice" aria-label="Copy Lightning invoice">
+            <span>{{ compactInvoice }}</span>
+          </button>
           <div class="qr-actions">
             <button type="button" (click)="openWalletAgain()">Open wallet</button>
             <button type="button" (click)="copyInvoice()">Copy invoice</button>
