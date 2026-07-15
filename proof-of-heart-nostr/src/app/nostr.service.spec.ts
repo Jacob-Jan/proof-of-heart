@@ -1,4 +1,4 @@
-import { mergeCharityProfiles, parseNip57ZapReceipt, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+import { mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
 
 describe('mergeCharityProfiles', () => {
   it('preserves cached visual and follower fields when live refresh omits them', () => {
@@ -289,5 +289,22 @@ describe('zap receipt stats', () => {
     });
 
     expect(parseNip57ZapReceipt({ kind: 30079, tags: [['p', 'recipient-a']] })).toBeNull();
+  });
+});
+
+
+describe('ratingStatsByRecipient', () => {
+  it('counts only the latest active rating per rater and recipient', () => {
+    const stats = ratingStatsByRecipient([
+      { pubkey: 'alice', created_at: 100, tags: [['p', 'charity-a'], ['rating', '5']] },
+      { pubkey: 'alice', created_at: 200, tags: [['p', 'charity-a'], ['rating', '3'], ['rating_state', '1']] },
+      { pubkey: 'bob', created_at: 150, tags: [['p', 'charity-a'], ['rating', '4']] },
+      { pubkey: 'carol', created_at: 180, tags: [['p', 'charity-a'], ['rating', '2']] },
+      { pubkey: 'carol', created_at: 210, tags: [['p', 'charity-a'], ['rating_state', '0']] },
+      { pubkey: 'dan', created_at: 220, tags: [['p', 'charity-b'], ['rating', '5']] }
+    ], ['charity-a']);
+
+    expect(stats.get('charity-a')).toEqual({ total: 7, count: 2 });
+    expect(stats.has('charity-b')).toBeFalse();
   });
 });

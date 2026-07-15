@@ -249,6 +249,37 @@ export function totalZapSatsByRecipient(zapReceipts: any[], recipients: string[]
   return zapMap;
 }
 
+export function ratingStatsByRecipient(ratingEvents: any[], recipients: string[]): Map<string, { total: number; count: number }> {
+  const recipientSet = new Set(recipients);
+  const latestByRaterAndRecipient = new Map<string, any>();
+
+  for (const ev of ratingEvents || []) {
+    const p = ev?.tags?.find((t: string[]) => t[0] === 'p' && recipientSet.has(t[1]))?.[1];
+    if (!p || !ev?.pubkey) continue;
+    const key = `${ev.pubkey}:${p}`;
+    const prev = latestByRaterAndRecipient.get(key);
+    if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) {
+      latestByRaterAndRecipient.set(key, ev);
+    }
+  }
+
+  const ratingMap = new Map<string, { total: number; count: number }>();
+  for (const ev of latestByRaterAndRecipient.values()) {
+    const p = ev.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+    if (!p) continue;
+    const stateTag = ev.tags?.find((t: string[]) => t[0] === 'rating_state')?.[1];
+    if (stateTag === '0') continue;
+    const r = Number(ev.tags?.find((t: string[]) => t[0] === 'rating')?.[1]);
+    if (!Number.isFinite(r) || r < 1 || r > 5) continue;
+    const current = ratingMap.get(p) ?? { total: 0, count: 0 };
+    current.total += r;
+    current.count += 1;
+    ratingMap.set(p, current);
+  }
+
+  return ratingMap;
+}
+
 @Injectable({ providedIn: 'root' })
 export class NostrService {
   private pool = new SimplePool();
@@ -329,7 +360,7 @@ export class NostrService {
     const url = new URL(`nostrconnect://${clientPubkey}`);
     for (const relay of relays) url.searchParams.append('relay', relay);
     url.searchParams.set('secret', secret);
-    url.searchParams.set('perms', 'sign_event:9734,get_public_key');
+    url.searchParams.set('perms', 'sign_event:9734,sign_event:1984,sign_event:30079,get_public_key');
     url.searchParams.set('name', 'Proof of Heart');
     url.searchParams.set('url', typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
     return { url: url.toString(), clientPubkey, relays };
@@ -433,15 +464,24 @@ export class NostrService {
 
   async signEventWithAvailableSigner(event: any, timeoutMs = 60_000): Promise<any> {
     if (typeof window !== 'undefined' && window.nostr) {
-      return this.withTimeout(window.nostr.signEvent(event), timeoutMs, 'Signer response');
+      const signed = await this.withTimeout(window.nostr.signEvent(event), timeoutMs, 'Signer response');
+      this.rememberSignedEventPubkey(signed);
+      return signed;
     }
 
     const result = await this.nip46Request('sign_event', [JSON.stringify(event)], timeoutMs);
     try {
-      return JSON.parse(result);
+      const signed = JSON.parse(result);
+      this.rememberSignedEventPubkey(signed);
+      return signed;
     } catch {
       throw new Error('Remote signer returned an invalid signed event.');
     }
+  }
+
+  private rememberSignedEventPubkey(signed: any): void {
+    if (typeof window === 'undefined' || !signed?.pubkey) return;
+    window.localStorage.setItem(LAST_PUBKEY_KEY, signed.pubkey);
   }
 
   getRelayMode(): 'auto' | 'test' | 'prod' {
@@ -590,7 +630,7 @@ export class NostrService {
       return { pubkey: session.userPubkey, npub: nip19.npubEncode(session.userPubkey) };
     }
 
-    throw new Error('No Nostr signer found. Connect a NIP-07 extension or pair a NIP-46 remote signer.');
+    throw new Error('No Nostr signer found. Use a browser extension or pair a NIP-46 remote signer.');
   }
 
   async loadKind0Profile(pubkey: string): Promise<Record<string, any>> {
@@ -801,7 +841,6 @@ export class NostrService {
   }
 
   async publishRating(targetPubkey: string, rating: number, note = ''): Promise<string> {
-    if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getWriteRelays();
     const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
 
@@ -811,18 +850,58 @@ export class NostrService {
       tags: [
         ['p', targetPubkey],
         ['d', `rating:${targetPubkey}`],
+        ['rating_state', '1'],
         ['rating', String(cleanRating)]
       ],
       content: note
     };
 
-    const signed = await window.nostr.signEvent(event);
+    const signed = await this.signEventWithAvailableSigner(event);
     await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
+  async publishRemoveRating(targetPubkey: string): Promise<string> {
+    const relays = this.getWriteRelays();
+
+    const event = {
+      kind: KIND_CHARITY_RATING,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['p', targetPubkey],
+        ['d', `rating:${targetPubkey}`],
+        ['rating_state', '0']
+      ],
+      content: 'Rating removed'
+    };
+
+    const signed = await this.signEventWithAvailableSigner(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
+    return signed.id;
+  }
+
+  async loadUserRating(targetPubkey: string, raterPubkey: string): Promise<number | null> {
+    if (!targetPubkey || !raterPubkey) return null;
+    const relays = this.getActiveRelays();
+    const ratings = await this.pool.querySync(relays, {
+      kinds: [KIND_CHARITY_RATING],
+      authors: [raterPubkey],
+      '#p': [targetPubkey],
+      limit: 200
+    });
+
+    const latest = [...ratings]
+      .sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0))[0] as any;
+
+    if (!latest) return null;
+    const stateTag = latest.tags?.find((t: string[]) => t[0] === 'rating_state')?.[1];
+    if (stateTag === '0') return null;
+    const r = Number(latest.tags?.find((t: string[]) => t[0] === 'rating')?.[1]);
+    if (!Number.isFinite(r) || r < 1 || r > 5) return null;
+    return Math.max(1, Math.min(5, Math.round(r)));
+  }
+
   async publishReport(targetPubkey: string, reason: 'spam' | 'impersonation' | 'scam', note = ''): Promise<string> {
-    if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getWriteRelays();
 
     const event = {
@@ -836,13 +915,12 @@ export class NostrService {
       content: note || `Report reason: ${reason}`
     };
 
-    const signed = await window.nostr.signEvent(event);
+    const signed = await this.signEventWithAvailableSigner(event);
     await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
   async publishUnreport(targetPubkey: string): Promise<string> {
-    if (!window.nostr) throw new Error('No Nostr signer found.');
     const relays = this.getWriteRelays();
 
     const event = {
@@ -856,7 +934,7 @@ export class NostrService {
       content: 'Report withdrawn'
     };
 
-    const signed = await window.nostr.signEvent(event);
+    const signed = await this.signEventWithAvailableSigner(event);
     await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
@@ -1620,16 +1698,7 @@ export class NostrService {
 
     const stableFollowerCounts = await this.loadStableFollowerCounts(pubkeys, followerMap);
 
-    const ratingMap = new Map<string, { total: number; count: number }>();
-    for (const ev of ratings as any[]) {
-      const p = ev.tags.find((t: string[]) => t[0] === 'p')?.[1];
-      const r = Number(ev.tags.find((t: string[]) => t[0] === 'rating')?.[1]);
-      if (!p || Number.isNaN(r) || r < 1 || r > 5) continue;
-      const current = ratingMap.get(p) ?? { total: 0, count: 0 };
-      current.total += r;
-      current.count += 1;
-      ratingMap.set(p, current);
-    }
+    const ratingMap = ratingStatsByRecipient(ratings as any[], pubkeys);
 
     const zapMap = totalZapSatsByRecipient(zapReceipts as any[], pubkeys);
 
