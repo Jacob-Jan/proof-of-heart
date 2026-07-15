@@ -81,6 +81,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   rating = 5;
   ratingHover = 0;
   ratingNote = '';
+  userRating: number | null = null;
   reportReason: 'spam' | 'impersonation' | 'scam' = 'scam';
   reportNote = '';
   showRateDialog = false;
@@ -118,6 +119,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   nip46ConnectUrl = '';
   nip46Pairing = false;
   nip46PairingError = '';
+  actionSignerStatus = '';
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   consoleLog: string[] = [];
@@ -245,6 +247,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.followersLoaded = false;
     this.canEdit = false;
     this.hasFlagged = false;
+    this.userRating = null;
     this.loadStatus = 'fetching charity profile from nostr relays...';
     this.loadStatusTone = 'relay';
     this.nostr.setCharityFeedStatus('relay', this.loadStatus);
@@ -288,8 +291,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
               if (!isCurrent()) return;
               console.warn('Flag status check failed', e);
             });
+          void this.nostr.loadUserRating(this.charity.pubkey, this.visitorPubkey)
+            .then((rating) => {
+              if (!isCurrent()) return;
+              this.userRating = rating;
+            })
+            .catch((e) => {
+              if (!isCurrent()) return;
+              console.warn('Rating status check failed', e);
+            });
         } else {
           this.hasFlagged = false;
+          this.userRating = null;
         }
       } else {
         this.title.setTitle('Charity not found | Proof of Heart');
@@ -356,9 +369,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   openRateDialog() {
-    this.rating = 5;
+    this.rating = this.userRating || 5;
     this.ratingHover = 0;
     this.ratingNote = '';
+    this.actionSignerStatus = '';
     this.showRateDialog = true;
   }
 
@@ -387,6 +401,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   openFlagDialog() {
     this.reportReason = 'scam';
     this.reportNote = '';
+    this.actionSignerStatus = '';
     this.showFlagDialog = true;
   }
 
@@ -401,18 +416,44 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   async rate() {
     if (!this.charity) return;
     try {
+      await this.ensureActionSigner('rating');
       await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
-      this.toast('Rating published to Nostr.', 'success', 3000);
+      this.toast(this.userRating ? 'Rating updated on Nostr.' : 'Rating published to Nostr.', 'success', 3000);
+      this.actionSignerStatus = '';
       this.closeRateDialog();
       await this.refreshCharity();
     } catch (e: any) {
+      this.actionSignerStatus = '';
       this.toast(e?.message || 'Failed to publish rating.', 'error', 4000);
+    }
+  }
+
+  async removeRating() {
+    if (!this.charity) return;
+    try {
+      await this.ensureActionSigner('rating');
+      const latestRating = await this.nostr.loadUserRating(this.charity.pubkey, this.visitorPubkey);
+      if (!latestRating) {
+        this.userRating = null;
+        this.toast('No rating found for this signer.', 'info', 3000);
+        return;
+      }
+      await this.nostr.publishRemoveRating(this.charity.pubkey);
+      this.userRating = null;
+      this.actionSignerStatus = '';
+      this.toast('Rating removed from Nostr.', 'success', 3000);
+      this.closeRateDialog();
+      await this.refreshCharity();
+    } catch (e: any) {
+      this.actionSignerStatus = '';
+      this.toast(e?.message || 'Failed to remove rating.', 'error', 4000);
     }
   }
 
   async report() {
     if (!this.charity) return;
     try {
+      await this.ensureActionSigner(this.hasFlagged ? 'unflag' : 'flag');
       if (this.hasFlagged) {
         await this.nostr.publishUnreport(this.charity.pubkey);
         this.toast('Flag removed from Nostr.', 'success', 3000);
@@ -420,10 +461,53 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         await this.nostr.publishReport(this.charity.pubkey, this.reportReason, this.reportNote);
         this.toast('Flag published to Nostr.', 'success', 3000);
       }
+      this.actionSignerStatus = '';
       this.closeFlagDialog();
       await this.refreshCharity();
     } catch (e: any) {
+      this.actionSignerStatus = '';
       this.toast(e?.message || 'Failed to update flag.', 'error', 4000);
+    }
+  }
+
+  private async ensureActionSigner(action: 'rating' | 'flag' | 'unflag'): Promise<void> {
+    if (await this.nostr.hasSigner()) {
+      this.signerConnected = true;
+      if (!this.visitorPubkey) {
+        const signer = await this.nostr.connectSigner();
+        this.visitorPubkey = signer.pubkey;
+      }
+      await this.refreshActionIdentityState();
+      return;
+    }
+
+    const label = action === 'rating' ? 'rate' : action === 'unflag' ? 'remove your flag' : 'flag';
+    const pairing = this.nostr.startNip46Pairing();
+    this.nip46ConnectUrl = pairing.url;
+    this.nip46Pairing = true;
+    this.nip46PairingError = '';
+    this.actionSignerStatus = `Pair a Nostr remote signer to ${label}. This is only for this action; you do not need to log in to Proof of Heart.`;
+    this.launchExternalUri(pairing.url);
+
+    const signer = await this.nostr.waitForNip46Pairing(120_000);
+    this.visitorPubkey = signer.pubkey;
+    this.signerConnected = true;
+    this.nip46Pairing = false;
+    this.actionSignerStatus = `Signer paired. Approve the ${label} event…`;
+    await this.refreshActionIdentityState();
+  }
+
+  private async refreshActionIdentityState(): Promise<void> {
+    if (!this.charity || !this.visitorPubkey) return;
+    try {
+      this.hasFlagged = await this.nostr.hasUserFlagged(this.charity.pubkey, this.visitorPubkey);
+    } catch {
+      // Flag-state lookup is best-effort; signing can still proceed.
+    }
+    try {
+      this.userRating = await this.nostr.loadUserRating(this.charity.pubkey, this.visitorPubkey);
+    } catch {
+      // Rating-state lookup is best-effort; signing can still proceed.
     }
   }
 

@@ -177,9 +177,9 @@
           </div>
 
           <div class="actions-row">
-            <button type="button" class="icon-action" (click)="openRateDialog()" title="Rate charity">
+            <button type="button" class="icon-action" (click)="openRateDialog()" [title]="userRating ? 'Update or remove your rating' : 'Rate charity'">
               <i class="fa-solid fa-star"></i>
-              <span>Rate</span>
+              <span>{{ userRating ? 'Rated ' + userRating : 'Rate' }}</span>
             </button>
             <button type="button" class="icon-action" (click)="openFlagDialog()" [title]="hasFlagged ? 'Remove your flag' : 'Flag charity'">
               <i class="fa-solid" [class.fa-flag]="!hasFlagged" [class.fa-flag-checkered]="hasFlagged"></i>
@@ -211,11 +211,27 @@
           }
         </div>
         <p class="rating-selected">Selected: {{ rating }} / 5</p>
+        @if (userRating) {
+          <p class="rating-selected">Your current rating from this signer: {{ userRating }} / 5. Publishing again updates it.</p>
+        }
+        @if (actionSignerStatus) {
+          <p class="rating-selected">{{ actionSignerStatus }}</p>
+          @if (nip46Pairing && nip46ConnectUrl) {
+            <div class="dialog-actions">
+              <button type="button" (click)="openNip46Signer()">Open remote signer</button>
+              <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
+            </div>
+          }
+        }
         <label>Note (optional)</label>
         <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
         <div class="dialog-actions">
+          @if (userRating) {
+            <button type="button" style="background: transparent; border-color: transparent; color: #9b2c2c; padding-inline: 4px;" (click)="removeRating()">Remove my rating</button>
+          }
+          <span style="flex: 1 1 auto;"></span>
           <button type="button" (click)="closeRateDialog()">Cancel</button>
-          <button type="button" (click)="rate()">Publish rating</button>
+          <button type="button" (click)="rate()">{{ userRating ? 'Update rating' : 'Publish rating' }}</button>
         </div>
       </div>
     </div>
@@ -236,6 +252,15 @@
           <textarea [(ngModel)]="reportNote" name="reportNote"></textarea>
         } @else {
           <p class="rating-selected">This will remove your previous flag for this charity.</p>
+        }
+        @if (actionSignerStatus) {
+          <p class="rating-selected">{{ actionSignerStatus }}</p>
+          @if (nip46Pairing && nip46ConnectUrl) {
+            <div class="dialog-actions">
+              <button type="button" (click)="openNip46Signer()">Open remote signer</button>
+              <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
+            </div>
+          }
         }
         <div class="dialog-actions">
           <button type="button" (click)="closeFlagDialog()">Cancel</button>
