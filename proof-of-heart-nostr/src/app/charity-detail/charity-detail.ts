@@ -115,6 +115,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private donationAttemptToken = 0;
   private autoWalletLaunchPaymentKey = '';
   lastAndroidSignerUrl = '';
+  nip46ConnectUrl = '';
+  nip46Pairing = false;
+  nip46PairingError = '';
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   consoleLog: string[] = [];
@@ -488,23 +491,31 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
 
-    if (!window.nostr) {
-      if (isAndroidBrowser()) {
-        try {
-          await this.startAndroidSignerZap(lightningAddress, sats, since);
-          return;
-        } catch (e: any) {
-          if (!this.isCurrentDonationAttempt(token)) return;
-          this.donationStatus = this.donationErrorMessage(e);
-          this.donating = false;
-          return;
+    if (!window.nostr && !this.nostr.hasNip46Session()) {
+      try {
+        await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
+        return;
+      } catch (e: any) {
+        this.nip46Pairing = false;
+        this.nip46PairingError = this.donationErrorMessage(e);
+        if (!this.isCurrentDonationAttempt(token)) return;
+        if (isAndroidBrowser()) {
+          try {
+            await this.startAndroidSignerZap(lightningAddress, sats, since);
+            return;
+          } catch (androidErr: any) {
+            if (!this.isCurrentDonationAttempt(token)) return;
+            this.donationStatus = this.donationErrorMessage(androidErr);
+            this.donating = false;
+            return;
+          }
         }
-      }
 
-      this.donationStatus = 'A Nostr signer is required for verified zaps. On Android, use Amber or another NIP-55 signer; on desktop, use a NIP-07 extension.';
-      this.toast('Connect a Nostr signer to zap.', 'error', 3500);
-      this.donating = false;
-      return;
+        this.donationStatus = this.donationErrorMessage(e);
+        this.toast('Connect a Nostr signer to zap.', 'error', 3500);
+        this.donating = false;
+        return;
+      }
     }
 
     this.donationStatus = 'Preparing standard NIP-57 zap request…';
@@ -533,6 +544,62 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async startNip46ZapPairingAndContinue(token: number, lightningAddress: string, sats: number, since: number): Promise<void> {
+    const pairing = this.nostr.startNip46Pairing();
+    this.nip46ConnectUrl = pairing.url;
+    this.nip46Pairing = true;
+    this.nip46PairingError = '';
+    this.donationStatus = 'Pair a NIP-46 remote signer. Open the signer link or scan/copy it in any signer that supports Nostr Connect.';
+    this.launchExternalUri(pairing.url);
+
+    await this.nostr.waitForNip46Pairing(120_000);
+    if (!this.isCurrentDonationAttempt(token)) return;
+    this.nip46Pairing = false;
+    this.donationStatus = 'Remote signer paired. Preparing standard NIP-57 zap request…';
+
+    const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
+    if (!this.isCurrentDonationAttempt(token)) return;
+    const payment: PendingZapPayment = {
+      charityPubkey: this.charity!.pubkey,
+      invoice,
+      donorPubkey,
+      sats,
+      since,
+      zapRequestId,
+      createdAt: Date.now()
+    };
+    await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+      this.writePendingZapPayment(payment);
+      void this.watchForZapReceipt(payment);
+    }, token, false);
+    this.donating = false;
+  }
+
+  openNip46Signer() {
+    if (!this.nip46ConnectUrl) return;
+    this.launchExternalUri(this.nip46ConnectUrl);
+  }
+
+  async copyNip46ConnectUrl() {
+    if (!this.nip46ConnectUrl) return;
+    try {
+      await navigator.clipboard?.writeText(this.nip46ConnectUrl);
+      this.toast('NIP-46 pairing link copied.', 'success', 2500);
+    } catch {
+      this.toast('Could not copy pairing link.', 'error', 2500);
+    }
+  }
+
+  async useAndroidSignerFallback() {
+    if (!this.charity || !isAndroidBrowser()) return;
+    try {
+      await this.startAndroidSignerZap(this.donationAddress, this.donationSats, Math.floor(Date.now() / 1000) - 10);
+    } catch (e: any) {
+      this.donationStatus = this.donationErrorMessage(e);
+      this.donating = false;
+    }
+  }
+
   private prepareDonation(flow: 'lightning' | 'zap'): boolean {
     if (!this.charity) return false;
 
@@ -555,6 +622,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.showLightningThanksCard = false;
     this.showZapCelebration = false;
     this.lastAndroidSignerUrl = '';
+    this.nip46PairingError = '';
     this.clearDonationTimers();
     this.donating = true;
     this.donationAttemptToken += 1;
@@ -1038,10 +1106,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private async createNip57ZapInvoice(lightningAddress: string, sats: number): Promise<{ invoice: string; donorPubkey: string; zapRequestId?: string }> {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
 
-    if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
-
-    this.donationStatus = 'Approve the standard NIP-57 zap request in your Nostr signer…';
-    const signedZap = await this.withTimeout(window.nostr.signEvent(zapRequest), 15_000, 'Signer approval');
+    this.donationStatus = this.nostr.hasNip07Signer()
+      ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
+      : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
+    const signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, 60_000);
     return this.createInvoiceFromSignedZap(payParams.callback, amountMsat, signedZap);
   }
 

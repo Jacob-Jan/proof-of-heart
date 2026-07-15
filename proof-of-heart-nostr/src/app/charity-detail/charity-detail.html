@@ -318,6 +318,19 @@
             <button type="button" (click)="openWalletAgain()">Open wallet</button>
             <button type="button" (click)="copyInvoice()">Copy invoice</button>
           </div>
+        } @else if (nip46ConnectUrl) {
+          <div class="qr-actions">
+            <button type="button" (click)="openNip46Signer()">Open remote signer</button>
+            <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
+            @if (lastAndroidSignerUrl) {
+              <button type="button" (click)="openAndroidSignerAgain()">Use Android callback</button>
+            } @else {
+              <button type="button" (click)="useAndroidSignerFallback()">Use Android callback</button>
+            }
+          </div>
+          @if (nip46PairingError) {
+            <p class="qr-help">{{ nip46PairingError }}</p>
+          }
         } @else if (lastAndroidSignerUrl) {
           <div class="qr-actions">
             <button type="button" (click)="openAndroidSignerAgain()">Open signer</button>

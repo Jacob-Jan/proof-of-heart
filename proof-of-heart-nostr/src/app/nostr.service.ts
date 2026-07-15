@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { SimplePool } from 'nostr-tools/pool';
-import { nip19, nip57 } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey, nip19, nip44, nip57, utils } from 'nostr-tools';
 
 export interface CharityProfile {
   pubkey: string;
@@ -132,6 +132,18 @@ const CHARITIES_CACHE_VERSION = 2;
 const CHARITIES_CACHE_TTL_HOME_MS = 30 * 60 * 1000;
 const CHARITIES_CACHE_TTL_DETAIL_MS = 10 * 60 * 1000;
 const CHARITY_DETAIL_CACHE_PREFIX = 'poh_charity_detail_cache_v1:';
+const NIP46_SESSION_KEY = 'poh_nip46_session_v1';
+const NIP46_DEFAULT_RELAYS = ['wss://relay.nsec.app', 'wss://relay.primal.net', 'wss://relay.damus.io'];
+
+interface Nip46Session {
+  clientSecretKey: string;
+  clientPubkey: string;
+  relays: string[];
+  secret: string;
+  remotePubkey?: string;
+  userPubkey?: string;
+  createdAt: number;
+}
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
 const KIND_CHARITY_RATING = 30079; // app-specific parameterized replaceable
@@ -269,7 +281,167 @@ export class NostrService {
   }
 
   async hasSigner(): Promise<boolean> {
+    return typeof window !== 'undefined' && (!!window.nostr || !!this.readNip46Session()?.remotePubkey);
+  }
+
+  hasNip07Signer(): boolean {
     return typeof window !== 'undefined' && !!window.nostr;
+  }
+
+  hasNip46Session(): boolean {
+    return !!this.readNip46Session()?.remotePubkey;
+  }
+
+  private readNip46Session(): Nip46Session | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(NIP46_SESSION_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed?.clientSecretKey || !parsed?.clientPubkey || !Array.isArray(parsed?.relays)) return null;
+      return parsed as Nip46Session;
+    } catch {
+      return null;
+    }
+  }
+
+  private writeNip46Session(session: Nip46Session): void {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(NIP46_SESSION_KEY, JSON.stringify(session));
+  }
+
+  clearNip46Session(): void {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(NIP46_SESSION_KEY);
+  }
+
+  startNip46Pairing(): { url: string; clientPubkey: string; relays: string[] } {
+    const existing = this.readNip46Session();
+    const clientSecret = existing?.clientSecretKey
+      ? utils.hexToBytes(existing.clientSecretKey)
+      : generateSecretKey();
+    const clientSecretKey = utils.bytesToHex(clientSecret);
+    const clientPubkey = getPublicKey(clientSecret);
+    const relays = this.uniqueRelays(existing?.relays?.length ? existing.relays : NIP46_DEFAULT_RELAYS);
+    const secret = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const session: Nip46Session = { clientSecretKey, clientPubkey, relays, secret, createdAt: Date.now() };
+    this.writeNip46Session(session);
+
+    const url = new URL(`nostrconnect://${clientPubkey}`);
+    for (const relay of relays) url.searchParams.append('relay', relay);
+    url.searchParams.set('secret', secret);
+    url.searchParams.set('perms', 'sign_event:9734,get_public_key');
+    url.searchParams.set('name', 'Proof of Heart');
+    url.searchParams.set('url', typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
+    return { url: url.toString(), clientPubkey, relays };
+  }
+
+  async waitForNip46Pairing(timeoutMs = 120_000): Promise<{ pubkey: string; npub: string }> {
+    const session = this.readNip46Session();
+    if (!session) throw new Error('No NIP-46 pairing request is active.');
+    const clientSecret = utils.hexToBytes(session.clientSecretKey);
+    const startedAt = Math.floor(Date.now() / 1000) - 5;
+
+    const remotePubkey = await new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        sub.close('timeout');
+        reject(new Error('Remote signer pairing timed out. Open your signer and approve the Proof of Heart connection.'));
+      }, timeoutMs);
+
+      const sub = this.pool.subscribeMany(session.relays, {
+        kinds: [24133],
+        '#p': [session.clientPubkey],
+        since: startedAt,
+        limit: 50
+      }, {
+        onevent: (event: any) => {
+          try {
+            const conversationKey = nip44.v2.utils.getConversationKey(clientSecret, event.pubkey);
+            const message = JSON.parse(nip44.v2.decrypt(event.content, conversationKey));
+            if (message?.result !== session.secret) return;
+            clearTimeout(timer);
+            sub.close('paired');
+            resolve(event.pubkey);
+          } catch {
+            // Ignore non-matching or undecryptable NIP-46 traffic.
+          }
+        }
+      } as any);
+    });
+
+    const paired: Nip46Session = { ...session, remotePubkey };
+    this.writeNip46Session(paired);
+    const userPubkey = await this.nip46Request('get_public_key', [], 60_000, paired);
+    const finalSession = { ...paired, userPubkey };
+    this.writeNip46Session(finalSession);
+    if (typeof window !== 'undefined') window.localStorage.setItem(LAST_PUBKEY_KEY, userPubkey);
+    return { pubkey: userPubkey, npub: nip19.npubEncode(userPubkey) };
+  }
+
+  private async nip46Request(method: string, params: string[], timeoutMs = 60_000, sessionArg?: Nip46Session): Promise<string> {
+    const session = sessionArg || this.readNip46Session();
+    if (!session?.remotePubkey) throw new Error('No NIP-46 remote signer is paired yet.');
+    const remotePubkey = session.remotePubkey;
+    const clientSecret = utils.hexToBytes(session.clientSecretKey);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const conversationKey = nip44.v2.utils.getConversationKey(clientSecret, remotePubkey);
+    const content = nip44.v2.encrypt(JSON.stringify({ id, method, params }), conversationKey);
+    const requestEvent = finalizeEvent({
+      kind: 24133,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['p', remotePubkey]],
+      content
+    }, clientSecret);
+
+    const responsePromise = new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        sub.close('timeout');
+        reject(new Error(`Remote signer ${method} timed out.`));
+      }, timeoutMs);
+
+      const sub = this.pool.subscribeMany(session.relays, {
+        kinds: [24133],
+        authors: [remotePubkey],
+        '#p': [session.clientPubkey],
+        since: Math.floor(Date.now() / 1000) - 5,
+        limit: 50
+      }, {
+        onevent: (event: any) => {
+          try {
+            const payload = JSON.parse(nip44.v2.decrypt(event.content, conversationKey));
+            if (payload?.id !== id) return;
+            if (payload?.result === 'auth_url' && payload?.error) {
+              window.open(payload.error, '_blank', 'noopener');
+              return;
+            }
+            clearTimeout(timer);
+            sub.close('response');
+            if (payload?.error) reject(new Error(payload.error));
+            else resolve(String(payload?.result || ''));
+          } catch {
+            // Ignore non-matching traffic.
+          }
+        }
+      } as any);
+    });
+
+    const publishResults = await Promise.allSettled(this.pool.publish(session.relays, requestEvent as any));
+    if (!publishResults.some((result) => result.status === 'fulfilled')) {
+      throw new Error('Could not publish request to remote signer relays.');
+    }
+    return responsePromise;
+  }
+
+  async signEventWithAvailableSigner(event: any, timeoutMs = 60_000): Promise<any> {
+    if (typeof window !== 'undefined' && window.nostr) {
+      return this.withTimeout(window.nostr.signEvent(event), timeoutMs, 'Signer response');
+    }
+
+    const result = await this.nip46Request('sign_event', [JSON.stringify(event)], timeoutMs);
+    try {
+      return JSON.parse(result);
+    } catch {
+      throw new Error('Remote signer returned an invalid signed event.');
+    }
   }
 
   getRelayMode(): 'auto' | 'test' | 'prod' {
@@ -403,13 +575,22 @@ export class NostrService {
   }
 
   async connectSigner(): Promise<{ pubkey: string; npub: string }> {
-    if (!window.nostr) throw new Error('No Nostr signer found (install a NIP-07 extension).');
-    const pubkey = await window.nostr.getPublicKey();
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(LAST_PUBKEY_KEY, pubkey);
+    if (window.nostr) {
+      const pubkey = await window.nostr.getPublicKey();
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(LAST_PUBKEY_KEY, pubkey);
+      }
+      const npub = nip19.npubEncode(pubkey);
+      return { pubkey, npub };
     }
-    const npub = nip19.npubEncode(pubkey);
-    return { pubkey, npub };
+
+    const session = this.readNip46Session();
+    if (session?.userPubkey) {
+      if (typeof window !== 'undefined') window.localStorage.setItem(LAST_PUBKEY_KEY, session.userPubkey);
+      return { pubkey: session.userPubkey, npub: nip19.npubEncode(session.userPubkey) };
+    }
+
+    throw new Error('No Nostr signer found. Connect a NIP-07 extension or pair a NIP-46 remote signer.');
   }
 
   async loadKind0Profile(pubkey: string): Promise<Record<string, any>> {
