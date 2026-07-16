@@ -11,4 +11,16 @@
   <button mat-flat-button type="button" (click)="continueToProfile()" [disabled]="loading || !charityConfirmed">
     {{ loading ? 'Connecting…' : 'Connect Nostr' }}
   </button>
+
+  <div class="signer-site-help" [class.visible]="signerHelpVisible">
+    <strong>Using AKA Profiles?</strong>
+    <p>
+      Approve or add this exact site in AKA Profiles, then tap Connect Nostr again.
+      A new signer profile may have an empty recent-sites list, so use the current site below.
+    </p>
+    <div class="site-origin-row">
+      <code>{{ currentSiteOrigin }}</code>
+      <button type="button" class="copy-site" (click)="copyCurrentSite()">Copy site</button>
+    </div>
+  </div>
 </section>

@@ -21,6 +21,8 @@ export class CharityOnboardComponent {
 
   charityConfirmed = false;
   loading = false;
+  signerHelpVisible = false;
+  currentSiteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org';
 
   private toast(message: string, kind: 'success' | 'error' | 'info' = 'info', duration = 3500) {
     this.snack.open(message, 'Close', { duration, panelClass: [`toast-${kind}`] });
@@ -34,15 +36,26 @@ export class CharityOnboardComponent {
 
     this.loading = true;
     try {
+      this.signerHelpVisible = false;
       const { pubkey, npub } = await this.nostr.connectSigner();
       this.nostr.markLocalOnboarding(pubkey);
       await this.nostr.ensureCharityProfile(pubkey);
       this.toast('Connected. Opening your public charity profile…', 'success', 2600);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
+      this.signerHelpVisible = true;
       this.toast(e?.message || 'Failed to connect Nostr signer', 'error', 4000);
     } finally {
       this.loading = false;
+    }
+  }
+
+  async copyCurrentSite() {
+    try {
+      await navigator.clipboard?.writeText(this.currentSiteOrigin);
+      this.toast('Current site copied. Add or approve it in AKA Profiles, then retry.', 'success', 3500);
+    } catch {
+      this.toast(`Copy this site in AKA Profiles: ${this.currentSiteOrigin}`, 'info', 6000);
     }
   }
 }
