@@ -190,22 +190,42 @@ export function sortCharityProfiles(charities: CharityProfile[]): CharityProfile
   return [...charities].sort(compareCharityProfiles);
 }
 
-export function zapReceiptSats(event: any): number {
-  const amountMsat = Number(event?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
-  if (Number.isFinite(amountMsat) && amountMsat > 0) return Math.floor(amountMsat / 1000);
+function tagValue(tags: any[] | undefined, name: string): string | undefined {
+  const value = tags?.find((t: string[]) => t[0] === name)?.[1];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
 
-  const bolt11 = event?.tags?.find((t: string[]) => t[0] === 'bolt11')?.[1];
-  if (typeof bolt11 === 'string' && bolt11) {
-    const sats = Number(nip57.getSatoshisAmountFromBolt11(bolt11));
-    if (Number.isFinite(sats) && sats > 0) return Math.floor(sats);
+function msatTagToSats(value: unknown): number {
+  if (typeof value !== 'string' && typeof value !== 'number') return 0;
+  const normalized = String(value).trim().toLowerCase().replace(/msats?$/, '');
+  const amountMsat = Number(normalized);
+  if (!Number.isFinite(amountMsat) || amountMsat <= 0) return 0;
+  return Math.floor(amountMsat / 1000);
+}
+
+export function zapReceiptSats(event: any): number {
+  // Standard NIP-57 receipts prove the paid amount through the BOLT11 invoice.
+  // Treat receipt/request amount tags only as fallbacks because they can represent
+  // intent metadata rather than the actual settled invoice amount.
+  const bolt11 = tagValue(event?.tags, 'bolt11');
+  if (bolt11) {
+    try {
+      const sats = Number(nip57.getSatoshisAmountFromBolt11(bolt11));
+      if (Number.isFinite(sats) && sats > 0) return Math.floor(sats);
+    } catch {
+      // fall back to amount tags below
+    }
   }
 
-  const description = event?.tags?.find((t: string[]) => t[0] === 'description')?.[1];
-  if (typeof description === 'string' && description) {
+  const receiptAmountSats = msatTagToSats(tagValue(event?.tags, 'amount'));
+  if (receiptAmountSats > 0) return receiptAmountSats;
+
+  const description = tagValue(event?.tags, 'description');
+  if (description) {
     try {
       const zapRequest = JSON.parse(description);
-      const requestAmountMsat = Number(zapRequest?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
-      if (Number.isFinite(requestAmountMsat) && requestAmountMsat > 0) return Math.floor(requestAmountMsat / 1000);
+      const requestAmountSats = msatTagToSats(tagValue(zapRequest?.tags, 'amount'));
+      if (requestAmountSats > 0) return requestAmountSats;
     } catch {
       // ignore malformed zap descriptions
     }

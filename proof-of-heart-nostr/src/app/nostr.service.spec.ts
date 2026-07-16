@@ -244,6 +244,35 @@ describe('zap receipt stats', () => {
     expect(totals.has('other-recipient')).toBeFalse();
   });
 
+  it('prefers the paid bolt11 amount over receipt/request amount tags', () => {
+    const sats = zapReceiptSats({
+      kind: 9735,
+      tags: [
+        ['p', 'recipient-a'],
+        ['amount', '21000'],
+        ['bolt11', 'lnbc10u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'],
+        ['description', JSON.stringify({
+          kind: 9734,
+          tags: [['amount', '21000']]
+        })]
+      ]
+    });
+
+    expect(sats).toBe(1000);
+  });
+
+  it('parses receipt amount tags with msat suffix when bolt11 is unavailable', () => {
+    const sats = zapReceiptSats({
+      kind: 9735,
+      tags: [
+        ['p', 'recipient-a'],
+        ['amount', '21000msat']
+      ]
+    });
+
+    expect(sats).toBe(21);
+  });
+
   it('falls back to the zap request amount in the description tag', () => {
     const sats = zapReceiptSats({
       kind: 9735,
