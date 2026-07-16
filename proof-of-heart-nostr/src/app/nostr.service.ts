@@ -56,6 +56,24 @@ export interface Nip57ZapReceipt {
   comment?: string;
 }
 
+export interface RecentRatingRecord {
+  eventId: string;
+  raterPubkey: string;
+  recipientPubkey: string;
+  rating: number;
+  createdAt: number;
+  note?: string;
+}
+
+export interface RecentFlagRecord {
+  eventId: string;
+  reporterPubkey: string;
+  recipientPubkey: string;
+  reason?: string;
+  createdAt: number;
+  note?: string;
+}
+
 export interface CharityFeedStatus {
   tone: 'relay' | 'cache' | 'success' | 'warning';
   label: string;
@@ -581,6 +599,77 @@ export class NostrService {
     }
 
     return [...byId.values()]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  }
+
+  async loadRecentRatingsForCharity(pubkey: string, limit = 12): Promise<RecentRatingRecord[]> {
+    if (!pubkey) return [];
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [KIND_CHARITY_RATING],
+      '#p': [pubkey],
+      limit: Math.max(limit * 5, 50)
+    });
+
+    const latestByRater = new Map<string, any>();
+    for (const ev of events as any[]) {
+      const p = ev.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+      if (p !== pubkey || !ev.pubkey) continue;
+      const prev = latestByRater.get(ev.pubkey);
+      if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) latestByRater.set(ev.pubkey, ev);
+    }
+
+    return [...latestByRater.values()]
+      .map((ev: any): RecentRatingRecord | null => {
+        const stateTag = ev.tags?.find((t: string[]) => t[0] === 'rating_state')?.[1];
+        if (stateTag === '0') return null;
+        const rating = Number(ev.tags?.find((t: string[]) => t[0] === 'rating')?.[1]);
+        if (!Number.isFinite(rating) || rating < 1 || rating > 5) return null;
+        return {
+          eventId: ev.id || `${ev.pubkey}:${ev.created_at}`,
+          raterPubkey: ev.pubkey,
+          recipientPubkey: pubkey,
+          rating: Math.max(1, Math.min(5, Math.round(rating))),
+          createdAt: Number(ev.created_at) || 0,
+          note: typeof ev.content === 'string' && ev.content.trim() ? ev.content.trim() : undefined
+        };
+      })
+      .filter((record): record is RecentRatingRecord => !!record)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  }
+
+  async loadRecentFlagsForCharity(pubkey: string, limit = 12): Promise<RecentFlagRecord[]> {
+    if (!pubkey) return [];
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [KIND_REPORT],
+      '#p': [pubkey],
+      limit: Math.max(limit * 5, 50)
+    });
+
+    const latestByReporter = new Map<string, any>();
+    for (const ev of events as any[]) {
+      const p = ev.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+      if (p !== pubkey || !ev.pubkey) continue;
+      const prev = latestByReporter.get(ev.pubkey);
+      if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) latestByReporter.set(ev.pubkey, ev);
+    }
+
+    return [...latestByReporter.values()]
+      .map((ev: any): RecentFlagRecord | null => {
+        const stateTag = ev.tags?.find((t: string[]) => t[0] === 'report_state')?.[1];
+        if (stateTag === '0') return null;
+        const pTag = ev.tags?.find((t: string[]) => t[0] === 'p' && t[1] === pubkey);
+        return {
+          eventId: ev.id || `${ev.pubkey}:${ev.created_at}`,
+          reporterPubkey: ev.pubkey,
+          recipientPubkey: pubkey,
+          reason: pTag?.[2],
+          createdAt: Number(ev.created_at) || 0,
+          note: typeof ev.content === 'string' && ev.content.trim() ? ev.content.trim() : undefined
+        };
+      })
+      .filter((record): record is RecentFlagRecord => !!record)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit);
   }

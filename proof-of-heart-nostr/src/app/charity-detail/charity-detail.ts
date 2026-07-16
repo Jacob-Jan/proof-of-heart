@@ -1,7 +1,7 @@
 import { Component, DOCUMENT, Inject, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { CharityProfile, Nip57ZapReceipt, NostrService } from '../nostr.service';
+import { CharityProfile, Nip57ZapReceipt, NostrService, RecentFlagRecord, RecentRatingRecord } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -106,6 +106,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   qrDataUrl = '';
   recentZapReceipts: Nip57ZapReceipt[] = [];
   recentZapsLoading = false;
+  recentRatings: RecentRatingRecord[] = [];
+  recentRatingsLoading = false;
+  recentFlags: RecentFlagRecord[] = [];
+  recentFlagsLoading = false;
+  activityDialog: 'ratings' | 'flags' | null = null;
   loadStatus = 'fetching charity profile from nostr relays...';
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
   private lightningThanksTimer?: ReturnType<typeof setTimeout>;
@@ -173,6 +178,29 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch {
       return `${pubkey.slice(0, 8)}…${pubkey.slice(-6)}`;
     }
+  }
+
+  npubFor(pubkey: string): string {
+    if (!pubkey) return '';
+    try {
+      return nip19.npubEncode(pubkey);
+    } catch {
+      return pubkey;
+    }
+  }
+
+  primalUrlFor(pubkey: string): string {
+    const npub = this.npubFor(pubkey);
+    return `https://primal.net/p/${npub}`;
+  }
+
+  njumpUrlFor(pubkey: string): string {
+    const npub = this.npubFor(pubkey);
+    return `https://njump.me/${npub}`;
+  }
+
+  openProfileLink(event: MouseEvent): void {
+    event.stopPropagation();
   }
 
   formatZapDate(createdAt: number): string {
@@ -278,6 +306,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (this.charity) {
         this.updateSeo(this.charity);
         this.loadRecentZapReceipts(this.charity.pubkey, isCurrent);
+        this.loadRecentRatings(this.charity.pubkey, isCurrent);
+        this.loadRecentFlags(this.charity.pubkey, isCurrent);
         this.resumePendingZapPaymentIfPresent();
         this.loading = false;
 
@@ -533,6 +563,50 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       });
   }
 
+  private loadRecentRatings(pubkey: string, isCurrent: () => boolean) {
+    if (!pubkey) return;
+    this.recentRatingsLoading = true;
+    this.nostr.loadRecentRatingsForCharity(pubkey, 12)
+      .then((ratings) => {
+        if (!isCurrent()) return;
+        this.recentRatings = ratings;
+      })
+      .catch((err) => {
+        if (!isCurrent()) return;
+        console.warn('[PoH] recent ratings failed', err);
+      })
+      .finally(() => {
+        if (!isCurrent()) return;
+        this.recentRatingsLoading = false;
+      });
+  }
+
+  private loadRecentFlags(pubkey: string, isCurrent: () => boolean) {
+    if (!pubkey) return;
+    this.recentFlagsLoading = true;
+    this.nostr.loadRecentFlagsForCharity(pubkey, 12)
+      .then((flags) => {
+        if (!isCurrent()) return;
+        this.recentFlags = flags;
+      })
+      .catch((err) => {
+        if (!isCurrent()) return;
+        console.warn('[PoH] recent flags failed', err);
+      })
+      .finally(() => {
+        if (!isCurrent()) return;
+        this.recentFlagsLoading = false;
+      });
+  }
+
+  openActivityDialog(kind: 'ratings' | 'flags'): void {
+    this.activityDialog = kind;
+  }
+
+  closeActivityDialog(): void {
+    this.activityDialog = null;
+  }
+
   private donationErrorMessage(err: any): string {
     const raw = String(err?.message || err || '').toLowerCase();
 
@@ -580,6 +654,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
         return;
       } catch (e: any) {
+        this.nostr.clearNip46Session();
+        this.nip46ConnectUrl = '';
         this.nip46Pairing = false;
         this.nip46PairingError = this.donationErrorMessage(e);
         if (!this.isCurrentDonationAttempt(token)) return;
@@ -622,6 +698,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }, token, true);
     } catch (e: any) {
       if (!this.isCurrentDonationAttempt(token)) return;
+      if (!this.nostr.hasNip07Signer() && isAndroidBrowser()) {
+        try {
+          await this.startAndroidSignerZap(lightningAddress, sats, since);
+          return;
+        } catch (androidErr: any) {
+          if (!this.isCurrentDonationAttempt(token)) return;
+          this.donationStatus = this.donationErrorMessage(androidErr);
+          return;
+        }
+      }
       this.donationStatus = this.donationErrorMessage(e);
     } finally {
       if (this.isCurrentDonationAttempt(token)) this.donating = false;
@@ -676,6 +762,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   async useAndroidSignerFallback() {
     if (!this.charity || !isAndroidBrowser()) return;
+    this.nostr.clearNip46Session();
+    this.nip46ConnectUrl = '';
+    this.nip46Pairing = false;
+    this.nip46PairingError = '';
     try {
       await this.startAndroidSignerZap(this.donationAddress, this.donationSats, Math.floor(Date.now() / 1000) - 10);
     } catch (e: any) {
@@ -1195,11 +1285,24 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   private async createNip57ZapInvoice(lightningAddress: string, sats: number): Promise<{ invoice: string; donorPubkey: string; zapRequestId?: string }> {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
+    const usingRemoteSigner = !this.nostr.hasNip07Signer() && this.nostr.hasNip46Session();
 
     this.donationStatus = this.nostr.hasNip07Signer()
       ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
       : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
-    const signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, 60_000);
+    let signedZap: any;
+    try {
+      signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, 60_000);
+    } catch (e: any) {
+      if (usingRemoteSigner) {
+        this.nostr.clearNip46Session();
+        this.nip46ConnectUrl = '';
+        this.nip46Pairing = false;
+        this.nip46PairingError = this.donationErrorMessage(e);
+        throw new Error(`Remote signer session failed and was cleared. ${e?.message || ''}`.trim());
+      }
+      throw e;
+    }
     return this.createInvoiceFromSignedZap(payParams.callback, amountMsat, signedZap);
   }
 

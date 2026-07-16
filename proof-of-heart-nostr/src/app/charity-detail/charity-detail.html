@@ -52,18 +52,18 @@
           <span>...</span>
         }
       </span>
-      <span class="stat-chip">
+      <button type="button" class="stat-chip" style="cursor:pointer; font-family: inherit;" (click)="openActivityDialog('ratings')" [title]="recentRatingsLoading ? 'Checking recent ratings…' : 'Show recent ratings'">
         <i class="fa-solid fa-star"></i>
         {{ charity.ratingAvg ? (charity.ratingAvg | number:'1.1-2') : '0.0' }} / 5 ({{ charity.ratingCount }} ratings)
-      </span>
+      </button>
       <span class="stat-chip">
         <i class="fa-solid fa-bolt"></i>
         {{ charity.zappedSats | number }} sats zapped
       </span>
-      <span class="stat-chip" [class.warning-chip]="charity.flags > 0">
+      <button type="button" class="stat-chip" style="cursor:pointer; font-family: inherit;" [class.warning-chip]="charity.flags > 0" (click)="openActivityDialog('flags')" [title]="recentFlagsLoading ? 'Checking recent flags…' : 'Show recent flags'">
         <i class="fa-solid fa-flag"></i>
         {{ charity.flags }} flags
-      </span>
+      </button>
     </div>
 
     @if (nip55DebugMode) {
@@ -163,7 +163,10 @@
                 @for (zap of recentZapReceipts; track zap.receiptId) {
                   <li>
                     <strong>{{ zap.sats | number }} sats</strong>
-                    <span>from {{ donorLabel(zap.donorPubkey) }}</span>
+                    <span>
+                      from
+                      <a [href]="primalUrlFor(zap.donorPubkey)" target="_blank" rel="noopener noreferrer" (click)="openProfileLink($event)">{{ donorLabel(zap.donorPubkey) }}</a>
+                    </span>
                     <small>{{ formatZapDate(zap.createdAt) }}</small>
                     @if (zap.comment) {
                       <em>{{ zap.comment }}</em>
@@ -190,6 +193,68 @@
       </div>
     </div>
   </section>
+
+  @if (activityDialog) {
+    <div class="dialog-overlay" (click)="closeActivityDialog()">
+      <div class="dialog-card" (click)="$event.stopPropagation()">
+        <h3>{{ activityDialog === 'ratings' ? 'Recent ratings' : 'Recent flags' }}</h3>
+        @if (activityDialog === 'ratings') {
+          @if (recentRatingsLoading) {
+            <p class="rating-selected">Checking relays…</p>
+          }
+          @if (recentRatings.length) {
+            <ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">
+              @for (record of recentRatings; track record.eventId) {
+                <li style="border:1px solid #eee5d8; border-radius:12px; padding:10px; display:grid; gap:4px;">
+                  <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+                    <strong>{{ record.rating }} / 5</strong>
+                    <small>{{ formatZapDate(record.createdAt) }}</small>
+                  </div>
+                  <span>
+                    by
+                    <a [href]="primalUrlFor(record.raterPubkey)" target="_blank" rel="noopener noreferrer" (click)="openProfileLink($event)">{{ donorLabel(record.raterPubkey) }}</a>
+                  </span>
+                  @if (record.note) {
+                    <em>{{ record.note }}</em>
+                  }
+                </li>
+              }
+            </ul>
+          } @else if (!recentRatingsLoading) {
+            <p class="rating-selected">No active ratings found on the queried relays.</p>
+          }
+        } @else {
+          @if (recentFlagsLoading) {
+            <p class="rating-selected">Checking relays…</p>
+          }
+          @if (recentFlags.length) {
+            <ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">
+              @for (record of recentFlags; track record.eventId) {
+                <li style="border:1px solid #f3d9a5; border-radius:12px; padding:10px; display:grid; gap:4px; background:#fffaf2;">
+                  <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+                    <strong>{{ record.reason || 'flag' }}</strong>
+                    <small>{{ formatZapDate(record.createdAt) }}</small>
+                  </div>
+                  <span>
+                    by
+                    <a [href]="primalUrlFor(record.reporterPubkey)" target="_blank" rel="noopener noreferrer" (click)="openProfileLink($event)">{{ donorLabel(record.reporterPubkey) }}</a>
+                  </span>
+                  @if (record.note) {
+                    <em>{{ record.note }}</em>
+                  }
+                </li>
+              }
+            </ul>
+          } @else if (!recentFlagsLoading) {
+            <p class="rating-selected">No active flags found on the queried relays.</p>
+          }
+        }
+        <div class="dialog-actions">
+          <button type="button" (click)="closeActivityDialog()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
 
   @if (showRateDialog) {
     <div class="dialog-overlay" (click)="closeRateDialog()">
