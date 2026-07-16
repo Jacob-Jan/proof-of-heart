@@ -537,7 +537,27 @@ export class NostrService {
 
   setRelayMode(mode: 'auto' | 'test' | 'prod') {
     if (typeof window === 'undefined') return;
+    const previous = this.getRelayMode();
     window.localStorage.setItem(RELAY_MODE_KEY, mode);
+    if (previous !== mode) {
+      this.clearCharityDataCaches();
+    }
+  }
+
+  private clearCharityDataCaches(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(CHARITIES_CACHE_KEY);
+      window.localStorage.removeItem(FOLLOWERS_CACHE_KEY);
+      for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+        const key = window.localStorage.key(i);
+        if (key?.startsWith(CHARITY_DETAIL_CACHE_PREFIX)) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
   }
 
   private isLocalhostRuntime(): boolean {

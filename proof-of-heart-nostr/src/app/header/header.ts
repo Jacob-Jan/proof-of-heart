@@ -50,8 +50,14 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   setRelayMode(mode: 'test' | 'prod'): void {
+    const previous = this.nostr.getRelayMode();
+    if (previous === mode) return;
+
     this.nostr.setRelayMode(mode);
     this.relayMode = mode;
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   }
 
   get relayBadgeLabel() {
