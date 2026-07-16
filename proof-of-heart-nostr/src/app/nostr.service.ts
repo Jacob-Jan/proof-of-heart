@@ -56,6 +56,24 @@ export interface Nip57ZapReceipt {
   comment?: string;
 }
 
+export interface RecentRatingRecord {
+  eventId: string;
+  raterPubkey: string;
+  recipientPubkey: string;
+  rating: number;
+  createdAt: number;
+  note?: string;
+}
+
+export interface RecentFlagRecord {
+  eventId: string;
+  reporterPubkey: string;
+  recipientPubkey: string;
+  reason?: string;
+  createdAt: number;
+  note?: string;
+}
+
 export interface CharityFeedStatus {
   tone: 'relay' | 'cache' | 'success' | 'warning';
   label: string;
@@ -172,22 +190,42 @@ export function sortCharityProfiles(charities: CharityProfile[]): CharityProfile
   return [...charities].sort(compareCharityProfiles);
 }
 
-export function zapReceiptSats(event: any): number {
-  const amountMsat = Number(event?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
-  if (Number.isFinite(amountMsat) && amountMsat > 0) return Math.floor(amountMsat / 1000);
+function tagValue(tags: any[] | undefined, name: string): string | undefined {
+  const value = tags?.find((t: string[]) => t[0] === name)?.[1];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
 
-  const bolt11 = event?.tags?.find((t: string[]) => t[0] === 'bolt11')?.[1];
-  if (typeof bolt11 === 'string' && bolt11) {
-    const sats = Number(nip57.getSatoshisAmountFromBolt11(bolt11));
-    if (Number.isFinite(sats) && sats > 0) return Math.floor(sats);
+function msatTagToSats(value: unknown): number {
+  if (typeof value !== 'string' && typeof value !== 'number') return 0;
+  const normalized = String(value).trim().toLowerCase().replace(/msats?$/, '');
+  const amountMsat = Number(normalized);
+  if (!Number.isFinite(amountMsat) || amountMsat <= 0) return 0;
+  return Math.floor(amountMsat / 1000);
+}
+
+export function zapReceiptSats(event: any): number {
+  // Standard NIP-57 receipts prove the paid amount through the BOLT11 invoice.
+  // Treat receipt/request amount tags only as fallbacks because they can represent
+  // intent metadata rather than the actual settled invoice amount.
+  const bolt11 = tagValue(event?.tags, 'bolt11');
+  if (bolt11) {
+    try {
+      const sats = Number(nip57.getSatoshisAmountFromBolt11(bolt11));
+      if (Number.isFinite(sats) && sats > 0) return Math.floor(sats);
+    } catch {
+      // fall back to amount tags below
+    }
   }
 
-  const description = event?.tags?.find((t: string[]) => t[0] === 'description')?.[1];
-  if (typeof description === 'string' && description) {
+  const receiptAmountSats = msatTagToSats(tagValue(event?.tags, 'amount'));
+  if (receiptAmountSats > 0) return receiptAmountSats;
+
+  const description = tagValue(event?.tags, 'description');
+  if (description) {
     try {
       const zapRequest = JSON.parse(description);
-      const requestAmountMsat = Number(zapRequest?.tags?.find((t: string[]) => t[0] === 'amount')?.[1]);
-      if (Number.isFinite(requestAmountMsat) && requestAmountMsat > 0) return Math.floor(requestAmountMsat / 1000);
+      const requestAmountSats = msatTagToSats(tagValue(zapRequest?.tags, 'amount'));
+      if (requestAmountSats > 0) return requestAmountSats;
     } catch {
       // ignore malformed zap descriptions
     }
@@ -236,10 +274,16 @@ export function parseNip57ZapReceipt(event: any): Nip57ZapReceipt | null {
 export function totalZapSatsByRecipient(zapReceipts: any[], recipients: string[]): Map<string, number> {
   const recipientSet = new Set(recipients);
   const zapMap = new Map<string, number>();
+  const seen = new Set<string>();
 
   for (const ev of zapReceipts || []) {
     const p = ev?.tags?.find((t: string[]) => t[0] === 'p' && recipientSet.has(t[1]))?.[1];
     if (!p) continue;
+
+    const id = typeof ev?.id === 'string' && ev.id ? ev.id : undefined;
+    const dedupeKey = id || `${p}:${ev?.created_at || ''}:${tagValue(ev?.tags, 'bolt11') || tagValue(ev?.tags, 'amount') || tagValue(ev?.tags, 'description') || ''}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
 
     const sats = zapReceiptSats(ev);
     if (!sats || sats <= 0) continue;
@@ -581,6 +625,89 @@ export class NostrService {
     }
 
     return [...byId.values()]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  }
+
+  async loadTotalNip57ZapSatsForCharity(pubkey: string, limit = 10_000): Promise<number> {
+    if (!pubkey) return 0;
+
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [9735],
+      '#p': [pubkey],
+      limit
+    });
+
+    return totalZapSatsByRecipient(events as any[], [pubkey]).get(pubkey) || 0;
+  }
+
+  async loadRecentRatingsForCharity(pubkey: string, limit = 12): Promise<RecentRatingRecord[]> {
+    if (!pubkey) return [];
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [KIND_CHARITY_RATING],
+      '#p': [pubkey],
+      limit: Math.max(limit * 5, 50)
+    });
+
+    const latestByRater = new Map<string, any>();
+    for (const ev of events as any[]) {
+      const p = ev.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+      if (p !== pubkey || !ev.pubkey) continue;
+      const prev = latestByRater.get(ev.pubkey);
+      if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) latestByRater.set(ev.pubkey, ev);
+    }
+
+    return [...latestByRater.values()]
+      .map((ev: any): RecentRatingRecord | null => {
+        const stateTag = ev.tags?.find((t: string[]) => t[0] === 'rating_state')?.[1];
+        if (stateTag === '0') return null;
+        const rating = Number(ev.tags?.find((t: string[]) => t[0] === 'rating')?.[1]);
+        if (!Number.isFinite(rating) || rating < 1 || rating > 5) return null;
+        return {
+          eventId: ev.id || `${ev.pubkey}:${ev.created_at}`,
+          raterPubkey: ev.pubkey,
+          recipientPubkey: pubkey,
+          rating: Math.max(1, Math.min(5, Math.round(rating))),
+          createdAt: Number(ev.created_at) || 0,
+          note: typeof ev.content === 'string' && ev.content.trim() ? ev.content.trim() : undefined
+        };
+      })
+      .filter((record): record is RecentRatingRecord => !!record)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  }
+
+  async loadRecentFlagsForCharity(pubkey: string, limit = 12): Promise<RecentFlagRecord[]> {
+    if (!pubkey) return [];
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [KIND_REPORT],
+      '#p': [pubkey],
+      limit: Math.max(limit * 5, 50)
+    });
+
+    const latestByReporter = new Map<string, any>();
+    for (const ev of events as any[]) {
+      const p = ev.tags?.find((t: string[]) => t[0] === 'p')?.[1];
+      if (p !== pubkey || !ev.pubkey) continue;
+      const prev = latestByReporter.get(ev.pubkey);
+      if (!prev || (ev.created_at || 0) > (prev.created_at || 0)) latestByReporter.set(ev.pubkey, ev);
+    }
+
+    return [...latestByReporter.values()]
+      .map((ev: any): RecentFlagRecord | null => {
+        const stateTag = ev.tags?.find((t: string[]) => t[0] === 'report_state')?.[1];
+        if (stateTag === '0') return null;
+        const pTag = ev.tags?.find((t: string[]) => t[0] === 'p' && t[1] === pubkey);
+        return {
+          eventId: ev.id || `${ev.pubkey}:${ev.created_at}`,
+          reporterPubkey: ev.pubkey,
+          recipientPubkey: pubkey,
+          reason: pTag?.[2],
+          createdAt: Number(ev.created_at) || 0,
+          note: typeof ev.content === 'string' && ev.content.trim() ? ev.content.trim() : undefined
+        };
+      })
+      .filter((record): record is RecentFlagRecord => !!record)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit);
   }
