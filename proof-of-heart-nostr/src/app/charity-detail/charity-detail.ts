@@ -306,6 +306,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       if (this.charity) {
         this.updateSeo(this.charity);
         this.loadRecentZapReceipts(this.charity.pubkey, isCurrent);
+        this.loadTotalZapSats(this.charity.pubkey, isCurrent);
         this.loadRecentRatings(this.charity.pubkey, isCurrent);
         this.loadRecentFlags(this.charity.pubkey, isCurrent);
         this.resumePendingZapPaymentIfPresent();
@@ -560,6 +561,20 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       .finally(() => {
         if (!isCurrent()) return;
         this.recentZapsLoading = false;
+      });
+  }
+
+  private loadTotalZapSats(pubkey: string, isCurrent: () => boolean) {
+    if (!pubkey) return;
+    this.nostr.loadTotalNip57ZapSatsForCharity(pubkey)
+      .then((zappedSats) => {
+        if (!isCurrent() || !this.charity || this.charity.pubkey !== pubkey) return;
+        this.charity = { ...this.charity, zappedSats };
+        this.nostr.cacheCharityDetail(this.charity);
+      })
+      .catch((err) => {
+        if (!isCurrent()) return;
+        console.warn('[PoH] total zap sats failed', err);
       });
   }
 

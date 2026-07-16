@@ -244,6 +244,38 @@ describe('zap receipt stats', () => {
     expect(totals.has('other-recipient')).toBeFalse();
   });
 
+  it('deduplicates zap receipts by event id across relays', () => {
+    const receipt = {
+      id: 'receipt-1',
+      kind: 9735,
+      created_at: 123456,
+      tags: [
+        ['p', 'recipient-a'],
+        ['bolt11', 'lnbc10u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']
+      ]
+    };
+
+    const totals = totalZapSatsByRecipient([receipt, { ...receipt }], ['recipient-a']);
+
+    expect(totals.get('recipient-a')).toBe(1000);
+  });
+
+  it('matches the recipient when receipts have multiple p tags', () => {
+    const totals = totalZapSatsByRecipient([
+      {
+        id: 'receipt-1',
+        kind: 9735,
+        tags: [
+          ['p', 'donor-pubkey'],
+          ['p', 'recipient-a'],
+          ['bolt11', 'lnbc10u1p000000pp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']
+        ]
+      }
+    ], ['recipient-a']);
+
+    expect(totals.get('recipient-a')).toBe(1000);
+  });
+
   it('prefers the paid bolt11 amount over receipt/request amount tags', () => {
     const sats = zapReceiptSats({
       kind: 9735,

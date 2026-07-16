@@ -274,10 +274,16 @@ export function parseNip57ZapReceipt(event: any): Nip57ZapReceipt | null {
 export function totalZapSatsByRecipient(zapReceipts: any[], recipients: string[]): Map<string, number> {
   const recipientSet = new Set(recipients);
   const zapMap = new Map<string, number>();
+  const seen = new Set<string>();
 
   for (const ev of zapReceipts || []) {
     const p = ev?.tags?.find((t: string[]) => t[0] === 'p' && recipientSet.has(t[1]))?.[1];
     if (!p) continue;
+
+    const id = typeof ev?.id === 'string' && ev.id ? ev.id : undefined;
+    const dedupeKey = id || `${p}:${ev?.created_at || ''}:${tagValue(ev?.tags, 'bolt11') || tagValue(ev?.tags, 'amount') || tagValue(ev?.tags, 'description') || ''}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
 
     const sats = zapReceiptSats(ev);
     if (!sats || sats <= 0) continue;
@@ -621,6 +627,18 @@ export class NostrService {
     return [...byId.values()]
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit);
+  }
+
+  async loadTotalNip57ZapSatsForCharity(pubkey: string, limit = 10_000): Promise<number> {
+    if (!pubkey) return 0;
+
+    const events = await this.pool.querySync(this.getActiveRelays(), {
+      kinds: [9735],
+      '#p': [pubkey],
+      limit
+    });
+
+    return totalZapSatsByRecipient(events as any[], [pubkey]).get(pubkey) || 0;
   }
 
   async loadRecentRatingsForCharity(pubkey: string, limit = 12): Promise<RecentRatingRecord[]> {
