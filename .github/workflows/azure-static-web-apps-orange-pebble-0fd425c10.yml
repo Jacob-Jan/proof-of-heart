@@ -39,4 +39,6 @@ jobs:
           app_location: "./proof-of-heart-nostr"
           api_location: ""
           output_location: "dist/proof-of-heart-nostr/browser"
+          app_build_command: "npx ng build --configuration production --progress=false"
+          build_timeout_in_minutes: 30
           github_id_token: ${{ steps.idtoken.outputs.result }}
