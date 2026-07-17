@@ -80,6 +80,11 @@ export interface CharityFeedStatus {
   text: string;
 }
 
+export function ensureEventPubkeyForNip07(event: any, getPublicKey: () => Promise<string>): Promise<any> {
+  if (event?.pubkey) return Promise.resolve(event);
+  return getPublicKey().then((pubkey) => ({ ...event, pubkey }));
+}
+
 export function mergeCharityProfiles(existing: CharityProfile[], incoming: CharityProfile[]): CharityProfile[] {
   const existingByPubkey = new Map(existing.map((charity) => [charity.pubkey, charity] as const));
 
@@ -508,7 +513,8 @@ export class NostrService {
 
   async signEventWithAvailableSigner(event: any, timeoutMs = 60_000): Promise<any> {
     if (typeof window !== 'undefined' && window.nostr) {
-      const signed = await this.withTimeout(window.nostr.signEvent(event), timeoutMs, 'Signer response');
+      const eventWithPubkey = await ensureEventPubkeyForNip07(event, () => this.withTimeout(window.nostr!.getPublicKey(), timeoutMs, 'Signer pubkey'));
+      const signed = await this.withTimeout(window.nostr.signEvent(eventWithPubkey), timeoutMs, 'Signer response');
       this.rememberSignedEventPubkey(signed);
       return signed;
     }
