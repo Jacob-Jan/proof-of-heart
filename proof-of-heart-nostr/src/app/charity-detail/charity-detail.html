@@ -284,7 +284,6 @@
           @if (nip46Pairing && nip46ConnectUrl) {
             <div class="dialog-actions">
               <button type="button" (click)="openNip46Signer()">Open remote signer</button>
-              <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
             </div>
           }
         }
@@ -323,7 +322,6 @@
           @if (nip46Pairing && nip46ConnectUrl) {
             <div class="dialog-actions">
               <button type="button" (click)="openNip46Signer()">Open remote signer</button>
-              <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
             </div>
           }
         }
@@ -413,12 +411,6 @@
         } @else if (nip46ConnectUrl) {
           <div class="qr-actions">
             <button type="button" (click)="openNip46Signer()">Open remote signer</button>
-            <button type="button" (click)="copyNip46ConnectUrl()">Copy pairing link</button>
-            @if (lastAndroidSignerUrl) {
-              <button type="button" (click)="openAndroidSignerAgain()">Use Android callback</button>
-            } @else {
-              <button type="button" (click)="useAndroidSignerFallback()">Use Android callback</button>
-            }
           </div>
           @if (nip46PairingError) {
             <p class="qr-help">{{ nip46PairingError }}</p>
