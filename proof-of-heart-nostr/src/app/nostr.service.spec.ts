@@ -1,4 +1,39 @@
-import { mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+import { ensureEventPubkeyForNip07, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+
+describe('ensureEventPubkeyForNip07', () => {
+  it('adds the signer pubkey before signEvent for Flamingo compatibility', async () => {
+    const event = {
+      kind: 1,
+      created_at: 123,
+      tags: [],
+      content: 'hello world'
+    };
+
+    const withPubkey = await ensureEventPubkeyForNip07(event, async () => 'donor-pubkey');
+
+    expect(withPubkey).toEqual({ ...event, pubkey: 'donor-pubkey' });
+    expect('pubkey' in event).toBeFalse();
+  });
+
+  it('keeps an existing pubkey without asking the signer again', async () => {
+    const event = {
+      kind: 9734,
+      created_at: 123,
+      tags: [],
+      content: '',
+      pubkey: 'existing-pubkey'
+    };
+    let askedForPubkey = false;
+
+    const withPubkey = await ensureEventPubkeyForNip07(event, async () => {
+      askedForPubkey = true;
+      return 'other-pubkey';
+    });
+
+    expect(withPubkey).toEqual(event);
+    expect(askedForPubkey).toBeFalse();
+  });
+});
 
 describe('mergeCharityProfiles', () => {
   it('preserves cached visual and follower fields when live refresh omits them', () => {
