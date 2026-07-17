@@ -15,6 +15,7 @@ export interface CharityProfile {
   lud06?: string;
   followers: number;
   followersLoaded?: boolean;
+  activityLoaded?: boolean;
   flags: number;
   hidden: boolean;
   ratingAvg: number;
@@ -108,11 +109,12 @@ export function mergeCharityProfiles(existing: CharityProfile[], incoming: Chari
       lud06: fresh.lud06 ?? cached.lud06,
       followers: fresh.followersLoaded ? fresh.followers : cached.followers,
       followersLoaded: fresh.followersLoaded || cached.followersLoaded,
-      flags: Number.isFinite(fresh.flags) ? fresh.flags : cached.flags,
-      hidden: typeof fresh.hidden === 'boolean' ? fresh.hidden : cached.hidden,
-      ratingAvg: Number.isFinite(fresh.ratingAvg) ? fresh.ratingAvg : cached.ratingAvg,
-      ratingCount: Number.isFinite(fresh.ratingCount) ? fresh.ratingCount : cached.ratingCount,
-      zappedSats: Number.isFinite(fresh.zappedSats) ? fresh.zappedSats : cached.zappedSats,
+      activityLoaded: fresh.activityLoaded || cached.activityLoaded,
+      flags: fresh.activityLoaded && Number.isFinite(fresh.flags) ? fresh.flags : cached.flags,
+      hidden: fresh.activityLoaded && typeof fresh.hidden === 'boolean' ? fresh.hidden : cached.hidden,
+      ratingAvg: fresh.activityLoaded && Number.isFinite(fresh.ratingAvg) ? fresh.ratingAvg : cached.ratingAvg,
+      ratingCount: fresh.activityLoaded && Number.isFinite(fresh.ratingCount) ? fresh.ratingCount : cached.ratingCount,
+      zappedSats: fresh.activityLoaded && Number.isFinite(fresh.zappedSats) ? fresh.zappedSats : cached.zappedSats,
       charity: {
         ...cached.charity,
         ...fresh.charity,
@@ -150,6 +152,8 @@ const ONBOARDED_PUBKEYS_KEY = 'poh_onboarded_pubkeys';
 const PRIMAL_WS_URL = 'wss://cache2.primal.net/v1';
 const FOLLOWERS_CACHE_KEY = 'poh_followers_cache_v1';
 const FOLLOWERS_CACHE_TTL_MS = 10 * 60 * 1000;
+const ACTIVITY_STATS_CACHE_KEY = 'poh_activity_stats_cache_v1';
+const ACTIVITY_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const CHARITIES_CACHE_KEY = 'poh_charities_cache_v2';
 const CHARITIES_CACHE_VERSION = 2;
 const CHARITIES_CACHE_TTL_HOME_MS = 30 * 60 * 1000;
@@ -166,6 +170,15 @@ interface Nip46Session {
   remotePubkey?: string;
   userPubkey?: string;
   createdAt: number;
+}
+
+interface CachedActivityStats {
+  flags: number;
+  hidden: boolean;
+  ratingAvg: number;
+  ratingCount: number;
+  zappedSats: number;
+  ts: number;
 }
 
 const KIND_CHARITY_PROFILE = 30078; // app-specific parameterized replaceable
@@ -644,7 +657,9 @@ export class NostrService {
       limit
     });
 
-    return totalZapSatsByRecipient(events as any[], [pubkey]).get(pubkey) || 0;
+    const zappedSats = totalZapSatsByRecipient(events as any[], [pubkey]).get(pubkey) || 0;
+    this.cacheCharityActivityStats(pubkey, { zappedSats });
+    return zappedSats;
   }
 
   async loadRecentRatingsForCharity(pubkey: string, limit = 12): Promise<RecentRatingRecord[]> {
@@ -1151,6 +1166,144 @@ export class NostrService {
     return hydrated;
   }
 
+  private readActivityStatsCache(): Record<string, CachedActivityStats> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(ACTIVITY_STATS_CACHE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (!parsed || typeof parsed !== 'object') return {};
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  private writeActivityStatsCache(cache: Record<string, CachedActivityStats>): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(ACTIVITY_STATS_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // ignore quota / storage errors
+    }
+  }
+
+  private isFreshActivityStats(stats: CachedActivityStats | undefined, now = Date.now()): stats is CachedActivityStats {
+    return !!stats
+      && Number.isFinite(stats.ts)
+      && (now - stats.ts) < ACTIVITY_STATS_CACHE_TTL_MS
+      && Number.isFinite(stats.flags)
+      && Number.isFinite(stats.ratingAvg)
+      && Number.isFinite(stats.ratingCount)
+      && Number.isFinite(stats.zappedSats);
+  }
+
+  private normalizeActivityStats(stats: Partial<CachedActivityStats>): CachedActivityStats {
+    const flags = Math.max(0, Math.floor(Number(stats.flags) || 0));
+    const ratingCount = Math.max(0, Math.floor(Number(stats.ratingCount) || 0));
+    const ratingAvg = ratingCount ? Math.max(0, Math.min(5, Number(stats.ratingAvg) || 0)) : 0;
+    const zappedSats = Math.max(0, Math.floor(Number(stats.zappedSats) || 0));
+    return {
+      flags,
+      hidden: typeof stats.hidden === 'boolean' ? stats.hidden : flags >= FLAG_HIDE_THRESHOLD,
+      ratingAvg,
+      ratingCount,
+      zappedSats,
+      ts: Number.isFinite(stats.ts) ? Number(stats.ts) : Date.now()
+    };
+  }
+
+  private readCachedActivityStats(pubkeys: string[], maxAgeMs = ACTIVITY_STATS_CACHE_TTL_MS): Map<string, CachedActivityStats> {
+    const now = Date.now();
+    const cache = this.readActivityStatsCache();
+    const result = new Map<string, CachedActivityStats>();
+
+    for (const pubkey of pubkeys) {
+      const cached = cache[pubkey];
+      if (this.isFreshActivityStats(cached, now) && (now - cached.ts) < maxAgeMs) {
+        result.set(pubkey, this.normalizeActivityStats(cached));
+      }
+    }
+
+    return result;
+  }
+
+  private hydrateCachedActivityStats(charities: CharityProfile[], persist = false): CharityProfile[] {
+    if (typeof window === 'undefined' || !charities.length) return charities;
+
+    const activityStats = this.readCachedActivityStats(charities.map((charity) => charity.pubkey));
+    if (!activityStats.size) return charities;
+
+    let changed = false;
+    const hydrated = charities.map((charity) => {
+      const cached = activityStats.get(charity.pubkey);
+      if (!cached) return charity;
+      changed = true;
+      return {
+        ...charity,
+        activityLoaded: true,
+        flags: cached.flags,
+        hidden: cached.hidden,
+        ratingAvg: cached.ratingAvg,
+        ratingCount: cached.ratingCount,
+        zappedSats: cached.zappedSats
+      };
+    });
+
+    if (changed && persist) {
+      this.writeCharityCache(hydrated);
+    }
+
+    return hydrated;
+  }
+
+  cacheCharityActivityStats(pubkey: string, stats: Partial<Omit<CachedActivityStats, 'ts'>>): void {
+    if (typeof window === 'undefined' || !pubkey) return;
+    const cache = this.readActivityStatsCache();
+    const previous = this.isFreshActivityStats(cache[pubkey]) ? cache[pubkey] : undefined;
+    const normalized = this.normalizeActivityStats({
+      flags: previous?.flags ?? 0,
+      ...(previous ? { hidden: previous.hidden } : {}),
+      ratingAvg: previous?.ratingAvg ?? 0,
+      ratingCount: previous?.ratingCount ?? 0,
+      zappedSats: previous?.zappedSats ?? 0,
+      ...stats,
+      ts: Date.now()
+    });
+    cache[pubkey] = normalized;
+    this.writeActivityStatsCache(cache);
+
+    const cachedCharity = this.readStoredCharityCache(500).find((charity) => charity.pubkey === pubkey);
+    if (cachedCharity) {
+      this.writeCharityCache([{
+        ...cachedCharity,
+        activityLoaded: true,
+        flags: normalized.flags,
+        hidden: normalized.hidden,
+        ratingAvg: normalized.ratingAvg,
+        ratingCount: normalized.ratingCount,
+        zappedSats: normalized.zappedSats
+      }], 'upsert');
+    }
+  }
+
+  private cacheCharityActivityStatsFromProfiles(charities: CharityProfile[]): void {
+    if (typeof window === 'undefined' || !charities.length) return;
+    const cache = this.readActivityStatsCache();
+    const now = Date.now();
+    for (const charity of charities) {
+      if (!charity?.pubkey || !charity.activityLoaded) continue;
+      cache[charity.pubkey] = this.normalizeActivityStats({
+        flags: charity.flags,
+        hidden: charity.hidden,
+        ratingAvg: charity.ratingAvg,
+        ratingCount: charity.ratingCount,
+        zappedSats: charity.zappedSats,
+        ts: now
+      });
+    }
+    this.writeActivityStatsCache(cache);
+  }
+
   private readCharityCache(limit = 100, maxAgeMs = CHARITIES_CACHE_TTL_HOME_MS): CharityProfile[] {
     if (typeof window === 'undefined') return [];
     try {
@@ -1171,7 +1324,7 @@ export class NostrService {
         .map((record: any) => this.coerceCachedCharity(record))
         .filter((value: CharityProfile | null): value is CharityProfile => !!value)
         .slice(0, limit);
-      return sortCharityProfiles(this.hydrateCachedFollowerCounts(charities, true));
+      return sortCharityProfiles(this.hydrateCachedActivityStats(this.hydrateCachedFollowerCounts(charities, true), true));
     } catch {
       try {
         window.localStorage.removeItem(CHARITIES_CACHE_KEY);
@@ -1237,6 +1390,7 @@ export class NostrService {
     }
 
     const cachedFollowerCounts = this.readCachedFollowerCounts(pubkeys);
+    const cachedActivityStats = this.readCachedActivityStats(pubkeys);
 
     const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
@@ -1284,6 +1438,7 @@ export class NostrService {
         metadata?.name,
         metadata?.username
       ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
+      const cachedActivity = cachedActivityStats.get(pubkey);
 
       charities.push({
         pubkey,
@@ -1296,11 +1451,12 @@ export class NostrService {
         lud06: metadata?.lud06,
         followers: cachedFollowerCounts.get(pubkey) ?? 0,
         followersLoaded: cachedFollowerCounts.has(pubkey),
-        flags: 0,
-        hidden: false,
-        ratingAvg: 0,
-        ratingCount: 0,
-        zappedSats: 0,
+        activityLoaded: !!cachedActivity,
+        flags: cachedActivity?.flags ?? 0,
+        hidden: cachedActivity?.hidden ?? false,
+        ratingAvg: cachedActivity?.ratingAvg ?? 0,
+        ratingCount: cachedActivity?.ratingCount ?? 0,
+        zappedSats: cachedActivity?.zappedSats ?? 0,
         profileUpdatedAt: Number((charityEvent as any).created_at) || 0,
         charity: {
           shortDescription: extra?.shortDescription,
@@ -1325,6 +1481,15 @@ export class NostrService {
   cacheCharityDetail(charity: CharityProfile): void {
     if (typeof window === 'undefined' || !charity?.pubkey) return;
     try {
+      if (charity.activityLoaded) {
+        this.cacheCharityActivityStats(charity.pubkey, {
+          flags: charity.flags,
+          hidden: charity.hidden,
+          ratingAvg: charity.ratingAvg,
+          ratingCount: charity.ratingCount,
+          zappedSats: charity.zappedSats
+        });
+      }
       const payload = { v: CHARITIES_CACHE_VERSION, ts: Date.now(), charity };
       window.localStorage.setItem(this.charityDetailCacheKey(charity.pubkey), JSON.stringify(payload));
     } catch {
@@ -1379,11 +1544,30 @@ export class NostrService {
       const charity = this.coerceCachedCharity(parsed?.charity);
       if (!charity) return null;
       const hydratedFollowers = this.readCachedFollowerCounts([pubkey]).get(pubkey);
-      if (hydratedFollowers === undefined || hydratedFollowers === charity.followers) {
+      const hydratedActivity = this.readCachedActivityStats([pubkey]).get(pubkey);
+      const updated: CharityProfile = {
+        ...charity,
+        ...(hydratedFollowers !== undefined ? { followers: hydratedFollowers, followersLoaded: true } : {}),
+        ...(hydratedActivity ? {
+          activityLoaded: true,
+          flags: hydratedActivity.flags,
+          hidden: hydratedActivity.hidden,
+          ratingAvg: hydratedActivity.ratingAvg,
+          ratingCount: hydratedActivity.ratingCount,
+          zappedSats: hydratedActivity.zappedSats
+        } : {})
+      };
+      if (updated.followers === charity.followers
+        && updated.followersLoaded === charity.followersLoaded
+        && updated.activityLoaded === charity.activityLoaded
+        && updated.flags === charity.flags
+        && updated.hidden === charity.hidden
+        && updated.ratingAvg === charity.ratingAvg
+        && updated.ratingCount === charity.ratingCount
+        && updated.zappedSats === charity.zappedSats) {
         return charity;
       }
 
-      const updated = { ...charity, followers: hydratedFollowers };
       this.cacheCharityDetail(updated);
       return updated;
     } catch {
@@ -1430,6 +1614,9 @@ export class NostrService {
       lud06: typeof record.lud06 === 'string' ? record.lud06 : undefined,
       followers: Number.isFinite(followers) ? Math.max(0, Math.floor(followers)) : 0,
       followersLoaded,
+      activityLoaded: typeof record.activityLoaded === 'boolean'
+        ? record.activityLoaded
+        : Number.isFinite(Number(record.flags)) || Number.isFinite(Number(record.ratingCount)) || Number.isFinite(Number(record.zappedSats)),
       flags: Number.isFinite(Number(record.flags)) ? Number(record.flags) : 0,
       hidden: Boolean(record.hidden),
       ratingAvg: Number.isFinite(Number(record.ratingAvg)) ? Number(record.ratingAvg) : 0,
@@ -1637,6 +1824,7 @@ export class NostrService {
     }
 
     const cachedFollowerCounts = this.readCachedFollowerCounts(pubkeys);
+    const cachedActivityStats = this.readCachedActivityStats(pubkeys);
 
     const profileEvents = await this.pool.querySync(kind0Relays, {
       kinds: [0],
@@ -1685,6 +1873,7 @@ export class NostrService {
         metadata?.name,
         metadata?.username
       ].find((v: any) => typeof v === 'string' && v.trim().length > 0);
+      const cachedActivity = cachedActivityStats.get(pubkey);
 
       charities.push({
         pubkey,
@@ -1697,11 +1886,12 @@ export class NostrService {
         lud06: metadata?.lud06,
         followers: cachedFollowerCounts.get(pubkey) ?? 0,
         followersLoaded: cachedFollowerCounts.has(pubkey),
-        flags: 0,
-        hidden: false,
-        ratingAvg: 0,
-        ratingCount: 0,
-        zappedSats: 0,
+        activityLoaded: !!cachedActivity,
+        flags: cachedActivity?.flags ?? 0,
+        hidden: cachedActivity?.hidden ?? false,
+        ratingAvg: cachedActivity?.ratingAvg ?? 0,
+        ratingCount: cachedActivity?.ratingCount ?? 0,
+        zappedSats: cachedActivity?.zappedSats ?? 0,
         profileUpdatedAt: Number((charityEvent as any).created_at) || 0,
         charity: {
           shortDescription: extra?.shortDescription,
@@ -1861,6 +2051,7 @@ export class NostrService {
         lud06: metadata?.lud06,
         followers: stableFollowerCounts.get(pubkey) ?? followerMap.get(pubkey)?.size ?? 0,
         followersLoaded: true,
+        activityLoaded: true,
         flags,
         hidden: flags >= FLAG_HIDE_THRESHOLD,
         ratingAvg: rating.count ? rating.total / rating.count : 0,
@@ -1881,6 +2072,7 @@ export class NostrService {
     }
 
     const sorted = sortCharityProfiles(charities).slice(0, limit);
+    this.cacheCharityActivityStatsFromProfiles(sorted);
     this.writeCharityCache(sorted);
     return sorted;
   }

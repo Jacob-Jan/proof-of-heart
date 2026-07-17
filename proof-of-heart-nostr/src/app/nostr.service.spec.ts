@@ -48,6 +48,7 @@ describe('mergeCharityProfiles', () => {
       lud06: 'lnurl1cached',
       followers: 42,
       followersLoaded: true,
+      activityLoaded: true,
       flags: 2,
       hidden: false,
       ratingAvg: 4.5,
@@ -74,6 +75,7 @@ describe('mergeCharityProfiles', () => {
       lud06: undefined,
       followers: 0,
       followersLoaded: false,
+      activityLoaded: false,
       flags: 0,
       hidden: false,
       ratingAvg: 0,
@@ -97,10 +99,55 @@ describe('mergeCharityProfiles', () => {
     expect(merged.website).toBe(cached.website);
     expect(merged.followers).toBe(cached.followers);
     expect(merged.followersLoaded).toBeTrue();
+    expect(merged.flags).toBe(2);
+    expect(merged.ratingAvg).toBe(4.5);
+    expect(merged.ratingCount).toBe(9);
+    expect(merged.zappedSats).toBe(1234);
+    expect(merged.activityLoaded).toBeTrue();
     expect(merged.charity.shortDescription).toBe('cached short');
     expect(merged.charity.description).toBe('cached description');
     expect(merged.charity.donationMessage).toBe('cached donate');
     expect(merged.charity.lightningAddress).toBe('cached@example.com');
+    expect(merged.profileUpdatedAt).toBe(200);
+  });
+
+  it('keeps cached activity chips when a newer minimal refresh has not loaded them yet', () => {
+    const cached: CharityProfile = {
+      pubkey: 'cached-pubkey',
+      npub: 'npub1cached',
+      name: 'Cached charity',
+      about: 'cached about',
+      followers: 42,
+      followersLoaded: true,
+      activityLoaded: true,
+      flags: 2,
+      hidden: false,
+      ratingAvg: 4.5,
+      ratingCount: 9,
+      zappedSats: 1234,
+      profileUpdatedAt: 100,
+      charity: { isVisible: true }
+    };
+
+    const fresh: CharityProfile = {
+      ...cached,
+      followersLoaded: false,
+      activityLoaded: false,
+      flags: 0,
+      hidden: false,
+      ratingAvg: 0,
+      ratingCount: 0,
+      zappedSats: 0,
+      profileUpdatedAt: 200
+    };
+
+    const [merged] = mergeCharityProfiles([cached], [fresh]);
+
+    expect(merged.flags).toBe(2);
+    expect(merged.ratingAvg).toBe(4.5);
+    expect(merged.ratingCount).toBe(9);
+    expect(merged.zappedSats).toBe(1234);
+    expect(merged.activityLoaded).toBeTrue();
     expect(merged.profileUpdatedAt).toBe(200);
   });
 
@@ -112,6 +159,7 @@ describe('mergeCharityProfiles', () => {
       about: 'cached about',
       followers: 42,
       followersLoaded: true,
+      activityLoaded: true,
       flags: 2,
       hidden: false,
       ratingAvg: 4.5,

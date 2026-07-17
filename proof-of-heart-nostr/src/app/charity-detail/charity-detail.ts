@@ -569,7 +569,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.nostr.loadTotalNip57ZapSatsForCharity(pubkey)
       .then((zappedSats) => {
         if (!isCurrent() || !this.charity || this.charity.pubkey !== pubkey) return;
-        this.charity = { ...this.charity, zappedSats };
+        this.charity = { ...this.charity, activityLoaded: true, zappedSats };
         this.nostr.cacheCharityDetail(this.charity);
       })
       .catch((err) => {
