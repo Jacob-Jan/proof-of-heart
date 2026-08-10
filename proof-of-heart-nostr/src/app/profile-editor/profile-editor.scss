@@ -126,6 +126,49 @@
       background: #fff;
     }
 
+    .logo-upload-row {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+
+    .logo-preview {
+      width: 84px;
+      height: 84px;
+      border: 1px dashed #bfb4d7;
+      border-radius: 18px;
+      background: #fff;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: #7a7188;
+      font-size: 0.82rem;
+      text-align: center;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
+    .logo-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      button {
+        width: fit-content;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .logo-upload-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .account-buttons {
       display: flex;
       gap: 10px;
