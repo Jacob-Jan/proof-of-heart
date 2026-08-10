@@ -37,6 +37,22 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
+export function normalizeCharityWebsiteHref(website?: string): string {
+  const trimmed = (website || '').trim();
+  if (!trimmed) return '';
+
+  const candidate = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(candidate) ? candidate : `https://${candidate}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    return parsed.href;
+  } catch {
+    return '';
+  }
+}
+
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
@@ -397,6 +413,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           this.loading = false;
         }
       });
+  }
+
+  charityWebsiteHref(website?: string): string {
+    return normalizeCharityWebsiteHref(website);
   }
 
   openRateDialog() {
@@ -2006,6 +2026,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.jsonLdScriptElement = undefined;
     }
 
+    const websiteHref = normalizeCharityWebsiteHref(charity.website);
+
     const jsonLdObject: any = {
       '@context': 'https://schema.org',
       '@type': 'NGO',
@@ -2013,7 +2035,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       url: canonical,
       description: charity.charity.description || charity.charity.shortDescription || charity.about || '',
       image: charity.picture || undefined,
-      sameAs: [charity.website].filter(Boolean),
+      sameAs: [websiteHref].filter(Boolean),
       potentialAction: {
         '@type': 'DonateAction',
         target: canonical,

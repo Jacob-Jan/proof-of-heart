@@ -16,7 +16,7 @@
             <p class="short-description">{{ charity.charity.shortDescription || charity.about }}</p>
           }
           @if (charity.website) {
-            <a class="website" target="_blank" [href]="charity.website">{{ charity.website }}</a>
+            <a class="website" target="_blank" rel="noopener noreferrer" [href]="charityWebsiteHref(charity.website)">{{ charity.website }}</a>
           }
         </div>
       </div>
