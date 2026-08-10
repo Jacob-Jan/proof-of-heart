@@ -1,4 +1,4 @@
-import { buildKind0ProfileMetadata, ensureEventPubkeyForNip07, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+import { buildKind0ProfileMetadata, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
 
 describe('buildKind0ProfileMetadata', () => {
   it('updates editable Nostr profile fields while preserving unknown metadata', () => {
@@ -69,6 +69,74 @@ describe('ensureEventPubkeyForNip07', () => {
 
     expect(withPubkey).toEqual(event);
     expect(askedForPubkey).toBeFalse();
+  });
+});
+
+describe('profile editor save helpers', () => {
+  it('does not treat a cleared legacy shortDescription as an app profile change by itself', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeFalse();
+  });
+
+  it('detects real app profile field changes', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
+      { description: 'Updated', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeTrue();
+  });
+});
+
+describe('NIP-46 profile editing permissions', () => {
+  it('requests permissions for all profile editor signing actions', () => {
+    const permissions = getNip46ProfilePermissions();
+
+    expect(permissions).toContain('sign_event:0');
+    expect(permissions).toContain('sign_event:24242');
+    expect(permissions).toContain('sign_event:30078');
+    expect(permissions).toContain('get_public_key');
+  });
+});
+
+describe('publishCharityProfile', () => {
+  let originalNostr: any;
+
+  beforeEach(() => {
+    originalNostr = (window as any).nostr;
+    delete (window as any).nostr;
+    window.localStorage.setItem('poh_nip46_session_v1', JSON.stringify({
+      clientSecretKey: '1'.repeat(64),
+      clientPubkey: '2'.repeat(64),
+      relays: ['wss://relay.example'],
+      remotePubkey: '3'.repeat(64),
+      userPubkey: '4'.repeat(64),
+      createdAt: Date.now()
+    }));
+    window.localStorage.setItem('poh_last_pubkey', '4'.repeat(64));
+  });
+
+  afterEach(() => {
+    if (originalNostr) (window as any).nostr = originalNostr;
+    else delete (window as any).nostr;
+    window.localStorage.removeItem('poh_nip46_session_v1');
+    window.localStorage.removeItem('poh_last_pubkey');
+  });
+
+  it('uses the shared signer abstraction so remote signers can publish app profile events', async () => {
+    const service = new NostrService();
+    const signed = { id: 'signed-charity-profile', pubkey: '4'.repeat(64), kind: 30078, tags: [], content: '{}' };
+    spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
+    spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
+    (service as any).pool = {
+      publish: () => [Promise.resolve('ok')],
+      querySync: async () => [signed]
+    };
+
+    const id = await service.publishCharityProfile({ description: 'Long description', isVisible: true });
+
+    expect(id).toBe('signed-charity-profile');
+    expect((service as any).signEventWithAvailableSigner).toHaveBeenCalled();
   });
 });
 

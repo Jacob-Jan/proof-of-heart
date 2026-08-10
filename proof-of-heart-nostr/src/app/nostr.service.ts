@@ -120,6 +120,31 @@ export function buildKind0ProfileMetadata(existing: Record<string, any> = {}, ed
   return next;
 }
 
+export function hasCharityProfileChanges(existing: CharityExtraFields = {}, next: CharityExtraFields = {}): boolean {
+  const keys: (keyof CharityExtraFields)[] = [
+    'description',
+    'country',
+    'category',
+    'donationMessage',
+    'lightningAddress',
+    'isVisible'
+  ];
+  const normalize = (value: any) => typeof value === 'string' ? value.trim() : value;
+  return keys.some((key) => normalize(existing[key]) !== normalize(next[key]));
+}
+
+export function getNip46ProfilePermissions(): string {
+  return [
+    'sign_event:0',
+    'sign_event:24242',
+    'sign_event:30078',
+    'sign_event:30079',
+    'sign_event:1984',
+    'sign_event:9734',
+    'get_public_key'
+  ].join(',');
+}
+
 export function mergeCharityProfiles(existing: CharityProfile[], incoming: CharityProfile[]): CharityProfile[] {
   const existingByPubkey = new Map(existing.map((charity) => [charity.pubkey, charity] as const));
 
@@ -457,7 +482,7 @@ export class NostrService {
     const url = new URL(`nostrconnect://${clientPubkey}`);
     for (const relay of relays) url.searchParams.append('relay', relay);
     url.searchParams.set('secret', secret);
-    url.searchParams.set('perms', 'sign_event:9734,sign_event:1984,sign_event:30079,get_public_key');
+    url.searchParams.set('perms', getNip46ProfilePermissions());
     url.searchParams.set('name', 'Proof of Heart');
     url.searchParams.set('url', typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
     return { url: url.toString(), clientPubkey, relays };
@@ -1007,7 +1032,6 @@ export class NostrService {
   }
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
-    if (!window.nostr) throw new Error('No Nostr signer found.');
     const appRelays = this.getWriteRelays();
 
     const localPubkey = typeof window !== 'undefined'
@@ -1030,11 +1054,7 @@ export class NostrService {
 
     let signed: any;
     try {
-      signed = await this.withTimeout(
-        window.nostr.signEvent(event),
-        60_000,
-        'Signer response'
-      );
+      signed = await this.signEventWithAvailableSigner(event, 60_000);
       console.info('[PoH] publishCharityProfile:signed', { id: signed?.id, pubkey: signed?.pubkey });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:sign-failed', e);

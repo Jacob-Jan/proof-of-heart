@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CharityExtraFields, Kind0ProfileEdits, NostrService } from '../nostr.service';
+import { CharityExtraFields, hasCharityProfileChanges, Kind0ProfileEdits, NostrService } from '../nostr.service';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -158,22 +158,25 @@ export class ProfileEditorComponent implements OnInit {
       // Keep legacy app-specific shortDescription cleared; Nostr bio is now the short text.
       payload.shortDescription = '';
 
-      this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
+      this.toast('Waiting for signer approval… check your signer.', 'info', 5000);
       let kind0Id = '';
+      let charityProfileId = '';
       if (this.hasKind0Changes(kind0Payload)) {
         const publishedKind0 = await this.nostr.publishKind0Profile(this.existingKind0Metadata, kind0Payload);
         kind0Id = publishedKind0.id;
         this.existingKind0Metadata = publishedKind0.metadata;
       }
-      const id = await this.nostr.publishCharityProfile(payload);
-      this.existingModel = { ...payload };
-      this.model = { ...payload };
+
+      if (hasCharityProfileChanges(this.existingModel, payload)) {
+        charityProfileId = await this.nostr.publishCharityProfile(payload);
+        this.existingModel = { ...payload };
+        this.model = { ...payload };
+      }
+
       if (this.ownPubkey) {
         this.nostr.refreshCharityProfileCache(this.ownPubkey, payload, this.existingKind0Metadata);
       }
-      this.toast(kind0Id
-        ? `Published Nostr profile and charity profile events.`
-        : `Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
+      this.toast(this.saveSuccessMessage(kind0Id, charityProfileId), 'success', 4500);
     } catch (e: any) {
       console.error('[PoH] profile-editor:save-failed', e);
       this.toast(e?.message || 'Failed to publish charity profile', 'error', 4500);
@@ -188,6 +191,13 @@ export class ProfileEditorComponent implements OnInit {
     return normalize(next.name) !== currentName
       || normalize(next.about) !== normalize(this.existingKind0Metadata['about'])
       || normalize(next.picture) !== normalize(this.existingKind0Metadata['picture']);
+  }
+
+  private saveSuccessMessage(kind0Id: string, charityProfileId: string): string {
+    if (kind0Id && charityProfileId) return 'Published Nostr profile and charity profile events.';
+    if (kind0Id) return 'Published Nostr profile.';
+    if (charityProfileId) return `Published charity profile event: ${charityProfileId.slice(0, 10)}…`;
+    return 'No profile changes to publish.';
   }
 
   async disconnect() {
