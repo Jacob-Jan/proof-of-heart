@@ -28,8 +28,23 @@
         <label>Public name</label>
         <input [(ngModel)]="kind0Name" name="kind0Name" placeholder="Charity name shown on Nostr" />
 
-        <label>Profile photo URL</label>
-        <input [(ngModel)]="kind0Picture" name="kind0Picture" placeholder="https://example.org/logo.png" />
+        <label>Profile photo</label>
+        <div class="logo-upload-row">
+          <div class="logo-preview">
+            @if (kind0Picture) {
+              <img [src]="kind0Picture" alt="Profile photo preview" />
+            } @else {
+              <span>No logo</span>
+            }
+          </div>
+          <div class="logo-actions">
+            <input #logoInput type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden (change)="uploadLogo($event)" />
+            <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="uploadingLogo">
+              {{ uploadingLogo ? 'Uploading…' : 'Upload logo' }}
+            </button>
+            <input [(ngModel)]="kind0Picture" name="kind0Picture" placeholder="Or paste image URL" />
+          </div>
+        </div>
 
         <label>Public about</label>
         <textarea [(ngModel)]="kind0About" name="kind0About" rows="3" placeholder="Short public Nostr bio"></textarea>
@@ -44,9 +59,6 @@
         <p class="appear-in-register">
           <mat-checkbox [(ngModel)]="model.isVisible" name="isVisible">Appear in register</mat-checkbox>
         </p>
-
-        <label>Short description</label>
-        <textarea [(ngModel)]="model.shortDescription" name="shortDescription" rows="3" placeholder="Short summary shown under your name"></textarea>
 
         <label>Description (long)</label>
         <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Long description shown in the More about section"></textarea>

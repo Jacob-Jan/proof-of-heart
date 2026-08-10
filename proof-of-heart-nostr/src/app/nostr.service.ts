@@ -48,6 +48,13 @@ export interface Kind0ProfileEdits {
   picture?: string;
 }
 
+export interface BlossomUploadResult {
+  url: string;
+  sha256: string;
+  size: number;
+  type: string;
+}
+
 export interface CharityLoadResult {
   charities: CharityProfile[];
   fromCache: boolean;
@@ -188,6 +195,7 @@ const CHARITIES_CACHE_TTL_DETAIL_MS = 10 * 60 * 1000;
 const CHARITY_DETAIL_CACHE_PREFIX = 'poh_charity_detail_cache_v1:';
 const NIP46_SESSION_KEY = 'poh_nip46_session_v1';
 const NIP46_DEFAULT_RELAYS = ['wss://relay.nsec.app', 'wss://relay.primal.net', 'wss://relay.damus.io'];
+const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
 interface Nip46Session {
   clientSecretKey: string;
@@ -869,6 +877,78 @@ export class NostrService {
     }
 
     return { id: signed.id, metadata };
+  }
+
+  async uploadProfileImageToBlossom(file: File, server = DEFAULT_BLOSSOM_SERVER): Promise<BlossomUploadResult> {
+    if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.');
+    if (file.size > 2 * 1024 * 1024) throw new Error('Logo image is too large. Please use an image under 2 MB.');
+
+    const normalizedServer = server.replace(/\/+$/, '');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const sha256 = await this.sha256Hex(bytes);
+    const expiration = Math.floor(Date.now() / 1000) + 10 * 60;
+    const authEvent = {
+      kind: 24242,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['t', 'upload'],
+        ['expiration', String(expiration)],
+        ['server', normalizedServer],
+        ['x', sha256]
+      ],
+      content: 'Upload charity profile image'
+    };
+
+    const signedAuth = await this.signEventWithAvailableSigner(authEvent, 60_000);
+    const authHeader = `Nostr ${this.base64UrlEncode(JSON.stringify(signedAuth))}`;
+    const response = await this.withTimeout(fetch(`${normalizedServer}/upload`, {
+      method: 'PUT',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-SHA-256': sha256
+      },
+      body: bytes
+    }), 60_000, 'Image upload');
+
+    if (!response.ok) {
+      throw new Error(response.headers.get('X-Reason') || `Image upload failed (${response.status}).`);
+    }
+
+    let descriptor: any = {};
+    try {
+      descriptor = await response.json();
+    } catch {
+      descriptor = {};
+    }
+
+    return {
+      url: typeof descriptor?.url === 'string' && descriptor.url ? descriptor.url : `${normalizedServer}/${sha256}${this.fileExtensionForMime(file.type)}`,
+      sha256: typeof descriptor?.sha256 === 'string' ? descriptor.sha256 : sha256,
+      size: Number(descriptor?.size) || file.size,
+      type: typeof descriptor?.type === 'string' ? descriptor.type : file.type
+    };
+  }
+
+  private async sha256Hex(bytes: Uint8Array): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  private base64UrlEncode(value: string): string {
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+    bytes.forEach((byte) => binary += String.fromCharCode(byte));
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  private fileExtensionForMime(type: string): string {
+    if (type === 'image/png') return '.png';
+    if (type === 'image/jpeg') return '.jpg';
+    if (type === 'image/webp') return '.webp';
+    if (type === 'image/gif') return '.gif';
+    if (type === 'image/svg+xml') return '.svg';
+    return '';
   }
 
   async getCurrentPubkey(): Promise<string> {

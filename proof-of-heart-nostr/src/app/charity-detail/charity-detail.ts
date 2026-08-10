@@ -1986,10 +1986,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const titleBits = [charity.name, category, country, 'Bitcoin Charity | Proof of Heart'].filter(Boolean);
     const title = titleBits.join(' · ');
     const description = (
-      charity.charity.shortDescription
-      || charity.about
-      || `Support ${charity.name}${country ? ` in ${country}` : ''}${category ? ` (${category})` : ''} with Bitcoin and Lightning donations.`
-    ).slice(0, 155);
+      charity.about
+      || charity.charity.description
+      || 'Nostr-native charity profile on Proof of Heart.'
+    ).slice(0, 160);
     const canonical = `https://proofofheart.org/charities/${charity.npub}`;
     const image = this.toAbsoluteAssetUrl(charity.picture) || 'https://proofofheart.org/assets/logo.png';
 
@@ -2033,7 +2033,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       '@type': 'NGO',
       name: charity.name,
       url: canonical,
-      description: charity.charity.description || charity.charity.shortDescription || charity.about || '',
+      description: charity.charity.description || charity.about || '',
       image: charity.picture || undefined,
       sameAs: [websiteHref].filter(Boolean),
       potentialAction: {

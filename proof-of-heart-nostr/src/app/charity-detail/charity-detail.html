@@ -12,8 +12,8 @@
         <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
         <div class="title-wrap">
           <h1>{{ charity.name }}</h1>
-          @if (charity.charity.shortDescription || charity.about) {
-            <p class="short-description">{{ charity.charity.shortDescription || charity.about }}</p>
+          @if (charity.about) {
+            <p class="short-description">{{ charity.about }}</p>
           }
           @if (charity.website) {
             <a class="website" target="_blank" rel="noopener noreferrer" [href]="charityWebsiteHref(charity.website)">{{ charity.website }}</a>

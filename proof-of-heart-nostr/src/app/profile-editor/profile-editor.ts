@@ -45,7 +45,6 @@ export class ProfileEditorComponent implements OnInit {
   private dialog = inject(MatDialog);
 
   model: CharityExtraFields = {
-    shortDescription: '',
     description: '',
     isVisible: true
   };
@@ -58,6 +57,7 @@ export class ProfileEditorComponent implements OnInit {
   private existingKind0Metadata: Record<string, any> = {};
   loadingExisting = false;
   saving = false;
+  uploadingLogo = false;
   needsSignerForLoad = false;
   ownPubkey: string | null = null;
   ownNpub: string | null = null;
@@ -111,13 +111,32 @@ export class ProfileEditorComponent implements OnInit {
         this.model = { ...existing };
       }
 
-      if (!this.model.shortDescription) this.model.shortDescription = this.kind0About;
       if (!this.model.description) this.model.description = '';
       if (this.model.isVisible === undefined) this.model.isVisible = true;
     } catch {
       this.needsSignerForLoad = true;
     } finally {
       this.loadingExisting = false;
+    }
+  }
+
+  async uploadLogo(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.uploadingLogo) return;
+
+    this.uploadingLogo = true;
+    try {
+      this.toast('Approve image upload in your signer…', 'info', 5000);
+      const uploaded = await this.nostr.uploadProfileImageToBlossom(file);
+      this.kind0Picture = uploaded.url;
+      this.toast('Logo uploaded. Save profile to publish it.', 'success', 4500);
+    } catch (e: any) {
+      console.error('[PoH] profile-editor:logo-upload-failed', e);
+      this.toast(e?.message || 'Logo upload failed', 'error', 5000);
+    } finally {
+      this.uploadingLogo = false;
     }
   }
 
@@ -136,6 +155,8 @@ export class ProfileEditorComponent implements OnInit {
         ...this.model,
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
+      // Keep legacy app-specific shortDescription cleared; Nostr bio is now the short text.
+      payload.shortDescription = '';
 
       this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
       let kind0Id = '';
