@@ -15,7 +15,8 @@ describe('buildKind0ProfileMetadata', () => {
     const next = buildKind0ProfileMetadata(existing, {
       name: 'My First Bitcoin',
       about: 'Bitcoin education',
-      picture: 'https://myfirstbitcoin.org/logo.png'
+      picture: 'https://myfirstbitcoin.org/logo.png',
+      lud16: 'hello@myfirstbitcoin.org'
     });
 
     expect(next).toEqual({
@@ -23,14 +24,15 @@ describe('buildKind0ProfileMetadata', () => {
       name: 'My First Bitcoin',
       display_name: 'My First Bitcoin',
       about: 'Bitcoin education',
-      picture: 'https://myfirstbitcoin.org/logo.png'
+      picture: 'https://myfirstbitcoin.org/logo.png',
+      lud16: 'hello@myfirstbitcoin.org'
     });
   });
 
   it('removes editable fields when the user clears them without touching unrelated fields', () => {
     const next = buildKind0ProfileMetadata(
-      { name: 'Old Name', display_name: 'Old Display', about: 'Old about', picture: 'https://example.org/old.png', nip05: 'charity@example.org' },
-      { name: '', about: '', picture: '' }
+      { name: 'Old Name', display_name: 'Old Display', about: 'Old about', picture: 'https://example.org/old.png', lud16: 'old@example.org', nip05: 'charity@example.org' },
+      { name: '', about: '', picture: '', lud16: '' }
     );
 
     expect(next).toEqual({ nip05: 'charity@example.org' });
@@ -77,6 +79,13 @@ describe('profile editor save helpers', () => {
     expect(hasCharityProfileChanges(
       { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
       { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeFalse();
+  });
+
+  it('does not treat legacy app-specific lightningAddress changes as app profile changes', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, lightningAddress: 'old@example.com' },
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, lightningAddress: '' }
     )).toBeFalse();
   });
 

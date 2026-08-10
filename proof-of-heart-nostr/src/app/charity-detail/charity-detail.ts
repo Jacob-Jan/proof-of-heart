@@ -171,7 +171,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private refreshToken = 0;
 
   get donationAddress(): string {
-    return (this.charity?.charity.lightningAddress || this.charity?.lud16 || '').trim();
+    return (this.charity?.lud16 || '').trim();
   }
 
   get canDonate(): boolean {
