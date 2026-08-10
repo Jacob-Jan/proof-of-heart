@@ -64,13 +64,66 @@
     .appear-in-register {
       display: flex;
       justify-content: flex-start;
-      margin-bottom: 16px;
+      margin: 2px 0 8px;
     }
 
     .account-form {
       display: flex;
       flex-direction: column;
+      gap: 14px;
+    }
+
+    .editor-section {
+      display: flex;
+      flex-direction: column;
       gap: 10px;
+      padding: 16px;
+      border: 1px solid #e4dfd2;
+      border-radius: 14px;
+      background: #fbfaf6;
+    }
+
+    .nostr-section {
+      background: #f7f3ff;
+      border-color: #ded2f2;
+    }
+
+    .poh-section {
+      background: #fbfaf6;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+
+      h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .section-note {
+        color: #6f675c;
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+    }
+
+    label {
+      font-weight: 600;
+      color: #2f2a22;
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid #d7d1c4;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      background: #fff;
     }
 
     .account-buttons {

@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CharityExtraFields, NostrService } from '../nostr.service';
+import { CharityExtraFields, Kind0ProfileEdits, NostrService } from '../nostr.service';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -52,8 +52,10 @@ export class ProfileEditorComponent implements OnInit {
 
   kind0Name = '';
   kind0About = '';
+  kind0Picture = '';
 
   private existingModel: CharityExtraFields = {};
+  private existingKind0Metadata: Record<string, any> = {};
   loadingExisting = false;
   saving = false;
   needsSignerForLoad = false;
@@ -93,6 +95,7 @@ export class ProfileEditorComponent implements OnInit {
         this.nostr.loadKind0Profile(pubkey)
       ]);
 
+      this.existingKind0Metadata = { ...(kind0 || {}) };
       this.kind0Name = (
         kind0?.['display_name'] ||
         kind0?.['displayName'] ||
@@ -101,6 +104,7 @@ export class ProfileEditorComponent implements OnInit {
         ''
       ).trim();
       this.kind0About = (kind0?.['about'] || '').trim();
+      this.kind0Picture = (kind0?.['picture'] || '').trim();
 
       if (existing) {
         this.existingModel = existing;
@@ -122,6 +126,11 @@ export class ProfileEditorComponent implements OnInit {
     this.saving = true;
 
     try {
+      const kind0Payload: Kind0ProfileEdits = {
+        name: this.kind0Name,
+        about: this.kind0About,
+        picture: this.kind0Picture
+      };
       const payload: CharityExtraFields = {
         ...this.existingModel,
         ...this.model,
@@ -129,19 +138,35 @@ export class ProfileEditorComponent implements OnInit {
       };
 
       this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
+      let kind0Id = '';
+      if (this.hasKind0Changes(kind0Payload)) {
+        const publishedKind0 = await this.nostr.publishKind0Profile(this.existingKind0Metadata, kind0Payload);
+        kind0Id = publishedKind0.id;
+        this.existingKind0Metadata = publishedKind0.metadata;
+      }
       const id = await this.nostr.publishCharityProfile(payload);
       this.existingModel = { ...payload };
       this.model = { ...payload };
       if (this.ownPubkey) {
-        this.nostr.refreshCharityProfileCache(this.ownPubkey, payload);
+        this.nostr.refreshCharityProfileCache(this.ownPubkey, payload, this.existingKind0Metadata);
       }
-      this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
+      this.toast(kind0Id
+        ? `Published Nostr profile and charity profile events.`
+        : `Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
       console.error('[PoH] profile-editor:save-failed', e);
       this.toast(e?.message || 'Failed to publish charity profile', 'error', 4500);
     } finally {
       this.saving = false;
     }
+  }
+
+  private hasKind0Changes(next: Kind0ProfileEdits): boolean {
+    const normalize = (value: any) => (typeof value === 'string' ? value.trim() : '');
+    const currentName = normalize(this.existingKind0Metadata['display_name'] || this.existingKind0Metadata['displayName'] || this.existingKind0Metadata['name'] || this.existingKind0Metadata['username']);
+    return normalize(next.name) !== currentName
+      || normalize(next.about) !== normalize(this.existingKind0Metadata['about'])
+      || normalize(next.picture) !== normalize(this.existingKind0Metadata['picture']);
   }
 
   async disconnect() {
