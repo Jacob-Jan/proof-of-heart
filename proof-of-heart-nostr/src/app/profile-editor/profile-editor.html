@@ -60,8 +60,9 @@
           <mat-checkbox [(ngModel)]="model.isVisible" name="isVisible">Appear in register</mat-checkbox>
         </p>
 
-        <label>Description (long)</label>
-        <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Long description shown in the More about section"></textarea>
+        <label>Description</label>
+        <p class="field-hint">Shown on the charity page.</p>
+        <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Describe the charity for its profile page"></textarea>
 
         <label>Country</label>
         <select [(ngModel)]="model.country" name="country">
