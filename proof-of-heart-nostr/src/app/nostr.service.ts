@@ -42,6 +42,12 @@ export interface CharityExtraFields {
   isVisible?: boolean;
 }
 
+export interface Kind0ProfileEdits {
+  name?: string;
+  about?: string;
+  picture?: string;
+}
+
 export interface CharityLoadResult {
   charities: CharityProfile[];
   fromCache: boolean;
@@ -84,6 +90,27 @@ export interface CharityFeedStatus {
 export function ensureEventPubkeyForNip07(event: any, getPublicKey: () => Promise<string>): Promise<any> {
   if (event?.pubkey) return Promise.resolve(event);
   return getPublicKey().then((pubkey) => ({ ...event, pubkey }));
+}
+
+export function buildKind0ProfileMetadata(existing: Record<string, any> = {}, edits: Kind0ProfileEdits): Record<string, any> {
+  const next: Record<string, any> = { ...(existing || {}) };
+  const setOrDelete = (key: string, value: string | undefined) => {
+    const trimmed = (value || '').trim();
+    if (trimmed) {
+      next[key] = trimmed;
+    } else {
+      delete next[key];
+    }
+  };
+
+  setOrDelete('name', edits.name);
+  setOrDelete('display_name', edits.name);
+  delete next['displayName'];
+  delete next['username'];
+  setOrDelete('about', edits.about);
+  setOrDelete('picture', edits.picture);
+
+  return next;
 }
 
 export function mergeCharityProfiles(existing: CharityProfile[], incoming: CharityProfile[]): CharityProfile[] {
@@ -792,7 +819,8 @@ export class NostrService {
     if (!events.length) return {};
 
     const sorted = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0));
-    const merged: Record<string, any> = {};
+    const latest = this.safeJson((sorted[0] as any)?.content || '{}');
+    const merged: Record<string, any> = { ...latest };
 
     for (const ev of sorted as any[]) {
       const data = this.safeJson(ev.content || '{}');
@@ -804,6 +832,43 @@ export class NostrService {
     }
 
     return merged;
+  }
+
+  async publishKind0Profile(existing: Record<string, any>, edits: Kind0ProfileEdits): Promise<{ id: string; metadata: Record<string, any> }> {
+    const localPubkey = typeof window !== 'undefined'
+      ? (window.localStorage.getItem(LAST_PUBKEY_KEY) || undefined)
+      : undefined;
+    const metadata = buildKind0ProfileMetadata(existing, edits);
+    const event = {
+      kind: 0,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [],
+      content: JSON.stringify(metadata),
+      ...(localPubkey ? { pubkey: localPubkey } : {})
+    };
+
+    let signed: any;
+    try {
+      signed = await this.signEventWithAvailableSigner(event, 60_000);
+    } catch (e: any) {
+      throw new Error(`Signer could not sign Nostr profile event. ${e?.message || ''}`.trim());
+    }
+
+    const relays = this.uniqueRelays([...this.getKind0ReadRelays(), ...(await this.loadAuthorWriteRelays(signed.pubkey).catch(() => []))]);
+    const publishResults = await this.withTimeout(
+      Promise.allSettled(this.pool.publish(relays, signed as any)),
+      15_000,
+      'Relay publish acknowledgements'
+    );
+    const acceptedRelays = publishResults
+      .map((result, index) => result.status === 'fulfilled' ? relays[index] : null)
+      .filter((relay): relay is string => !!relay);
+
+    if (!acceptedRelays.length) {
+      throw new Error('Signed Nostr profile event, but no relay accepted it. Try another relay/signer and retry.');
+    }
+
+    return { id: signed.id, metadata };
   }
 
   async getCurrentPubkey(): Promise<string> {
@@ -1497,7 +1562,7 @@ export class NostrService {
     }
   }
 
-  refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields): CharityProfile | null {
+  refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields, kind0Metadata?: Record<string, any>): CharityProfile | null {
     if (typeof window === 'undefined' || !pubkey) return null;
 
     const current =
@@ -1506,8 +1571,15 @@ export class NostrService {
       null;
     if (!current) return null;
 
+    const kind0Name = (kind0Metadata?.['display_name'] || kind0Metadata?.['displayName'] || kind0Metadata?.['name'] || kind0Metadata?.['username'] || '').trim();
+    const kind0About = (kind0Metadata?.['about'] || '').trim();
+    const kind0Picture = (kind0Metadata?.['picture'] || '').trim();
+
     const updated: CharityProfile = {
       ...current,
+      ...(kind0Name ? { name: kind0Name } : {}),
+      ...(kind0About ? { about: kind0About } : {}),
+      ...(kind0Picture ? { picture: kind0Picture } : {}),
       profileUpdatedAt: Math.max(Number(current.profileUpdatedAt) || 0, Math.floor(Date.now() / 1000)),
       charity: {
         ...current.charity,

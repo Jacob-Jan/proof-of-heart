@@ -1,4 +1,41 @@
-import { ensureEventPubkeyForNip07, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+import { buildKind0ProfileMetadata, ensureEventPubkeyForNip07, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+
+describe('buildKind0ProfileMetadata', () => {
+  it('updates editable Nostr profile fields while preserving unknown metadata', () => {
+    const existing = {
+      name: 'Old Name',
+      display_name: 'Old Display',
+      about: 'Old about',
+      picture: 'https://example.org/old.png',
+      banner: 'https://example.org/banner.png',
+      nip05: 'charity@example.org',
+      lud16: 'donate@example.org'
+    };
+
+    const next = buildKind0ProfileMetadata(existing, {
+      name: 'My First Bitcoin',
+      about: 'Bitcoin education',
+      picture: 'https://myfirstbitcoin.org/logo.png'
+    });
+
+    expect(next).toEqual({
+      ...existing,
+      name: 'My First Bitcoin',
+      display_name: 'My First Bitcoin',
+      about: 'Bitcoin education',
+      picture: 'https://myfirstbitcoin.org/logo.png'
+    });
+  });
+
+  it('removes editable fields when the user clears them without touching unrelated fields', () => {
+    const next = buildKind0ProfileMetadata(
+      { name: 'Old Name', display_name: 'Old Display', about: 'Old about', picture: 'https://example.org/old.png', nip05: 'charity@example.org' },
+      { name: '', about: '', picture: '' }
+    );
+
+    expect(next).toEqual({ nip05: 'charity@example.org' });
+  });
+});
 
 describe('ensureEventPubkeyForNip07', () => {
   it('adds the signer pubkey before signEvent for Flamingo compatibility', async () => {
