@@ -52,6 +52,7 @@ export class ProfileEditorComponent implements OnInit {
   kind0Name = '';
   kind0About = '';
   kind0Picture = '';
+  kind0Lud16 = '';
 
   private existingModel: CharityExtraFields = {};
   private existingKind0Metadata: Record<string, any> = {};
@@ -105,10 +106,15 @@ export class ProfileEditorComponent implements OnInit {
       ).trim();
       this.kind0About = (kind0?.['about'] || '').trim();
       this.kind0Picture = (kind0?.['picture'] || '').trim();
+      this.kind0Lud16 = (kind0?.['lud16'] || '').trim();
 
       if (existing) {
         this.existingModel = existing;
         this.model = { ...existing };
+      }
+
+      if (!this.kind0Lud16 && this.model.lightningAddress) {
+        this.kind0Lud16 = this.model.lightningAddress.trim();
       }
 
       if (!this.model.description) this.model.description = '';
@@ -148,15 +154,17 @@ export class ProfileEditorComponent implements OnInit {
       const kind0Payload: Kind0ProfileEdits = {
         name: this.kind0Name,
         about: this.kind0About,
-        picture: this.kind0Picture
+        picture: this.kind0Picture,
+        lud16: this.kind0Lud16
       };
       const payload: CharityExtraFields = {
         ...this.existingModel,
         ...this.model,
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
-      // Keep legacy app-specific shortDescription cleared; Nostr bio is now the short text.
+      // Keep legacy app-specific fields cleared; Nostr bio and Lightning address now live in kind 0.
       payload.shortDescription = '';
+      delete payload.lightningAddress;
 
       this.toast('Waiting for signer approval… check your signer.', 'info', 5000);
       let kind0Id = '';
@@ -190,7 +198,8 @@ export class ProfileEditorComponent implements OnInit {
     const currentName = normalize(this.existingKind0Metadata['display_name'] || this.existingKind0Metadata['displayName'] || this.existingKind0Metadata['name'] || this.existingKind0Metadata['username']);
     return normalize(next.name) !== currentName
       || normalize(next.about) !== normalize(this.existingKind0Metadata['about'])
-      || normalize(next.picture) !== normalize(this.existingKind0Metadata['picture']);
+      || normalize(next.picture) !== normalize(this.existingKind0Metadata['picture'])
+      || normalize(next.lud16) !== normalize(this.existingKind0Metadata['lud16']);
   }
 
   private saveSuccessMessage(kind0Id: string, charityProfileId: string): string {

@@ -46,6 +46,7 @@ export interface Kind0ProfileEdits {
   name?: string;
   about?: string;
   picture?: string;
+  lud16?: string;
 }
 
 export interface BlossomUploadResult {
@@ -116,6 +117,7 @@ export function buildKind0ProfileMetadata(existing: Record<string, any> = {}, ed
   delete next['username'];
   setOrDelete('about', edits.about);
   setOrDelete('picture', edits.picture);
+  setOrDelete('lud16', edits.lud16);
 
   return next;
 }
@@ -126,7 +128,6 @@ export function hasCharityProfileChanges(existing: CharityExtraFields = {}, next
     'country',
     'category',
     'donationMessage',
-    'lightningAddress',
     'isVisible'
   ];
   const normalize = (value: any) => typeof value === 'string' ? value.trim() : value;
@@ -1674,12 +1675,14 @@ export class NostrService {
     const kind0Name = (kind0Metadata?.['display_name'] || kind0Metadata?.['displayName'] || kind0Metadata?.['name'] || kind0Metadata?.['username'] || '').trim();
     const kind0About = (kind0Metadata?.['about'] || '').trim();
     const kind0Picture = (kind0Metadata?.['picture'] || '').trim();
+    const kind0Lud16 = (kind0Metadata?.['lud16'] || '').trim();
 
     const updated: CharityProfile = {
       ...current,
       ...(kind0Name ? { name: kind0Name } : {}),
       ...(kind0About ? { about: kind0About } : {}),
       ...(kind0Picture ? { picture: kind0Picture } : {}),
+      ...(kind0Metadata ? { lud16: kind0Lud16 || undefined } : {}),
       profileUpdatedAt: Math.max(Number(current.profileUpdatedAt) || 0, Math.floor(Date.now() / 1000)),
       charity: {
         ...current.charity,

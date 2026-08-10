@@ -48,6 +48,10 @@
         <label>Public about</label>
         <p class="field-hint">Shown on the charity card on the home page.</p>
         <textarea [(ngModel)]="kind0About" name="kind0About" rows="3" placeholder="Short public Nostr bio"></textarea>
+
+        <label>Lightning address</label>
+        <p class="field-hint">Used for donations and saved to your Nostr profile.</p>
+        <input [(ngModel)]="kind0Lud16" name="kind0Lud16" placeholder="name@domain.com" />
       </section>
 
       <section class="editor-section poh-section">
@@ -79,9 +83,6 @@
             <option [value]="category">{{ category }}</option>
           }
         </select>
-
-        <label>Lightning address (optional override)</label>
-        <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
       </section>
 
       <div class="account-buttons">
