@@ -42,11 +42,11 @@
             <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="uploadingLogo">
               {{ uploadingLogo ? 'Uploading…' : 'Upload logo' }}
             </button>
-            <input [(ngModel)]="kind0Picture" name="kind0Picture" placeholder="Or paste image URL" />
           </div>
         </div>
 
         <label>Public about</label>
+        <p class="field-hint">Shown on the charity card on the home page.</p>
         <textarea [(ngModel)]="kind0About" name="kind0About" rows="3" placeholder="Short public Nostr bio"></textarea>
       </section>
 
