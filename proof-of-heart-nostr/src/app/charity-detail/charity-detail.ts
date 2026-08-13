@@ -1328,12 +1328,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const usingRemoteSigner = !this.nostr.hasNip07Signer() && this.nostr.hasNip46Session();
 
+    const remoteSignerTimeoutMs = usingRemoteSigner && isAndroidBrowser() ? 10_000 : 60_000;
     this.donationStatus = this.nostr.hasNip07Signer()
       ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
-      : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
+      : isAndroidBrowser()
+        ? 'Trying your paired remote signer. If Amber is asleep, Proof of Heart will open Amber directly…'
+        : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
     let signedZap: any;
     try {
-      signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, 60_000);
+      signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, remoteSignerTimeoutMs);
     } catch (e: any) {
       if (usingRemoteSigner) {
         this.nostr.clearNip46Session();
