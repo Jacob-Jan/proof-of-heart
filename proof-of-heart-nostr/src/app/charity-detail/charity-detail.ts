@@ -34,7 +34,11 @@ function encodeLnurl(url: string): string {
 }
 
 function isAndroidBrowser(): boolean {
-  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as any;
+  const ua = navigator.userAgent || '';
+  const platform = nav.userAgentData?.platform || navigator.platform || '';
+  return /Android/i.test(ua) || /Android/i.test(platform);
 }
 
 export function normalizeCharityWebsiteHref(website?: string): string {
@@ -690,7 +694,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
 
-    if (!window.nostr && isAndroidBrowser()) {
+    if (isAndroidBrowser()) {
       this.nostr.clearNip46Session();
       this.nip46ConnectUrl = '';
       this.nip46Pairing = false;
