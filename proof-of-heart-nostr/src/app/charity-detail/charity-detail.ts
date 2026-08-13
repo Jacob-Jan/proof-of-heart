@@ -29,6 +29,12 @@ interface PendingZapPayment {
   createdAt: number;
 }
 
+interface AndroidSignerZapCallback {
+  requestId: string;
+  signedZapRaw: string;
+  pending?: any;
+}
+
 function encodeLnurl(url: string): string {
   return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
 }
@@ -756,6 +762,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
 
+    if (isAndroidBrowser() && !window.nostr) {
+      try {
+        await this.startAndroidSignerZap(lightningAddress, sats, since);
+        return;
+      } catch (androidErr: any) {
+        if (!this.isCurrentDonationAttempt(token)) return;
+        this.donationStatus = this.donationErrorMessage(androidErr);
+        this.donating = false;
+        return;
+      }
+    }
+
     if (!window.nostr && !this.nostr.hasNip46Session()) {
       try {
         await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
@@ -962,7 +980,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     beforeWalletLaunch?.();
 
     if (!autoLaunchWallet) {
-      this.donationStatus = `${readyMessage} Use Open wallet or scan/copy the invoice below. Checking relays for the verified NIP-57 receipt…`;
+      this.donationStatus = `${readyMessage} Use Open wallet or scan/copy the invoice below. Checking for the verified receipt…`;
       return;
     }
 
@@ -971,8 +989,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const launched = await this.tryLaunchInvoice(invoice);
     if (token !== undefined && !this.isCurrentDonationAttempt(token)) return;
     this.donationStatus = launched
-      ? `${readyMessage} Wallet open attempted. Checking relays for the verified NIP-57 receipt…`
-      : `${readyMessage} Use Open wallet or Copy invoice. Checking relays for the verified NIP-57 receipt…`;
+      ? `${readyMessage} Wallet open attempted. Checking for the verified receipt…`
+      : `${readyMessage} Use Open wallet or Copy invoice. Checking for the verified receipt…`;
     if (!launched) {
       this.toast('Could not open wallet automatically. Use QR or copy invoice.', 'info', 3500);
     }
@@ -1025,7 +1043,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationFlow = 'zap';
     this.showDonateModal = true;
     this.lastInvoice = payment.invoice;
-    this.donationStatus = 'Zap invoice ready. Tap Open wallet, scan the QR, or copy the invoice. Checking relays for the verified NIP-57 receipt…';
+    this.donationStatus = 'Zap invoice ready. Tap Open wallet, scan the QR, or copy the invoice. Checking for the verified receipt…';
     void this.generateQr(payment.invoice);
     void this.watchForZapReceipt(payment);
 
@@ -1036,8 +1054,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         const current = this.readPendingZapPayment();
         if (!current || this.zapPaymentWatchKey(current) !== watchKey || !this.showDonateModal) return;
         this.donationStatus = launched
-          ? 'Wallet open attempted. Checking relays for the verified NIP-57 zap receipt…'
-          : 'Use Open wallet or Copy invoice. Checking relays for the verified NIP-57 zap receipt…';
+          ? 'Wallet open attempted. Checking for the verified receipt…'
+          : 'Use Open wallet or Copy invoice. Checking for the verified receipt…';
       });
     }
   }
@@ -1066,7 +1084,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     this.clearPendingZapPayment(payment);
-    this.donationStatus = 'Verified NIP-57 zap receipt found on relays.';
+    this.donationStatus = 'Verified zap receipt found on relays.';
     this.celebrateZapReceipt();
     this.recentZapReceipts = [receipt, ...this.recentZapReceipts.filter((r) => r.receiptId !== receipt.receiptId)].slice(0, 8);
     await this.refreshCharity();
@@ -1458,25 +1476,25 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    // NIP-55 web callbacks append the result directly to callbackUrl. Android browser/signer
-    // combinations can strip query-string callback prefixes, so use the clean charity path
-    // as the callback prefix and recover the requestId from pending storage when the signed
-    // event is appended to the path.
-    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+    const pendingZap = {
+      requestId,
+      callback: payParams.callback,
+      amountMsat,
+      sats,
+      since,
+      createdAt: Date.now()
+    };
+    const state = this.encodeAndroidSignerZapState(pendingZap);
+    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)};androidSignerZap=${encodeURIComponent(state)}:`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
     this.lastAndroidSignerUrl = signerUrl;
 
     this.writePendingAndroidSignerZap({
-      requestId,
-      callback: payParams.callback,
-      amountMsat,
-      sats,
-      since,
+      ...pendingZap,
       signerUrl,
-      callbackUrl,
-      createdAt: Date.now()
+      callbackUrl
     });
     this.debugNip55('pending zap stored', {
       requestId,
@@ -1497,9 +1515,32 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       tagCount: zapRequest.tags?.length || 0
     });
     this.donationStatus = 'Opening signer…';
-    this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(signerUrl);
     this.debugNip55('auto signer launch attempted', { launched, signerUrlLength: signerUrl.length });
+  }
+
+  private encodeAndroidSignerZapState(pending: any): string {
+    const json = JSON.stringify({
+      requestId: pending.requestId,
+      callback: pending.callback,
+      amountMsat: pending.amountMsat,
+      sats: pending.sats,
+      since: pending.since,
+      createdAt: pending.createdAt
+    });
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  private decodeAndroidSignerZapState(state: string): any | null {
+    try {
+      return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(state)))));
+    } catch {
+      try {
+        return JSON.parse(decodeURIComponent(escape(atob(state))));
+      } catch {
+        return null;
+      }
+    }
   }
 
   private armAndroidSignerLaunchFallback(): void {
@@ -1732,7 +1773,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return { requestId: pending.requestId, signedZapRaw };
   }
 
-  private readPackedAndroidSignerZapCallbackFromPath(pathname: string): { requestId: string; signedZapRaw: string } | null {
+  private readPackedAndroidSignerZapCallbackFromPath(pathname: string): AndroidSignerZapCallback | null {
     const marker = ';androidSignerZap=';
     const markerIndex = pathname.indexOf(marker);
     if (markerIndex < 0) return null;
@@ -1745,23 +1786,31 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     try {
+      const rawIdOrState = decodeURIComponent(packed.slice(0, separator));
+      const pending = this.decodeAndroidSignerZapState(rawIdOrState);
       const parsed = {
-        requestId: decodeURIComponent(packed.slice(0, separator)),
-        signedZapRaw: decodeURIComponent(packed.slice(separator + 1))
+        requestId: pending?.requestId || rawIdOrState,
+        signedZapRaw: decodeURIComponent(packed.slice(separator + 1)),
+        pending: pending || undefined
       };
       this.debugNip55('path callback parsed', {
         requestId: parsed.requestId,
-        signedZapLength: parsed.signedZapRaw.length
+        signedZapLength: parsed.signedZapRaw.length,
+        stateEmbedded: !!pending
       });
       return parsed;
     } catch {
+      const rawIdOrState = packed.slice(0, separator);
+      const pending = this.decodeAndroidSignerZapState(rawIdOrState);
       const fallback = {
-        requestId: packed.slice(0, separator),
-        signedZapRaw: packed.slice(separator + 1)
+        requestId: pending?.requestId || rawIdOrState,
+        signedZapRaw: packed.slice(separator + 1),
+        pending: pending || undefined
       };
       this.debugNip55('path callback parsed without decoding', {
         requestId: fallback.requestId,
-        signedZapLength: fallback.signedZapRaw.length
+        signedZapLength: fallback.signedZapRaw.length,
+        stateEmbedded: !!pending
       });
       return fallback;
     }
@@ -1772,7 +1821,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
   }
 
-  private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
+  private readAndroidSignerZapCallback(): AndroidSignerZapCallback | null {
     const url = new URL(window.location.href);
     const directPathCallback = this.readDirectAppendedAndroidSignerZapCallback(url.pathname);
     if (directPathCallback) return directPathCallback;
@@ -1914,8 +1963,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationFlow = 'zap';
     this.showDonateModal = true;
     this.donating = false;
-    this.lastAndroidSignerUrl = pending.signerUrl;
-    this.donationStatus = 'Returned without a completed signature. Tap Open signer to retry.';
+    this.lastAndroidSignerUrl = '';
+    this.donationStatus = 'Signature not completed. Please try again.';
     this.debugNip55('pending signer zap restored without callback', {
       requestId: pending.requestId || '',
       callbackUrl: pending.callbackUrl || '',
@@ -1949,7 +1998,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     cleanUrl.hash = '';
     window.history.replaceState({}, '', cleanUrl.toString());
 
-    const pending = this.takePendingAndroidSignerZap();
+    const pending = signerCallback.pending || this.takePendingAndroidSignerZap();
     this.debugNip55('pending zap loaded', {
       exists: !!pending,
       pendingRequestId: pending?.requestId || '',

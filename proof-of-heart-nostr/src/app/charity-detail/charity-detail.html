@@ -173,7 +173,7 @@
                 }
               </ul>
             } @else {
-              <p class="empty-zaps">No verified NIP-57 zap receipts found yet.</p>
+              <p class="empty-zaps">No verified zap receipts found yet.</p>
             }
           </div>
 
@@ -367,7 +367,7 @@
               <i class="fa-solid fa-circle-check"></i>
             </div>
             <strong>Zap received</strong>
-            <p>Verified NIP-57 receipt found on relays. Thank you for supporting {{ charity.name || 'this charity' }}.</p>
+            <p>Verified zap receipt found. Thank you for supporting {{ charity.name || 'this charity' }}.</p>
           </div>
         }
 
@@ -401,14 +401,11 @@
           @if (nip46PairingError) {
             <p class="qr-help">{{ nip46PairingError }}</p>
           }
-        } @else if (lastAndroidSignerUrl) {
+        } @else if (nip55DebugMode && lastAndroidSignerUrl) {
           <div class="qr-actions">
             <button type="button" (click)="openAndroidSignerAgain()">Open signer</button>
-            @if (nip55DebugMode) {
-              <button type="button" (click)="openAndroidSignerAnchorDebug()">Signer link</button>
-              <button type="button" (click)="openAndroidSignerLocationDebug()">Signer location</button>
-            }
-            <button type="button" disabled>Copy invoice</button>
+            <button type="button" (click)="openAndroidSignerAnchorDebug()">Signer link</button>
+            <button type="button" (click)="openAndroidSignerLocationDebug()">Signer location</button>
           </div>
         } @else {
           <div class="qr-actions">
