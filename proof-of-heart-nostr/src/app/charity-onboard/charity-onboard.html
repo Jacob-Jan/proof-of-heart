@@ -12,12 +12,6 @@
     {{ loading ? 'Connecting…' : 'Connect Nostr' }}
   </button>
 
-  @if (showClipboardConnect) {
-    <button mat-stroked-button type="button" (click)="finishFromClipboard()" [disabled]="loading">
-      Finish connect
-    </button>
-  }
-
   @if (status) {
     <p class="onboard-status" aria-live="polite">
       @if (loading) { <mat-spinner diameter="14"></mat-spinner> }
