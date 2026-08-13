@@ -40,12 +40,12 @@ describe('buildKind0ProfileMetadata', () => {
 });
 
 describe('native Android signer connect helpers', () => {
-  it('builds a signer-neutral get_public_key URL without a browser callback', () => {
+  it('builds a signer-neutral get_public_key URL with a callback prefix', () => {
     const url = buildNativeAndroidSignerConnectUrl('https://proofofheart.org/charity/onboard');
 
     expect(url).toContain('nostrsigner:');
     expect(url).toContain('type=get_public_key');
-    expect(url).not.toContain('callbackUrl=');
+    expect(url).toContain('callbackUrl=https%3A%2F%2Fproofofheart.org%2Fcharity%2Fonboard%3FpohSignerConnect%3D');
     expect(url).not.toContain('Amber');
   });
 
