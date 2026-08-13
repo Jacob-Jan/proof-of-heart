@@ -2019,14 +2019,14 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       };
       await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart will show it after it is confirmed.', () => {
         this.writePendingZapPayment(payment);
-        this.debugNip55('zap receipt watch started before wallet launch', {
+        this.debugNip55('zap receipt watch started; waiting for manual wallet open', {
           donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',
           sats: payment.sats,
           since: payment.since,
           zapRequestId: zapRequestId || ''
         });
         void this.watchForZapReceipt(payment);
-      }, token, true);
+      }, token, false);
     } catch (e: any) {
       if (!this.showDonateModal) return;
       this.debugNip55('resume failed', { message: e?.message || String(e) });
