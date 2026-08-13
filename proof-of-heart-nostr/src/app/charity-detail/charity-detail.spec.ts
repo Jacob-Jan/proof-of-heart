@@ -94,5 +94,7 @@ describe('CharityDetailComponent Android zap flow', () => {
 
     expect(component.createInvoiceFromSignedZap).toHaveBeenCalledWith('https://ln.example.org/callback', 21000, jasmine.objectContaining({ id: 'zap-id' }));
     expect(component.presentInvoice).toHaveBeenCalled();
+    const presentArgs = component.presentInvoice.calls.mostRecent().args;
+    expect(presentArgs[4]).toBeFalse();
   });
 });
