@@ -27,7 +27,6 @@ export class CharityOnboardComponent implements OnInit {
   charityConfirmed = false;
   loading = false;
   status = '';
-  showClipboardConnect = false;
 
   ngOnInit() {
     const connected = this.nostr.consumeNativeAndroidSignerCallback();
@@ -49,7 +48,6 @@ export class CharityOnboardComponent implements OnInit {
 
     if (this.loading) return;
     this.loading = true;
-    this.showClipboardConnect = false;
     this.status = 'Connecting…';
     try {
       const { pubkey, npub } = isAndroidBrowser() && !this.nostr.hasNip07Signer()
@@ -58,28 +56,6 @@ export class CharityOnboardComponent implements OnInit {
       this.status = 'Finalizing…';
       await this.finishOnboarding(pubkey, npub);
     } catch (e: any) {
-      if (isAndroidBrowser() && !this.nostr.hasNip07Signer()) {
-        this.showClipboardConnect = true;
-        this.status = 'Tap finish to continue.';
-      } else {
-        this.status = 'Could not connect. Please try again.';
-        this.toast('Could not connect. Please try again.', 'error', 4000);
-      }
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  async finishFromClipboard() {
-    if (this.loading) return;
-    this.loading = true;
-    this.status = 'Finalizing…';
-    try {
-      const connected = await this.nostr.connectNativeAndroidSignerFromClipboard();
-      if (!connected) throw new Error('No signer result found.');
-      this.showClipboardConnect = false;
-      await this.finishOnboarding(connected.pubkey, connected.npub);
-    } catch {
       this.status = 'Could not connect. Please try again.';
       this.toast('Could not connect. Please try again.', 'error', 4000);
     } finally {

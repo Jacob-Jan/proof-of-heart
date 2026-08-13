@@ -99,20 +99,6 @@ export function buildNativeAndroidSignerConnectUrl(_callbackPageUrl?: string): s
   return 'nostrsigner:?type=get_public_key';
 }
 
-export function parseNativeAndroidSignerPubkeyFromClipboard(text: string | null | undefined): string | null {
-  const trimmed = (text || '').trim();
-  const candidates = [
-    trimmed,
-    trimmed.replace(/^nostrsigner:/i, '').trim()
-  ];
-
-  for (const candidate of candidates) {
-    if (/^[0-9a-f]{64}$/i.test(candidate)) return candidate.toLowerCase();
-  }
-
-  return null;
-}
-
 export function parseNativeAndroidSignerPubkeyFromUrl(href: string): { pubkey: string; cleanUrl: string } | null {
   let url: URL;
   try {
@@ -896,7 +882,7 @@ export class NostrService {
     throw new Error('No Nostr signer found. Use a browser extension or pair a NIP-46 remote signer.');
   }
 
-  async connectNativeAndroidSigner(timeoutMs = 12_000): Promise<{ pubkey: string; npub: string }> {
+  async connectNativeAndroidSigner(timeoutMs = 45_000): Promise<{ pubkey: string; npub: string }> {
     if (typeof window === 'undefined') throw new Error('No signer found.');
 
     const existing = parseNativeAndroidSignerPubkeyFromUrl(window.location.href);
@@ -905,17 +891,6 @@ export class NostrService {
     const signerUrl = buildNativeAndroidSignerConnectUrl(window.location.href);
     this.launchExternalUri(signerUrl);
     return this.waitForNativeAndroidSignerPubkey(timeoutMs);
-  }
-
-  async connectNativeAndroidSignerFromClipboard(): Promise<{ pubkey: string; npub: string } | null> {
-    if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) return null;
-    try {
-      const text = await navigator.clipboard.readText();
-      const pubkey = parseNativeAndroidSignerPubkeyFromClipboard(text);
-      return pubkey ? this.rememberConnectedPubkey(pubkey) : null;
-    } catch {
-      return null;
-    }
   }
 
   consumeNativeAndroidSignerCallback(): { pubkey: string; npub: string } | null {
@@ -931,7 +906,6 @@ export class NostrService {
       const startedAt = Date.now();
       let pollTimer: ReturnType<typeof setTimeout> | undefined;
       let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
-      let readingClipboard = false;
 
       const finish = (result: { pubkey: string; npub: string } | null, error?: Error) => {
         if (settled) return;
@@ -960,21 +934,7 @@ export class NostrService {
           const pubkey = await this.withTimeout(window.nostr.getPublicKey(), Math.min(10_000, timeoutMs), 'Signer response');
           finish(this.rememberConnectedPubkey(pubkey));
         } catch {
-          // Keep waiting for URL/clipboard result while the timeout is active.
-        }
-      };
-
-      const tryClipboardResult = async () => {
-        if (readingClipboard || !navigator.clipboard?.readText) return;
-        readingClipboard = true;
-        try {
-          const text = await navigator.clipboard.readText();
-          const pubkey = parseNativeAndroidSignerPubkeyFromClipboard(text);
-          if (pubkey) finish(this.rememberConnectedPubkey(pubkey));
-        } catch {
-          // Clipboard read can be denied by the browser; keep waiting for the other paths.
-        } finally {
-          readingClipboard = false;
+          // Keep waiting for the callback URL while the timeout is active.
         }
       };
 
@@ -985,7 +945,6 @@ export class NostrService {
           return;
         }
         void tryInjectedSigner();
-        void tryClipboardResult();
       };
 
       window.addEventListener('focus', check);

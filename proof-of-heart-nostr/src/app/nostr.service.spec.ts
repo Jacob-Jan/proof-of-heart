@@ -1,4 +1,4 @@
-import { buildKind0ProfileMetadata, buildNativeAndroidSignerConnectUrl, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNativeAndroidSignerPubkeyFromClipboard, parseNativeAndroidSignerPubkeyFromUrl, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
+import { buildKind0ProfileMetadata, buildNativeAndroidSignerConnectUrl, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNativeAndroidSignerPubkeyFromUrl, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
 
 describe('buildKind0ProfileMetadata', () => {
   it('updates editable Nostr profile fields while preserving unknown metadata', () => {
@@ -55,15 +55,6 @@ describe('native Android signer connect helpers', () => {
 
     expect(parsed?.pubkey).toBe(pubkey);
     expect(parsed?.cleanUrl).toBe('https://proofofheart.org/charity/onboard?x=1');
-  });
-
-  it('parses the pubkey copied by a native signer when no callback URL is provided', () => {
-    const pubkey = 'b'.repeat(64);
-
-    expect(parseNativeAndroidSignerPubkeyFromClipboard(pubkey)).toBe(pubkey);
-    expect(parseNativeAndroidSignerPubkeyFromClipboard(`  ${pubkey}  `)).toBe(pubkey);
-    expect(parseNativeAndroidSignerPubkeyFromClipboard(`nostrsigner:${pubkey}`)).toBe(pubkey);
-    expect(parseNativeAndroidSignerPubkeyFromClipboard('not-a-pubkey')).toBeNull();
   });
 });
 
