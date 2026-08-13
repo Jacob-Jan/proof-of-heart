@@ -609,7 +609,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.nip46ConnectUrl = pairing.url;
     this.nip46Pairing = true;
     this.nip46PairingError = '';
-    this.actionSignerStatus = `Pair a Nostr remote signer to ${label}. This is only for this action; you do not need to log in to Proof of Heart.`;
+    this.actionSignerStatus = `Open your signer to ${label}. This is only for this action; you do not need to log in to Proof of Heart.`;
     this.launchExternalUri(pairing.url);
 
     const signer = await this.nostr.waitForNip46Pairing(120_000);
@@ -785,7 +785,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.donationStatus = 'Preparing standard NIP-57 zap request…';
+    this.donationStatus = 'Preparing zap…';
 
     try {
       const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
@@ -799,7 +799,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         zapRequestId,
         createdAt: Date.now()
       };
-      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart will show it after it is confirmed.', () => {
         this.writePendingZapPayment(payment);
         void this.watchForZapReceipt(payment);
       }, token, true);
@@ -826,13 +826,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.nip46ConnectUrl = pairing.url;
     this.nip46Pairing = true;
     this.nip46PairingError = '';
-    this.donationStatus = 'Pair a NIP-46 remote signer. Open the signer link or scan/copy it in any signer that supports Nostr Connect.';
+    this.donationStatus = 'Open your signer and approve the connection.';
     this.launchExternalUri(pairing.url);
 
     await this.nostr.waitForNip46Pairing(120_000);
     if (!this.isCurrentDonationAttempt(token)) return;
     this.nip46Pairing = false;
-    this.donationStatus = 'Remote signer paired. Preparing standard NIP-57 zap request…';
+    this.donationStatus = 'Signer connected. Preparing zap…';
 
     const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
     if (!this.isCurrentDonationAttempt(token)) return;
@@ -845,7 +845,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       zapRequestId,
       createdAt: Date.now()
     };
-    await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+    await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart will show it after it is confirmed.', () => {
       this.writePendingZapPayment(payment);
       void this.watchForZapReceipt(payment);
     }, token, true);
@@ -1061,7 +1061,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.activeZapPaymentWatchKey = '';
 
     if (!receipt || !this.charity || this.charity.pubkey !== payment.charityPubkey) {
-      this.donationStatus = 'Payment may still be settling. The verified zap will appear after the standard NIP-57 receipt reaches relays.';
+      this.donationStatus = 'Payment may still be settling. The verified zap will appear after it reaches relays.';
       return;
     }
 
@@ -1205,7 +1205,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       handoffState: this.currentNip55HandoffState()
     });
     this.donating = true;
-    this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
+    this.donationStatus = 'Opening signer again… If it does not appear, return here and tap Open signer again.';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(this.lastAndroidSignerUrl, method);
     this.debugNip55('manual signer launch attempted', {
@@ -1215,7 +1215,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     });
     if (!launched) {
       this.donating = false;
-      this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
+      this.donationStatus = 'Could not open your signer from this browser. Tap Open signer again or try another Android browser.';
     }
   }
 
@@ -1396,10 +1396,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     const remoteSignerTimeoutMs = usingRemoteSigner && isAndroidBrowser() ? 10_000 : 60_000;
     this.donationStatus = this.nostr.hasNip07Signer()
-      ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
+      ? 'Approve the zap in your signer…'
       : isAndroidBrowser()
-        ? 'Trying your paired remote signer. If Amber is asleep, Proof of Heart will open Amber directly…'
-        : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
+        ? 'Opening your signer…'
+        : 'Approve the zap in your signer…';
     let signedZap: any;
     try {
       signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, remoteSignerTimeoutMs);
@@ -1496,7 +1496,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       zapKind: zapRequest.kind,
       tagCount: zapRequest.tags?.length || 0
     });
-    this.donationStatus = 'Opening signer to approve the standard NIP-57 zap request…';
+    this.donationStatus = 'Opening signer…';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(signerUrl);
     this.debugNip55('auto signer launch attempted', { launched, signerUrlLength: signerUrl.length });
@@ -1509,7 +1509,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.androidSignerLaunchFallbackTimer = setTimeout(() => {
       if (!this.lastAndroidSignerUrl || this.lastInvoice || !this.showDonateModal) return;
       this.donating = false;
-      this.donationStatus = 'Still waiting for Android signer. Tap Open signer to retry; this reuses the same standard NIP-57 zap request.';
+      this.donationStatus = 'Still waiting for your signer. Tap Open signer to retry.';
       this.debugNip55('signer launch fallback visible');
     }, 7_000);
   }
@@ -1915,7 +1915,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.showDonateModal = true;
     this.donating = false;
     this.lastAndroidSignerUrl = pending.signerUrl;
-    this.donationStatus = 'Returned from Android signer without a signed zap event. Tap Open signer to retry the same standard NIP-57 request.';
+    this.donationStatus = 'Returned without a completed signature. Tap Open signer to retry.';
     this.debugNip55('pending signer zap restored without callback', {
       requestId: pending.requestId || '',
       callbackUrl: pending.callbackUrl || '',
@@ -1960,7 +1960,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     if (!pending || pending.requestId !== requestId) {
       this.androidSignerResumeInFlight = false;
       this.debugNip55('pending mismatch', { callbackRequestId: requestId, pendingRequestId: pending?.requestId || '' });
-      this.toast('Android signer response did not match this zap attempt.', 'error', 4000);
+      this.toast('Signer response did not match this zap attempt.', 'error', 4000);
       return;
     }
 
@@ -1981,7 +1981,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         this.androidSignerLaunchFallbackTimer = undefined;
       }
       const token = ++this.donationAttemptToken;
-      this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
+      this.donationStatus = 'Signature received. Creating invoice…';
       this.debugNip55('requesting invoice', {
         callbackHost: this.safeHost(pending.callback),
         amountMsat: pending.amountMsat
@@ -2006,7 +2006,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         zapRequestId,
         createdAt: Date.now()
       };
-      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart counts it only after a standard NIP-57 receipt appears on relays.', () => {
+      await this.presentInvoice(invoice, 'Zap invoice ready. Pay it with your wallet; Proof of Heart will show it after it is confirmed.', () => {
         this.writePendingZapPayment(payment);
         this.debugNip55('zap receipt watch started before wallet launch', {
           donorPubkey: donorPubkey ? `${donorPubkey.slice(0, 8)}…` : '',

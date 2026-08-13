@@ -36,20 +36,79 @@ export class CharityOnboardComponent {
 
     if (this.loading) return;
     this.loading = true;
-    this.status = 'Connecting to your Nostr signer… approve Proof of Heart if your signer asks.';
+    this.status = 'Connecting…';
     try {
-      const { pubkey, npub } = await this.nostr.connectSigner();
-      this.status = 'Signer connected. Publishing or verifying the charity profile on relays…';
+      const { pubkey, npub } = await this.connectForCharityOnboarding();
+      this.status = 'Finalizing…';
       this.nostr.markLocalOnboarding(pubkey);
       await this.nostr.ensureCharityProfile(pubkey);
-      this.status = 'Profile ready. Opening your public charity profile…';
-      this.toast('Connected. Opening your public charity profile…', 'success', 2600);
+      this.status = 'Profile ready. Opening your charity profile…';
+      this.toast('Connected. Opening your charity profile…', 'success', 2600);
       await this.router.navigate(['/charities', npub]);
     } catch (e: any) {
-      this.status = e?.message || 'Failed to connect Nostr signer.';
-      this.toast(e?.message || 'Failed to connect Nostr signer', 'error', 4000);
+      const message = this.friendlyConnectError(e);
+      this.status = message;
+      this.toast(message, 'error', 4000);
     } finally {
       this.loading = false;
     }
+  }
+
+  private async connectForCharityOnboarding(): Promise<{ pubkey: string; npub: string }> {
+    try {
+      return await this.nostr.connectSigner();
+    } catch (e: any) {
+      if (!this.isAndroidBrowser() || !this.isMissingSignerError(e)) throw e;
+      return this.connectWithAndroidSigningApp();
+    }
+  }
+
+  private async connectWithAndroidSigningApp(): Promise<{ pubkey: string; npub: string }> {
+    const pairing = this.nostr.startNip46Pairing();
+    this.status = 'Opening signer…';
+    if (!this.launchExternalUri(pairing.url)) {
+      throw new Error('Could not open your signer. Please try again.');
+    }
+    this.status = 'Waiting for approval…';
+    return this.nostr.waitForNip46Pairing();
+  }
+
+  private isAndroidBrowser(): boolean {
+    return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+  }
+
+  private isMissingSignerError(error: any): boolean {
+    const message = String(error?.message || error || '').toLowerCase();
+    return message.includes('no nostr signer') || message.includes('no signer');
+  }
+
+  private launchExternalUri(uri: string): boolean {
+    try {
+      window.location.href = uri;
+      return true;
+    } catch {
+      try {
+        const link = document.createElement('a');
+        link.href = uri;
+        link.target = '_self';
+        link.rel = 'noopener';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        window.setTimeout(() => link.remove(), 1_000);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  private friendlyConnectError(error: any): string {
+    if (this.isMissingSignerError(error)) {
+      return this.isAndroidBrowser()
+        ? 'Could not open your signer. Please try again.'
+        : 'No signer found. Please install or pair a Nostr signer.';
+    }
+    return error?.message || 'Could not connect signer. Please try again.';
   }
 }
