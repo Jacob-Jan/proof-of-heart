@@ -121,11 +121,16 @@ export class ProfileEditorComponent implements OnInit {
         existing || cached?.fields || null,
         relayHasKind0 ? relayKind0 : (cached?.kind0 || {})
       );
-      this.profileFreshForSave = !cached || (!!existing && relayHasKind0);
+      // Cached values are only a visual bootstrap. To avoid overwriting newer app-profile
+      // changes from elsewhere, require the Proof-of-Heart charity event to be confirmed
+      // from relays before saving when cache existed. Do not require a kind:0 hit here:
+      // new or under-indexed Nostr accounts may not have a discoverable Primal/NIP-65
+      // relay footprint yet, and saving kind:0 already merges the latest metadata we found.
+      this.profileFreshForSave = !cached || !!existing;
       loadedCacheOnly = !this.profileFreshForSave;
       this.loadStatus = this.profileFreshForSave
         ? ''
-        : 'Showing cached profile details only. Refresh from relays before saving to avoid overwriting newer changes.';
+        : 'Showing cached charity details only. Refresh from app relays before saving to avoid overwriting newer changes.';
     } catch {
       if (loadedCacheOnly) {
         this.needsSignerForLoad = false;
