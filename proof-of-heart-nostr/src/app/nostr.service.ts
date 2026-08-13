@@ -95,12 +95,8 @@ export interface CharityFeedStatus {
   text: string;
 }
 
-export function buildNativeAndroidSignerConnectUrl(callbackPageUrl: string): string {
-  const callback = new URL(callbackPageUrl);
-  callback.search = '';
-  callback.hash = '';
-  callback.searchParams.set('pohSignerConnect', '');
-  return `nostrsigner:?type=get_public_key&callbackUrl=${encodeURIComponent(callback.toString())}`;
+export function buildNativeAndroidSignerConnectUrl(_callbackPageUrl?: string): string {
+  return 'nostrsigner:?type=get_public_key';
 }
 
 export function parseNativeAndroidSignerPubkeyFromUrl(href: string): { pubkey: string; cleanUrl: string } | null {
