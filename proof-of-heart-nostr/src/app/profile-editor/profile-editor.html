@@ -76,38 +76,8 @@
         </p>
 
         <label>Description</label>
-        <p class="field-hint">Shown on the charity page. Use the simple editor, or switch to plain text.</p>
-        <div class="description-mode-toggle" role="group" aria-label="Description editor mode">
-          <button type="button" [class.active]="descriptionMode === 'rich'" (click)="setDescriptionMode('rich')">Simple editor</button>
-          <button type="button" [class.active]="descriptionMode === 'text'" (click)="setDescriptionMode('text')">Plain text</button>
-        </div>
-
-        @if (descriptionMode === 'rich') {
-          <div class="description-editor-shell">
-            <div class="description-toolbar" aria-label="Description formatting">
-              <button type="button" title="Bold" (click)="formatDescription('bold')"><strong>B</strong></button>
-              <button type="button" title="Italic" (click)="formatDescription('italic')"><em>I</em></button>
-              <button type="button" title="Heading" (click)="formatDescription('formatBlock', 'h3')">Heading</button>
-              <button type="button" title="Paragraph" (click)="formatDescription('formatBlock', 'p')">Text</button>
-              <button type="button" title="Bullet list" (click)="formatDescription('insertUnorderedList')">• List</button>
-              <button type="button" title="Numbered list" (click)="formatDescription('insertOrderedList')">1. List</button>
-              <button type="button" title="Link" (click)="addDescriptionLink()">Link</button>
-              <button type="button" title="Clear formatting" (click)="formatDescription('removeFormat')">Clear</button>
-            </div>
-            <div
-              #descriptionEditor
-              class="rich-description-editor"
-              contenteditable="true"
-              role="textbox"
-              aria-multiline="true"
-              data-placeholder="Tell donors what the charity does, who it helps, and why donations matter."
-              [innerHTML]="descriptionEditorHtml"
-              (input)="onDescriptionEditorInput($event)"
-              (blur)="onDescriptionEditorInput($event)"></div>
-          </div>
-        } @else {
-          <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Describe the charity for its profile page"></textarea>
-        }
+        <p class="field-hint">Shown on the charity page.</p>
+        <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Describe the charity for its profile page"></textarea>
 
         <label>Country</label>
         <select [(ngModel)]="model.country" name="country">
