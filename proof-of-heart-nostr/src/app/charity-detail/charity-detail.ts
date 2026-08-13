@@ -785,7 +785,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.donationStatus = 'Preparing standard NIP-57 zap request…';
+    this.donationStatus = 'Connecting…';
 
     try {
       const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
@@ -826,13 +826,13 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.nip46ConnectUrl = pairing.url;
     this.nip46Pairing = true;
     this.nip46PairingError = '';
-    this.donationStatus = 'Pair a NIP-46 remote signer. Open the signer link or scan/copy it in any signer that supports Nostr Connect.';
+    this.donationStatus = 'Connecting…';
     this.launchExternalUri(pairing.url);
 
     await this.nostr.waitForNip46Pairing(120_000);
     if (!this.isCurrentDonationAttempt(token)) return;
     this.nip46Pairing = false;
-    this.donationStatus = 'Remote signer paired. Preparing standard NIP-57 zap request…';
+    this.donationStatus = 'Finalizing…';
 
     const { invoice, donorPubkey, zapRequestId } = await this.createNip57ZapInvoice(lightningAddress, sats);
     if (!this.isCurrentDonationAttempt(token)) return;
@@ -1205,7 +1205,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       handoffState: this.currentNip55HandoffState()
     });
     this.donating = true;
-    this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
+    this.donationStatus = 'Opening signer…';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(this.lastAndroidSignerUrl, method);
     this.debugNip55('manual signer launch attempted', {
@@ -1215,7 +1215,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     });
     if (!launched) {
       this.donating = false;
-      this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
+      this.donationStatus = 'Could not open signer. Please try again.';
     }
   }
 
@@ -1261,7 +1261,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       try {
         // Android browsers are more reliable when custom signer schemes are assigned
         // directly from the tap handler. A synthetic hidden-anchor click can return
-        // without actually foregrounding Amber.
+        // without actually foregrounding a signing app.
         window.location.href = uri;
         return true;
       } catch {
@@ -1396,10 +1396,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
     const remoteSignerTimeoutMs = usingRemoteSigner && isAndroidBrowser() ? 10_000 : 60_000;
     this.donationStatus = this.nostr.hasNip07Signer()
-      ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
-      : isAndroidBrowser()
-        ? 'Trying your paired remote signer. If Amber is asleep, Proof of Heart will open Amber directly…'
-        : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
+      ? 'Approve in your signer…'
+      : 'Connecting…';
     let signedZap: any;
     try {
       signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, remoteSignerTimeoutMs);
@@ -1496,7 +1494,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       zapKind: zapRequest.kind,
       tagCount: zapRequest.tags?.length || 0
     });
-    this.donationStatus = 'Opening signer to approve the standard NIP-57 zap request…';
+    this.donationStatus = 'Opening signer…';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(signerUrl);
     this.debugNip55('auto signer launch attempted', { launched, signerUrlLength: signerUrl.length });
@@ -1509,7 +1507,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.androidSignerLaunchFallbackTimer = setTimeout(() => {
       if (!this.lastAndroidSignerUrl || this.lastInvoice || !this.showDonateModal) return;
       this.donating = false;
-      this.donationStatus = 'Still waiting for Android signer. Tap Open signer to retry; this reuses the same standard NIP-57 zap request.';
+      this.donationStatus = 'Still waiting for signer. Tap Open signer to try again.';
       this.debugNip55('signer launch fallback visible');
     }, 7_000);
   }
@@ -1694,7 +1692,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private cleanCharityIdParam(idParam: string): string {
-    // Amber can reopen Edge as /charities/<64hex><encoded-signed-event-json> when it
+    // Some signers can reopen a browser as /charities/<64hex><encoded-signed-event-json> when they
     // appends the signed event directly to a query-stripped callbackUrl. Keep the route
     // resolvable by treating the first 64 hex chars as the actual charity pubkey.
     const hexMatch = idParam.match(/^([0-9a-f]{64})(?:\{|%7B|%7b).*/);
@@ -1915,7 +1913,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.showDonateModal = true;
     this.donating = false;
     this.lastAndroidSignerUrl = pending.signerUrl;
-    this.donationStatus = 'Returned from Android signer without a signed zap event. Tap Open signer to retry the same standard NIP-57 request.';
+    this.donationStatus = 'Signer returned without a signed request. Tap Open signer to try again.';
     this.debugNip55('pending signer zap restored without callback', {
       requestId: pending.requestId || '',
       callbackUrl: pending.callbackUrl || '',
@@ -1981,7 +1979,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         this.androidSignerLaunchFallbackTimer = undefined;
       }
       const token = ++this.donationAttemptToken;
-      this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
+      this.donationStatus = 'Finalizing…';
       this.debugNip55('requesting invoice', {
         callbackHost: this.safeHost(pending.callback),
         amountMsat: pending.amountMsat
