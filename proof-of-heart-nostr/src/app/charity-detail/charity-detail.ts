@@ -29,12 +29,6 @@ interface PendingZapPayment {
   createdAt: number;
 }
 
-interface AndroidSignerZapCallback {
-  requestId: string;
-  signedZapRaw: string;
-  pending?: any;
-}
-
 function encodeLnurl(url: string): string {
   return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), false).toUpperCase();
 }
@@ -1484,8 +1478,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       since,
       createdAt: Date.now()
     };
-    const state = this.encodeAndroidSignerZapState(pendingZap);
-    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)};androidSignerZap=${encodeURIComponent(state)}:`;
+    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -1517,30 +1510,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     this.donationStatus = 'Opening signer…';
     const launched = this.launchExternalUri(signerUrl);
     this.debugNip55('auto signer launch attempted', { launched, signerUrlLength: signerUrl.length });
-  }
-
-  private encodeAndroidSignerZapState(pending: any): string {
-    const json = JSON.stringify({
-      requestId: pending.requestId,
-      callback: pending.callback,
-      amountMsat: pending.amountMsat,
-      sats: pending.sats,
-      since: pending.since,
-      createdAt: pending.createdAt
-    });
-    return btoa(unescape(encodeURIComponent(json)));
-  }
-
-  private decodeAndroidSignerZapState(state: string): any | null {
-    try {
-      return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(state)))));
-    } catch {
-      try {
-        return JSON.parse(decodeURIComponent(escape(atob(state))));
-      } catch {
-        return null;
-      }
-    }
   }
 
   private armAndroidSignerLaunchFallback(): void {
@@ -1773,7 +1742,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return { requestId: pending.requestId, signedZapRaw };
   }
 
-  private readPackedAndroidSignerZapCallbackFromPath(pathname: string): AndroidSignerZapCallback | null {
+  private readPackedAndroidSignerZapCallbackFromPath(pathname: string): { requestId: string; signedZapRaw: string } | null {
     const marker = ';androidSignerZap=';
     const markerIndex = pathname.indexOf(marker);
     if (markerIndex < 0) return null;
@@ -1786,31 +1755,23 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
 
     try {
-      const rawIdOrState = decodeURIComponent(packed.slice(0, separator));
-      const pending = this.decodeAndroidSignerZapState(rawIdOrState);
       const parsed = {
-        requestId: pending?.requestId || rawIdOrState,
-        signedZapRaw: decodeURIComponent(packed.slice(separator + 1)),
-        pending: pending || undefined
+        requestId: decodeURIComponent(packed.slice(0, separator)),
+        signedZapRaw: decodeURIComponent(packed.slice(separator + 1))
       };
       this.debugNip55('path callback parsed', {
         requestId: parsed.requestId,
-        signedZapLength: parsed.signedZapRaw.length,
-        stateEmbedded: !!pending
+        signedZapLength: parsed.signedZapRaw.length
       });
       return parsed;
     } catch {
-      const rawIdOrState = packed.slice(0, separator);
-      const pending = this.decodeAndroidSignerZapState(rawIdOrState);
       const fallback = {
-        requestId: pending?.requestId || rawIdOrState,
-        signedZapRaw: packed.slice(separator + 1),
-        pending: pending || undefined
+        requestId: packed.slice(0, separator),
+        signedZapRaw: packed.slice(separator + 1)
       };
       this.debugNip55('path callback parsed without decoding', {
         requestId: fallback.requestId,
-        signedZapLength: fallback.signedZapRaw.length,
-        stateEmbedded: !!pending
+        signedZapLength: fallback.signedZapRaw.length
       });
       return fallback;
     }
@@ -1821,7 +1782,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
   }
 
-  private readAndroidSignerZapCallback(): AndroidSignerZapCallback | null {
+  private readAndroidSignerZapCallback(): { requestId: string; signedZapRaw: string } | null {
     const url = new URL(window.location.href);
     const directPathCallback = this.readDirectAppendedAndroidSignerZapCallback(url.pathname);
     if (directPathCallback) return directPathCallback;
@@ -1998,7 +1959,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     cleanUrl.hash = '';
     window.history.replaceState({}, '', cleanUrl.toString());
 
-    const pending = signerCallback.pending || this.takePendingAndroidSignerZap();
+    const pending = this.takePendingAndroidSignerZap();
     this.debugNip55('pending zap loaded', {
       exists: !!pending,
       pendingRequestId: pending?.requestId || '',

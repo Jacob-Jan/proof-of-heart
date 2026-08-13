@@ -60,7 +60,7 @@ describe('CharityDetailComponent Android zap flow', () => {
     expect(component.createNip57ZapInvoice).not.toHaveBeenCalled();
   });
 
-  it('can recover a signed Android zap callback from URL state without pending local storage', async () => {
+  it('uses a clean Amber callback prefix and recovers the directly appended signed event', async () => {
     const component: any = Object.create(CharityDetailComponent.prototype);
     const pending = {
       requestId: 'req-1',
@@ -70,13 +70,13 @@ describe('CharityDetailComponent Android zap flow', () => {
       since: 123456,
       createdAt: 123456000
     };
-    const state = component.encodeAndroidSignerZapState(pending);
     const signedZap = encodeURIComponent(JSON.stringify({ kind: 9734, id: 'zap-id', pubkey: 'donor-pubkey', sig: 'sig' }));
-    history.replaceState({}, '', `/charities/${'a'.repeat(64)};androidSignerZap=${encodeURIComponent(state)}:${signedZap}`);
+    history.replaceState({}, '', `/charities/${'a'.repeat(64)}${signedZap}`);
     component.nip55DebugMode = false;
     component.debugNip55 = () => undefined;
     component.currentNip55HandoffState = () => ({});
-    component.takePendingAndroidSignerZap = () => undefined;
+    component.peekPendingAndroidSignerZap = () => pending;
+    component.takePendingAndroidSignerZap = () => pending;
     component.toast = jasmine.createSpy('toast');
     component.charity = { pubkey: 'a'.repeat(64) };
     component.showDonateModal = true;
