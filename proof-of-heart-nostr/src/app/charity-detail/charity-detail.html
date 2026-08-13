@@ -144,7 +144,7 @@
                 {{ donating && donationFlow === 'zap' ? 'Creating zap…' : 'Zap with Nostr' }}
               </button>
             </div>
-            <p class="donation-help">Lightning donations are plain invoices. Nostr zaps use standard NIP-57: sign a zap request, pay the invoice, then Proof of Heart counts only the verified receipt published by the recipient.</p>
+            <p class="donation-help">Lightning donations are plain invoices. Nostr zaps let your signer approve the zap before you pay.</p>
             <!-- donation status is shown inside the donation dialog -->
             <!-- invoice actions moved into donation dialog -->
           </div>
@@ -396,7 +396,7 @@
           </div>
         } @else if (nip46ConnectUrl) {
           <div class="qr-actions">
-            <button type="button" (click)="openNip46Signer()">Open remote signer</button>
+            <button type="button" (click)="openNip46Signer()">Open signer</button>
           </div>
           @if (nip46PairingError) {
             <p class="qr-help">{{ nip46PairingError }}</p>
