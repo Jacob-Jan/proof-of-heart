@@ -95,6 +95,32 @@ export interface CharityFeedStatus {
   text: string;
 }
 
+export function buildNativeAndroidSignerConnectUrl(callbackPageUrl: string): string {
+  const callback = new URL(callbackPageUrl);
+  callback.search = '';
+  callback.hash = '';
+  callback.searchParams.set('pohSignerConnect', '');
+  return `nostrsigner:?type=get_public_key&callbackUrl=${encodeURIComponent(callback.toString())}`;
+}
+
+export function parseNativeAndroidSignerPubkeyFromUrl(href: string): { pubkey: string; cleanUrl: string } | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+
+  const raw = url.searchParams.get('pohSignerConnect');
+  if (!raw) return null;
+  const pubkey = decodeURIComponent(raw).trim();
+  if (!/^[0-9a-f]{64}$/i.test(pubkey)) return null;
+
+  url.searchParams.delete('pohSignerConnect');
+  const cleanUrl = `${url.origin}${url.pathname}${url.search}${url.hash}`;
+  return { pubkey: pubkey.toLowerCase(), cleanUrl };
+}
+
 export function ensureEventPubkeyForNip07(event: any, getPublicKey: () => Promise<string>): Promise<any> {
   if (event?.pubkey) return Promise.resolve(event);
   return getPublicKey().then((pubkey) => ({ ...event, pubkey }));
@@ -858,6 +884,111 @@ export class NostrService {
     }
 
     throw new Error('No Nostr signer found. Use a browser extension or pair a NIP-46 remote signer.');
+  }
+
+  async connectNativeAndroidSigner(timeoutMs = 45_000): Promise<{ pubkey: string; npub: string }> {
+    if (typeof window === 'undefined') throw new Error('No signer found.');
+
+    const existing = parseNativeAndroidSignerPubkeyFromUrl(window.location.href);
+    if (existing) return this.rememberConnectedPubkey(existing.pubkey, existing.cleanUrl);
+
+    const signerUrl = buildNativeAndroidSignerConnectUrl(window.location.href);
+    this.launchExternalUri(signerUrl);
+    return this.waitForNativeAndroidSignerPubkey(timeoutMs);
+  }
+
+  consumeNativeAndroidSignerCallback(): { pubkey: string; npub: string } | null {
+    if (typeof window === 'undefined') return null;
+    const parsed = parseNativeAndroidSignerPubkeyFromUrl(window.location.href);
+    if (!parsed) return null;
+    return this.rememberConnectedPubkey(parsed.pubkey, parsed.cleanUrl);
+  }
+
+  private waitForNativeAndroidSignerPubkey(timeoutMs: number): Promise<{ pubkey: string; npub: string }> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const startedAt = Date.now();
+      let pollTimer: ReturnType<typeof setTimeout> | undefined;
+      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const finish = (result: { pubkey: string; npub: string } | null, error?: Error) => {
+        if (settled) return;
+        if (!result && !error) return;
+        settled = true;
+        window.removeEventListener('focus', check);
+        window.removeEventListener('pageshow', check);
+        window.removeEventListener('visibilitychange', check);
+        window.removeEventListener('popstate', check);
+        window.removeEventListener('hashchange', check);
+        if (pollTimer) clearTimeout(pollTimer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        if (result) resolve(result);
+        else reject(error || new Error('Could not connect signer.'));
+      };
+
+      const poll = () => {
+        if (settled) return;
+        check();
+        if (!settled && Date.now() - startedAt < timeoutMs) pollTimer = setTimeout(poll, 500);
+      };
+
+      const tryInjectedSigner = async () => {
+        if (!window.nostr) return;
+        try {
+          const pubkey = await this.withTimeout(window.nostr.getPublicKey(), Math.min(10_000, timeoutMs), 'Signer response');
+          finish(this.rememberConnectedPubkey(pubkey));
+        } catch {
+          // Keep waiting for the callback URL while the timeout is active.
+        }
+      };
+
+      const check = () => {
+        const parsed = parseNativeAndroidSignerPubkeyFromUrl(window.location.href);
+        if (parsed) {
+          finish(this.rememberConnectedPubkey(parsed.pubkey, parsed.cleanUrl));
+          return;
+        }
+        void tryInjectedSigner();
+      };
+
+      window.addEventListener('focus', check);
+      window.addEventListener('pageshow', check);
+      window.addEventListener('visibilitychange', check);
+      window.addEventListener('popstate', check);
+      window.addEventListener('hashchange', check);
+      timeoutTimer = setTimeout(() => finish(null, new Error('Could not connect signer.')), timeoutMs);
+      poll();
+    });
+  }
+
+  private rememberConnectedPubkey(pubkey: string, cleanUrl?: string): { pubkey: string; npub: string } {
+    const normalizedPubkey = pubkey.toLowerCase();
+    window.localStorage.setItem(LAST_PUBKEY_KEY, normalizedPubkey);
+    if (cleanUrl && window.location.href !== cleanUrl) {
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+    }
+    return { pubkey: normalizedPubkey, npub: nip19.npubEncode(normalizedPubkey) };
+  }
+
+  private launchExternalUri(uri: string): boolean {
+    try {
+      const link = document.createElement('a');
+      link.href = uri;
+      link.target = '_self';
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      window.setTimeout(() => link.remove(), 1_000);
+      return true;
+    } catch {
+      try {
+        window.location.href = uri;
+        return true;
+      } catch {
+        return false;
+      }
+    }
   }
 
   async loadKind0Profile(pubkey: string): Promise<Record<string, any>> {
