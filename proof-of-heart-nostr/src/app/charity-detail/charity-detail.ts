@@ -1478,7 +1478,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       since,
       createdAt: Date.now()
     };
-    const callbackUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+    const callbackBaseUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
+    const callbackUrl = `${callbackBaseUrl}?androidSignerZap=${encodeURIComponent(`${requestId}:`)}`;
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
