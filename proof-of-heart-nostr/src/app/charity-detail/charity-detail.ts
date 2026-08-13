@@ -690,22 +690,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
 
-    if (!window.nostr && isAndroidBrowser()) {
-      this.nostr.clearNip46Session();
-      this.nip46ConnectUrl = '';
-      this.nip46Pairing = false;
-      this.nip46PairingError = '';
-      try {
-        await this.startAndroidSignerZap(lightningAddress, sats, since);
-        return;
-      } catch (androidErr: any) {
-        if (!this.isCurrentDonationAttempt(token)) return;
-        this.donationStatus = this.donationErrorMessage(androidErr);
-        this.donating = false;
-        return;
-      }
-    }
-
     if (!window.nostr && !this.nostr.hasNip46Session()) {
       try {
         await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
@@ -1155,7 +1139,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       handoffState: this.currentNip55HandoffState()
     });
     this.donating = true;
-    this.donationStatus = 'Opening signer again… If no signer appears, return here and tap Open signer again.';
+    this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(this.lastAndroidSignerUrl, method);
     this.debugNip55('manual signer launch attempted', {
@@ -1165,7 +1149,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     });
     if (!launched) {
       this.donating = false;
-      this.donationStatus = 'Could not trigger a signer from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
+      this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
     }
   }
 
@@ -1211,7 +1195,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       try {
         // Android browsers are more reliable when custom signer schemes are assigned
         // directly from the tap handler. A synthetic hidden-anchor click can return
-        // without actually foregrounding the selected signer.
+        // without actually foregrounding Amber.
         window.location.href = uri;
         return true;
       } catch {
@@ -1347,7 +1331,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const remoteSignerTimeoutMs = usingRemoteSigner && isAndroidBrowser() ? 10_000 : 60_000;
     this.donationStatus = this.nostr.hasNip07Signer()
       ? 'Approve the standard NIP-57 zap request in your Nostr signer…'
-      : 'Approve the standard NIP-57 zap request in your remote signer…';
+      : isAndroidBrowser()
+        ? 'Trying your paired remote signer. If Amber is asleep, Proof of Heart will open Amber directly…'
+        : 'Approve the standard NIP-57 zap request in your NIP-46 remote signer…';
     let signedZap: any;
     try {
       signedZap = await this.nostr.signEventWithAvailableSigner(zapRequest, remoteSignerTimeoutMs);
@@ -1642,8 +1628,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private cleanCharityIdParam(idParam: string): string {
-    // Some Android signers can reopen Edge as /charities/<64hex><encoded-signed-event-json> when they
-    // append the signed event directly to a query-stripped callbackUrl. Keep the route
+    // Amber can reopen Edge as /charities/<64hex><encoded-signed-event-json> when it
+    // appends the signed event directly to a query-stripped callbackUrl. Keep the route
     // resolvable by treating the first 64 hex chars as the actual charity pubkey.
     const hexMatch = idParam.match(/^([0-9a-f]{64})(?:\{|%7B|%7b).*/);
     return hexMatch ? hexMatch[1] : idParam;
@@ -1929,7 +1915,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         this.androidSignerLaunchFallbackTimer = undefined;
       }
       const token = ++this.donationAttemptToken;
-      this.donationStatus = 'Signed zap request received from signer. Creating invoice…';
+      this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
       this.debugNip55('requesting invoice', {
         callbackHost: this.safeHost(pending.callback),
         amountMsat: pending.amountMsat
