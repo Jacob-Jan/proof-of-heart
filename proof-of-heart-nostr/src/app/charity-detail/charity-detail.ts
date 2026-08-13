@@ -420,6 +420,72 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return normalizeCharityWebsiteHref(website);
   }
 
+  charityDescriptionHtml(): string {
+    const description = this.charity?.charity?.description || '';
+    if (!description.trim()) return '<p>No charity description yet.</p>';
+    return this.looksLikeHtml(description)
+      ? this.sanitizeDescriptionHtml(description)
+      : this.plainTextToHtml(description);
+  }
+
+  private looksLikeHtml(value: string): boolean {
+    return /<\/?(p|br|strong|b|em|i|ul|ol|li|h2|h3|blockquote|a)\b/i.test(value || '');
+  }
+
+  private plainTextToHtml(value: string): string {
+    const escaped = this.escapeHtml(value.trim());
+    if (!escaped) return '';
+    return escaped
+      .split(/\n{2,}/)
+      .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  }
+
+  private sanitizeDescriptionHtml(value: string): string {
+    const allowedTags = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'H2', 'H3', 'BLOCKQUOTE', 'A']);
+    const doc = new DOMParser().parseFromString(value || '', 'text/html');
+    doc.body.querySelectorAll('*').forEach((el) => {
+      if (!allowedTags.has(el.tagName)) {
+        el.replaceWith(...Array.from(el.childNodes));
+        return;
+      }
+      const originalHref = el.getAttribute('href') || '';
+      Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
+      if (el.tagName === 'A') {
+        const href = this.safeDescriptionUrl(originalHref);
+        if (href) {
+          el.setAttribute('href', href);
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noopener noreferrer');
+        } else {
+          el.replaceWith(...Array.from(el.childNodes));
+        }
+      }
+    });
+    return doc.body.innerHTML.trim();
+  }
+
+  private safeDescriptionUrl(value: string): string {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return '';
+    const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const parsed = new URL(candidate);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
+    } catch {
+      return '';
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   openRateDialog() {
     this.rating = this.userRating || 5;
     this.ratingHover = 0;

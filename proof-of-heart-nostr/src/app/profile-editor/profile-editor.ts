@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -69,6 +69,9 @@ export class ProfileEditorComponent implements OnInit {
   ownNpub: string | null = null;
   readonly categories = CHARITY_CATEGORIES;
   readonly countries = COUNTRIES;
+  @ViewChild('descriptionEditor') descriptionEditor?: ElementRef<HTMLElement>;
+  descriptionMode: 'rich' | 'text' = 'rich';
+  descriptionEditorHtml = '';
 
   async ngOnInit() {
     const hasSigner = await this.nostr.hasSigner();
@@ -168,6 +171,146 @@ export class ProfileEditorComponent implements OnInit {
 
     if (!this.model.description) this.model.description = '';
     if (this.model.isVisible === undefined) this.model.isVisible = true;
+    this.syncDescriptionEditorFromModel();
+  }
+
+  private syncDescriptionEditorFromModel() {
+    const description = this.model.description || '';
+    this.descriptionMode = this.looksLikeHtml(description) ? 'rich' : this.descriptionMode;
+    this.descriptionEditorHtml = this.descriptionMode === 'rich'
+      ? this.descriptionToEditorHtml(description)
+      : '';
+  }
+
+  setDescriptionMode(mode: 'rich' | 'text') {
+    if (this.descriptionMode === mode) return;
+    if (mode === 'text') {
+      this.model.description = this.descriptionAsPlainText(this.model.description || '');
+      this.descriptionEditorHtml = '';
+    } else {
+      this.model.description = this.plainTextToHtml(this.model.description || '');
+      this.descriptionEditorHtml = this.model.description || '';
+      setTimeout(() => this.focusDescriptionEditor(), 0);
+    }
+    this.descriptionMode = mode;
+  }
+
+  onDescriptionEditorInput(event: Event) {
+    const editor = event.target as HTMLElement;
+    const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
+    this.model.description = this.emptyHtmlToBlank(html);
+  }
+
+  formatDescription(command: 'bold' | 'italic' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock' | 'removeFormat', value?: string) {
+    if (this.descriptionMode !== 'rich') return;
+    this.focusDescriptionEditor();
+    document.execCommand(command, false, value);
+    const editor = this.descriptionEditor?.nativeElement;
+    if (editor) {
+      const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
+      editor.innerHTML = html;
+      this.descriptionEditorHtml = html;
+      this.model.description = this.emptyHtmlToBlank(html);
+    }
+  }
+
+  addDescriptionLink() {
+    if (this.descriptionMode !== 'rich') return;
+    this.focusDescriptionEditor();
+    const url = window.prompt('Paste a link URL');
+    if (!url) return;
+    const safeUrl = this.safeUrl(url);
+    if (!safeUrl) {
+      this.toast('Use an http or https link.', 'error', 3500);
+      return;
+    }
+    document.execCommand('createLink', false, safeUrl);
+    const editor = this.descriptionEditor?.nativeElement;
+    if (editor) {
+      const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
+      editor.innerHTML = html;
+      this.descriptionEditorHtml = html;
+      this.model.description = this.emptyHtmlToBlank(html);
+    }
+  }
+
+  private focusDescriptionEditor() {
+    this.descriptionEditor?.nativeElement.focus();
+  }
+
+  private looksLikeHtml(value: string): boolean {
+    return /<\/?(p|br|strong|b|em|i|ul|ol|li|h2|h3|blockquote|a)\b/i.test(value || '');
+  }
+
+  private descriptionToEditorHtml(value: string): string {
+    if (!value) return '';
+    return this.looksLikeHtml(value) ? this.sanitizeDescriptionHtml(value) : this.plainTextToHtml(value);
+  }
+
+  private plainTextToHtml(value: string): string {
+    const escaped = this.escapeHtml(value.trim());
+    if (!escaped) return '';
+    return escaped
+      .split(/\n{2,}/)
+      .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  }
+
+  private descriptionAsPlainText(value: string): string {
+    if (!this.looksLikeHtml(value)) return value;
+    const doc = new DOMParser().parseFromString(value, 'text/html');
+    doc.querySelectorAll('p, h2, h3, blockquote, li').forEach((el) => el.append('\n'));
+    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  private sanitizeDescriptionHtml(value: string): string {
+    const allowedTags = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'H2', 'H3', 'BLOCKQUOTE', 'A']);
+    const doc = new DOMParser().parseFromString(value || '', 'text/html');
+    doc.body.querySelectorAll('*').forEach((el) => {
+      if (!allowedTags.has(el.tagName)) {
+        el.replaceWith(...Array.from(el.childNodes));
+        return;
+      }
+      const originalHref = el.getAttribute('href') || '';
+      Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
+      if (el.tagName === 'A') {
+        const href = this.safeUrl(originalHref);
+        if (href) {
+          el.setAttribute('href', href);
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noopener noreferrer');
+        } else {
+          el.replaceWith(...Array.from(el.childNodes));
+        }
+      }
+    });
+    return this.emptyHtmlToBlank(doc.body.innerHTML);
+  }
+
+  private emptyHtmlToBlank(value: string): string {
+    const normalized = (value || '').replace(/<p><br><\/p>/gi, '').replace(/&nbsp;/gi, ' ').trim();
+    return normalized && normalized !== '<br>' ? normalized : '';
+  }
+
+  private safeUrl(value: string): string {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return '';
+    const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const parsed = new URL(candidate);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
+    } catch {
+      return '';
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   async uploadLogo(event: Event) {
@@ -205,6 +348,11 @@ export class ProfileEditorComponent implements OnInit {
     this.saveStatus = 'Preparing profile changes…';
 
     try {
+      if (this.descriptionMode === 'rich') {
+        const editorHtml = this.descriptionEditor?.nativeElement.innerHTML || this.descriptionEditorHtml || '';
+        this.model.description = this.emptyHtmlToBlank(this.sanitizeDescriptionHtml(editorHtml));
+      }
+
       const kind0Payload: Kind0ProfileEdits = {
         name: this.kind0Name,
         about: this.kind0About,
