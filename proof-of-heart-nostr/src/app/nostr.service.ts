@@ -857,7 +857,7 @@ export class NostrService {
       return { pubkey: session.userPubkey, npub: nip19.npubEncode(session.userPubkey) };
     }
 
-    throw new Error('No signer found.');
+    throw new Error('No Nostr signer found. Use a browser extension or pair a NIP-46 remote signer.');
   }
 
   async loadKind0Profile(pubkey: string): Promise<Record<string, any>> {

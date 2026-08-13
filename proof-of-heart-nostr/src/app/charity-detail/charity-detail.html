@@ -102,7 +102,9 @@
 <div class="middle">
       <div class="left">
         <h3>More about {{ charity.name }}</h3>
-        <div class="description" [innerHTML]="charityDescriptionHtml()"></div>
+        <div class="description">
+          {{ charity.charity.description || 'No charity description yet.' }}
+        </div>
 
         <div class="meta-block">
           <p><strong>Nostr profile:</strong> <span [title]="nostrProfileUri">{{ nostrProfileUriShort }}</span></p>
@@ -144,7 +146,7 @@
                 {{ donating && donationFlow === 'zap' ? 'Creating zap…' : 'Zap with Nostr' }}
               </button>
             </div>
-            <p class="donation-help">Lightning donations are plain invoices. Nostr zaps let your signer approve the zap before you pay.</p>
+            <p class="donation-help">Lightning donations are plain invoices. Nostr zaps use standard NIP-57: sign a zap request, pay the invoice, then Proof of Heart counts only the verified receipt published by the recipient.</p>
             <!-- donation status is shown inside the donation dialog -->
             <!-- invoice actions moved into donation dialog -->
           </div>
@@ -173,7 +175,7 @@
                 }
               </ul>
             } @else {
-              <p class="empty-zaps">No verified zap receipts found yet.</p>
+              <p class="empty-zaps">No verified NIP-57 zap receipts found yet.</p>
             }
           </div>
 
@@ -367,7 +369,7 @@
               <i class="fa-solid fa-circle-check"></i>
             </div>
             <strong>Zap received</strong>
-            <p>Verified zap receipt found. Thank you for supporting {{ charity.name || 'this charity' }}.</p>
+            <p>Verified NIP-57 receipt found on relays. Thank you for supporting {{ charity.name || 'this charity' }}.</p>
           </div>
         }
 
@@ -396,16 +398,19 @@
           </div>
         } @else if (nip46ConnectUrl) {
           <div class="qr-actions">
-            <button type="button" (click)="openNip46Signer()">Open signer</button>
+            <button type="button" (click)="openNip46Signer()">Open remote signer</button>
           </div>
           @if (nip46PairingError) {
             <p class="qr-help">{{ nip46PairingError }}</p>
           }
-        } @else if (nip55DebugMode && lastAndroidSignerUrl) {
+        } @else if (lastAndroidSignerUrl) {
           <div class="qr-actions">
             <button type="button" (click)="openAndroidSignerAgain()">Open signer</button>
-            <button type="button" (click)="openAndroidSignerAnchorDebug()">Signer link</button>
-            <button type="button" (click)="openAndroidSignerLocationDebug()">Signer location</button>
+            @if (nip55DebugMode) {
+              <button type="button" (click)="openAndroidSignerAnchorDebug()">Signer link</button>
+              <button type="button" (click)="openAndroidSignerLocationDebug()">Signer location</button>
+            }
+            <button type="button" disabled>Copy invoice</button>
           </div>
         } @else {
           <div class="qr-actions">
