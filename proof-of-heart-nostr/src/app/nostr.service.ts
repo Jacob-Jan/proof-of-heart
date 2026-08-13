@@ -223,6 +223,10 @@ const NIP46_SESSION_KEY = 'poh_nip46_session_v1';
 const NIP46_DEFAULT_RELAYS = ['wss://relay.nsec.app', 'wss://relay.primal.net', 'wss://relay.damus.io'];
 const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
+function isAndroidRuntime(): boolean {
+  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+}
+
 interface Nip46Session {
   clientSecretKey: string;
   clientPubkey: string;
@@ -435,7 +439,7 @@ export class NostrService {
   }
 
   async hasSigner(): Promise<boolean> {
-    return typeof window !== 'undefined' && (!!window.nostr || !!this.readNip46Session()?.remotePubkey);
+    return typeof window !== 'undefined' && (!!window.nostr || (!isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey));
   }
 
   hasNip07Signer(): boolean {
@@ -443,7 +447,7 @@ export class NostrService {
   }
 
   hasNip46Session(): boolean {
-    return !!this.readNip46Session()?.remotePubkey;
+    return !isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey;
   }
 
   private readNip46Session(): Nip46Session | null {

@@ -108,6 +108,43 @@ describe('NIP-46 profile editing permissions', () => {
   });
 });
 
+describe('signer detection', () => {
+  let originalNostr: any;
+  let originalUserAgent: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    originalNostr = (window as any).nostr;
+    originalUserAgent = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
+    delete (window as any).nostr;
+    window.localStorage.setItem('poh_nip46_session_v1', JSON.stringify({
+      clientSecretKey: '1'.repeat(64),
+      clientPubkey: '2'.repeat(64),
+      relays: ['wss://relay.example'],
+      remotePubkey: '3'.repeat(64),
+      userPubkey: '4'.repeat(64),
+      createdAt: Date.now()
+    }));
+  });
+
+  afterEach(() => {
+    if (originalNostr) (window as any).nostr = originalNostr;
+    else delete (window as any).nostr;
+    if (originalUserAgent) Object.defineProperty(Navigator.prototype, 'userAgent', originalUserAgent);
+    window.localStorage.removeItem('poh_nip46_session_v1');
+  });
+
+  it('ignores cached remote signer sessions on Android so zaps can use the native signer chooser immediately', async () => {
+    Object.defineProperty(Navigator.prototype, 'userAgent', {
+      configurable: true,
+      get: () => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36'
+    });
+    const service = new NostrService();
+
+    await expectAsync(service.hasSigner()).toBeResolvedTo(false);
+    expect(service.hasNip46Session()).toBeFalse();
+  });
+});
+
 describe('publishCharityProfile', () => {
   let originalNostr: any;
 
