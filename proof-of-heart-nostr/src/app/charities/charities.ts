@@ -28,6 +28,8 @@ export class CharitiesComponent implements OnInit, OnDestroy {
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
   loading = true;
+  charityCtaLoading = false;
+  charityCtaStatus = '';
   enrichmentLoaded = false;
   loadStatus = 'fetching charities from nostr relays...';
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
@@ -153,14 +155,23 @@ export class CharitiesComponent implements OnInit, OnDestroy {
   }
 
   async goForCharities() {
-    const pubkey = await this.nostr.getCurrentPubkey();
+    if (this.charityCtaLoading) return;
+    this.charityCtaLoading = true;
+    this.charityCtaStatus = 'Checking whether this signer is already connected as a charity…';
+    try {
+      const pubkey = await this.nostr.getCurrentPubkey();
 
-    if (pubkey && this.nostr.hasLocalOnboarding(pubkey)) {
-      await this.router.navigate(['/charity/profile']);
-      return;
+      if (pubkey && this.nostr.hasLocalOnboarding(pubkey)) {
+        this.charityCtaStatus = 'Opening charity profile editor…';
+        await this.router.navigate(['/charity/profile']);
+        return;
+      }
+
+      this.charityCtaStatus = 'Opening charity onboarding…';
+      await this.router.navigate(['/charity/onboard']);
+    } finally {
+      this.charityCtaLoading = false;
     }
-
-    await this.router.navigate(['/charity/onboard']);
   }
 
   private applyFilters() {
@@ -215,7 +226,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
             '@type': 'NGO',
             name: c.name,
             url: `https://proofofheart.org/charities/${c.npub}`,
-            description: c.charity.shortDescription || c.about || '',
+            description: c.about || c.charity.description || '',
             image: c.picture || 'https://proofofheart.org/assets/logo.png',
             areaServed: c.charity.country ? { '@type': 'Country', name: c.charity.country } : undefined,
             sameAs: c.website ? [c.website] : undefined

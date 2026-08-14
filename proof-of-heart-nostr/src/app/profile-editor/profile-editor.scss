@@ -51,7 +51,9 @@
       margin-bottom: 20px;
     }
 
-    .loading-subtitle {
+    .loading-subtitle,
+    .inline-status,
+    .publish-status {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -61,16 +63,130 @@
       }
     }
 
+    .inline-status,
+    .publish-status {
+      margin: 0;
+      color: #6f675c;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .publish-status {
+      margin-top: -4px;
+    }
+
     .appear-in-register {
       display: flex;
       justify-content: flex-start;
-      margin-bottom: 16px;
+      margin: 2px 0 8px;
     }
 
     .account-form {
       display: flex;
       flex-direction: column;
+      gap: 14px;
+    }
+
+    .editor-section {
+      display: flex;
+      flex-direction: column;
       gap: 10px;
+      padding: 16px;
+      border: 1px solid #e4dfd2;
+      border-radius: 14px;
+      background: #fbfaf6;
+    }
+
+    .nostr-section {
+      background: #f7f3ff;
+      border-color: #ded2f2;
+    }
+
+    .poh-section {
+      background: #fbfaf6;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+
+      h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .section-note {
+        color: #6f675c;
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+    }
+
+    label {
+      font-weight: 600;
+      color: #2f2a22;
+    }
+
+    .field-hint {
+      margin: -6px 0 0;
+      color: #6f675c;
+      font-size: 0.86rem;
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid #d7d1c4;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .logo-upload-row {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+
+    .logo-preview {
+      width: 84px;
+      height: 84px;
+      border: 1px dashed #bfb4d7;
+      border-radius: 18px;
+      background: #fff;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: #7a7188;
+      font-size: 0.82rem;
+      text-align: center;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
+    .logo-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      button {
+        width: fit-content;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .logo-upload-row {
+        grid-template-columns: 1fr;
+      }
     }
 
     .account-buttons {

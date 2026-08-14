@@ -37,6 +37,22 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
+export function normalizeCharityWebsiteHref(website?: string): string {
+  const trimmed = (website || '').trim();
+  if (!trimmed) return '';
+
+  const candidate = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(candidate) ? candidate : `https://${candidate}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    return parsed.href;
+  } catch {
+    return '';
+  }
+}
+
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
@@ -125,6 +141,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   nip46Pairing = false;
   nip46PairingError = '';
   actionSignerStatus = '';
+  actionPublishing = false;
   nip55DebugMode = false;
   nip55DebugLog: string[] = [];
   consoleLog: string[] = [];
@@ -155,7 +172,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private refreshToken = 0;
 
   get donationAddress(): string {
-    return (this.charity?.charity.lightningAddress || this.charity?.lud16 || '').trim();
+    return (this.charity?.lud16 || '').trim();
   }
 
   get canDonate(): boolean {
@@ -399,6 +416,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       });
   }
 
+  charityWebsiteHref(website?: string): string {
+    return normalizeCharityWebsiteHref(website);
+  }
+
   openRateDialog() {
     this.rating = this.userRating || 5;
     this.ratingHover = 0;
@@ -445,9 +466,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   async rate() {
-    if (!this.charity) return;
+    if (!this.charity || this.actionPublishing) return;
+    this.actionPublishing = true;
     try {
-      await this.ensureActionSigner('rating');
+      if (!this.nostr.hasNip07Signer()) await this.ensureActionSigner('rating');
       await this.nostr.publishRating(this.charity.pubkey, this.rating, this.ratingNote);
       this.toast(this.userRating ? 'Rating updated on Nostr.' : 'Rating published to Nostr.', 'success', 3000);
       this.actionSignerStatus = '';
@@ -456,19 +478,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch (e: any) {
       this.actionSignerStatus = '';
       this.toast(e?.message || 'Failed to publish rating.', 'error', 4000);
+    } finally {
+      this.actionPublishing = false;
     }
   }
 
   async removeRating() {
-    if (!this.charity) return;
+    if (!this.charity || this.actionPublishing) return;
+    this.actionPublishing = true;
     try {
-      await this.ensureActionSigner('rating');
-      const latestRating = await this.nostr.loadUserRating(this.charity.pubkey, this.visitorPubkey);
-      if (!latestRating) {
-        this.userRating = null;
-        this.toast('No rating found for this signer.', 'info', 3000);
-        return;
-      }
+      if (!this.nostr.hasNip07Signer()) await this.ensureActionSigner('rating');
       await this.nostr.publishRemoveRating(this.charity.pubkey);
       this.userRating = null;
       this.actionSignerStatus = '';
@@ -478,13 +497,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch (e: any) {
       this.actionSignerStatus = '';
       this.toast(e?.message || 'Failed to remove rating.', 'error', 4000);
+    } finally {
+      this.actionPublishing = false;
     }
   }
 
   async report() {
-    if (!this.charity) return;
+    if (!this.charity || this.actionPublishing) return;
+    this.actionPublishing = true;
     try {
-      await this.ensureActionSigner(this.hasFlagged ? 'unflag' : 'flag');
+      if (!this.nostr.hasNip07Signer()) await this.ensureActionSigner(this.hasFlagged ? 'unflag' : 'flag');
       if (this.hasFlagged) {
         await this.nostr.publishUnreport(this.charity.pubkey);
         this.toast('Flag removed from Nostr.', 'success', 3000);
@@ -498,17 +520,21 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     } catch (e: any) {
       this.actionSignerStatus = '';
       this.toast(e?.message || 'Failed to update flag.', 'error', 4000);
+    } finally {
+      this.actionPublishing = false;
     }
   }
 
-  private async ensureActionSigner(action: 'rating' | 'flag' | 'unflag'): Promise<void> {
+  private async ensureActionSigner(action: 'rating' | 'flag' | 'unflag', refreshState = false): Promise<void> {
     if (await this.nostr.hasSigner()) {
       this.signerConnected = true;
       if (!this.visitorPubkey) {
         const signer = await this.nostr.connectSigner();
         this.visitorPubkey = signer.pubkey;
       }
-      await this.refreshActionIdentityState();
+      if (refreshState) {
+        await this.refreshActionIdentityState();
+      }
       return;
     }
 
@@ -663,6 +689,18 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const sats = this.donationSats;
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
+
+    if (isAndroidBrowser() && !window.nostr) {
+      try {
+        await this.startAndroidSignerZap(lightningAddress, sats, since);
+        return;
+      } catch (androidErr: any) {
+        if (!this.isCurrentDonationAttempt(token)) return;
+        this.donationStatus = this.donationErrorMessage(androidErr);
+        this.donating = false;
+        return;
+      }
+    }
 
     if (!window.nostr && !this.nostr.hasNip46Session()) {
       try {
@@ -1966,10 +2004,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const titleBits = [charity.name, category, country, 'Bitcoin Charity | Proof of Heart'].filter(Boolean);
     const title = titleBits.join(' · ');
     const description = (
-      charity.charity.shortDescription
-      || charity.about
-      || `Support ${charity.name}${country ? ` in ${country}` : ''}${category ? ` (${category})` : ''} with Bitcoin and Lightning donations.`
-    ).slice(0, 155);
+      charity.about
+      || charity.charity.description
+      || 'Nostr-native charity profile on Proof of Heart.'
+    ).slice(0, 160);
     const canonical = `https://proofofheart.org/charities/${charity.npub}`;
     const image = this.toAbsoluteAssetUrl(charity.picture) || 'https://proofofheart.org/assets/logo.png';
 
@@ -2006,14 +2044,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.jsonLdScriptElement = undefined;
     }
 
+    const websiteHref = normalizeCharityWebsiteHref(charity.website);
+
     const jsonLdObject: any = {
       '@context': 'https://schema.org',
       '@type': 'NGO',
       name: charity.name,
       url: canonical,
-      description: charity.charity.description || charity.charity.shortDescription || charity.about || '',
+      description: charity.charity.description || charity.about || '',
       image: charity.picture || undefined,
-      sameAs: [charity.website].filter(Boolean),
+      sameAs: [websiteHref].filter(Boolean),
       potentialAction: {
         '@type': 'DonateAction',
         target: canonical,

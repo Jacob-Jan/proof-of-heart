@@ -12,11 +12,11 @@
         <img [src]="charity.picture || '/assets/logo-contrast.png'" [alt]="charity.name + ' logo'">
         <div class="title-wrap">
           <h1>{{ charity.name }}</h1>
-          @if (charity.charity.shortDescription || charity.about) {
-            <p class="short-description">{{ charity.charity.shortDescription || charity.about }}</p>
+          @if (charity.about) {
+            <p class="short-description">{{ charity.about }}</p>
           }
           @if (charity.website) {
-            <a class="website" target="_blank" [href]="charity.website">{{ charity.website }}</a>
+            <a class="website" target="_blank" rel="noopener noreferrer" [href]="charityWebsiteHref(charity.website)">{{ charity.website }}</a>
           }
         </div>
       </div>
@@ -279,23 +279,17 @@
         @if (userRating) {
           <p class="rating-selected">Your current rating from this signer: {{ userRating }} / 5. Publishing again updates it.</p>
         }
-        @if (actionSignerStatus) {
-          <p class="rating-selected">{{ actionSignerStatus }}</p>
-          @if (nip46Pairing && nip46ConnectUrl) {
-            <div class="dialog-actions">
-              <button type="button" (click)="openNip46Signer()">Open remote signer</button>
-            </div>
-          }
-        }
         <label>Note (optional)</label>
         <textarea [(ngModel)]="ratingNote" name="ratingNote"></textarea>
         <div class="dialog-actions">
           @if (userRating) {
-            <button type="button" style="background: transparent; border-color: transparent; color: #9b2c2c; padding-inline: 4px;" (click)="removeRating()">Remove my rating</button>
+            <button type="button" style="background: transparent; border-color: transparent; color: #9b2c2c; padding-inline: 4px;" (click)="removeRating()" [disabled]="actionPublishing">Remove my rating</button>
           }
           <span style="flex: 1 1 auto;"></span>
           <button type="button" (click)="closeRateDialog()">Cancel</button>
-          <button type="button" (click)="rate()">{{ userRating ? 'Update rating' : 'Publish rating' }}</button>
+          <button type="button" (click)="rate()" [disabled]="actionPublishing">
+            {{ actionPublishing ? 'Publishing…' : (userRating ? 'Update rating' : 'Publish rating') }}
+          </button>
         </div>
       </div>
     </div>
@@ -317,17 +311,11 @@
         } @else {
           <p class="rating-selected">This will remove your previous flag for this charity.</p>
         }
-        @if (actionSignerStatus) {
-          <p class="rating-selected">{{ actionSignerStatus }}</p>
-          @if (nip46Pairing && nip46ConnectUrl) {
-            <div class="dialog-actions">
-              <button type="button" (click)="openNip46Signer()">Open remote signer</button>
-            </div>
-          }
-        }
         <div class="dialog-actions">
           <button type="button" (click)="closeFlagDialog()">Cancel</button>
-          <button type="button" (click)="report()">{{ hasFlagged ? 'Remove flag' : 'Publish flag' }}</button>
+          <button type="button" (click)="report()" [disabled]="actionPublishing">
+            {{ actionPublishing ? 'Publishing…' : (hasFlagged ? 'Remove flag' : 'Publish flag') }}
+          </button>
         </div>
       </div>
     </div>

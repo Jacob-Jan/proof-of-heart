@@ -11,4 +11,11 @@
   <button mat-flat-button type="button" (click)="continueToProfile()" [disabled]="loading || !charityConfirmed">
     {{ loading ? 'Connecting…' : 'Connect Nostr' }}
   </button>
+
+  @if (status) {
+    <p class="onboard-status" aria-live="polite">
+      @if (loading) { <mat-spinner diameter="14"></mat-spinner> }
+      <span>{{ status }}</span>
+    </p>
+  }
 </section>

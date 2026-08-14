@@ -2,20 +2,35 @@
   <h1>Admin Insights</h1>
 
   @if (checkingAccess) {
-    <p>Checking signer access…</p>
+    <p class="status-line" aria-live="polite">
+      <mat-spinner diameter="14"></mat-spinner>
+      <span>{{ status || 'Checking signer access…' }}</span>
+    </p>
   } @else if (!isAuthorized) {
     <div class="locked">
       <p>This page is restricted to the owner npub.</p>
       @if (connectedNpub) {
         <p><strong>Connected:</strong> {{ connectedNpub }}</p>
       }
-      <button mat-flat-button (click)="connectAndUnlock()">Connect owner signer</button>
+      <button mat-flat-button (click)="connectAndUnlock()" [disabled]="checkingAccess || loading">{{ checkingAccess ? 'Connecting…' : 'Connect owner signer' }}</button>
+      @if (status) {
+        <p class="status-line" aria-live="polite">
+          @if (checkingAccess || loading) { <mat-spinner diameter="14"></mat-spinner> }
+          <span>{{ status }}</span>
+        </p>
+      }
     </div>
   } @else {
     <div class="topbar">
       <p><strong>Signed in as:</strong> {{ connectedNpub }}</p>
       <button mat-flat-button (click)="reload()" [disabled]="loading">{{ loading ? 'Refreshing…' : 'Refresh insights' }}</button>
     </div>
+    @if (status) {
+      <p class="status-line" aria-live="polite">
+        @if (loading) { <mat-spinner diameter="14"></mat-spinner> }
+        <span>{{ status }}</span>
+      </p>
+    }
 
     <div class="kpis">
       <div class="kpi"><span>Total charities</span><strong>{{ totalCharities }}</strong></div>
