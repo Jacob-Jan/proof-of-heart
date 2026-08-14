@@ -28,8 +28,6 @@ export class CharitiesComponent implements OnInit, OnDestroy {
   allCharities: CharityProfile[] = [];
   charities: CharityProfile[] = [];
   loading = true;
-  charityCtaLoading = false;
-  charityCtaStatus = '';
   enrichmentLoaded = false;
   loadStatus = 'fetching charities from nostr relays...';
   loadStatusTone: 'relay' | 'cache' | 'success' | 'warning' = 'relay';
@@ -155,23 +153,14 @@ export class CharitiesComponent implements OnInit, OnDestroy {
   }
 
   async goForCharities() {
-    if (this.charityCtaLoading) return;
-    this.charityCtaLoading = true;
-    this.charityCtaStatus = 'Checking whether this signer is already connected as a charity…';
-    try {
-      const pubkey = await this.nostr.getCurrentPubkey();
+    const pubkey = await this.nostr.getCurrentPubkey();
 
-      if (pubkey && this.nostr.hasLocalOnboarding(pubkey)) {
-        this.charityCtaStatus = 'Opening charity profile editor…';
-        await this.router.navigate(['/charity/profile']);
-        return;
-      }
-
-      this.charityCtaStatus = 'Opening charity onboarding…';
-      await this.router.navigate(['/charity/onboard']);
-    } finally {
-      this.charityCtaLoading = false;
+    if (pubkey && this.nostr.hasLocalOnboarding(pubkey)) {
+      await this.router.navigate(['/charity/profile']);
+      return;
     }
+
+    await this.router.navigate(['/charity/onboard']);
   }
 
   private applyFilters() {

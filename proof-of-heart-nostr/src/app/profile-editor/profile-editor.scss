@@ -51,9 +51,7 @@
       margin-bottom: 20px;
     }
 
-    .loading-subtitle,
-    .inline-status,
-    .publish-status {
+    .loading-subtitle {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -61,18 +59,6 @@
       mat-spinner {
         flex: 0 0 auto;
       }
-    }
-
-    .inline-status,
-    .publish-status {
-      margin: 0;
-      color: #6f675c;
-      font-size: 0.9rem;
-      line-height: 1.35;
-    }
-
-    .publish-status {
-      margin-top: -4px;
     }
 
     .appear-in-register {

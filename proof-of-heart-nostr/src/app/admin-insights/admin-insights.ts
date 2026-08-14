@@ -5,14 +5,13 @@ import { NostrService, CharityProfile } from '../nostr.service';
 import { nip19 } from 'nostr-tools';
 import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 const ADMIN_NPUB = 'npub1rqu7t9t8rhs2lr9c5gtl92jhnwuyc9996m6s43rxaauxwmkffvks0helr0';
 
 @Component({
   selector: 'app-admin-insights',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatButtonModule, MatProgressSpinnerModule],
+  imports: [CommonModule, RouterModule, MatButtonModule],
   templateUrl: './admin-insights.html',
   styleUrl: './admin-insights.scss'
 })
@@ -22,7 +21,6 @@ export class AdminInsightsComponent implements OnInit {
 
   loading = false;
   checkingAccess = true;
-  status = 'Checking signer access…';
   connectedNpub = '';
   isAuthorized = false;
 
@@ -43,25 +41,19 @@ export class AdminInsightsComponent implements OnInit {
   }
 
   async connectAndUnlock() {
-    if (this.checkingAccess || this.loading) return;
-    this.checkingAccess = true;
-    this.status = 'Connecting owner signer… approve Proof of Heart if your signer asks.';
     try {
       const { npub } = await this.nostr.connectSigner();
       this.connectedNpub = npub;
       this.isAuthorized = npub === ADMIN_NPUB;
 
       if (!this.isAuthorized) {
-        this.status = 'Connected signer is not allowed for /admin.';
         this.toast('Connected signer is not allowed for /admin', 'error');
         return;
       }
 
-      this.status = 'Admin access granted. Loading charity insights from Nostr relays…';
       this.toast('Admin access granted', 'success');
       await this.loadInsights();
     } catch (e: any) {
-      this.status = e?.message || 'Failed to connect signer.';
       this.toast(e?.message || 'Failed to connect signer', 'error');
     } finally {
       this.checkingAccess = false;
@@ -76,7 +68,6 @@ export class AdminInsightsComponent implements OnInit {
   private async tryAutoCheckAccess() {
     try {
       if (!window.nostr) {
-        this.status = '';
         this.checkingAccess = false;
         return;
       }
@@ -86,10 +77,7 @@ export class AdminInsightsComponent implements OnInit {
       this.isAuthorized = npub === ADMIN_NPUB;
 
       if (this.isAuthorized) {
-        this.status = 'Owner signer detected. Loading charity insights from Nostr relays…';
         await this.loadInsights();
-      } else {
-        this.status = '';
       }
     } catch {
       // silent: user can manually connect
@@ -100,7 +88,6 @@ export class AdminInsightsComponent implements OnInit {
 
   private async loadInsights() {
     this.loading = true;
-    this.status = 'Loading charity insights from Nostr relays… this can take a moment.';
     try {
       const charities = await this.nostr.loadCharities(600);
 
@@ -124,9 +111,7 @@ export class AdminInsightsComponent implements OnInit {
         .filter(c => c.flags > 0)
         .sort((a, b) => b.flags - a.flags)
         .slice(0, 8);
-      this.status = 'Admin insights refreshed.';
     } catch (e: any) {
-      this.status = e?.message || 'Failed to load admin insights.';
       this.toast(e?.message || 'Failed to load admin insights', 'error');
     } finally {
       this.loading = false;
