@@ -759,6 +759,12 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       }, token, true);
     } catch (e: any) {
       if (!this.isCurrentDonationAttempt(token)) return;
+      if (!this.nostr.hasNip07Signer() && this.nostr.hasNip46Session()) {
+        this.nostr.clearNip46Session();
+        this.nip46ConnectUrl = '';
+        this.nip46Pairing = false;
+        this.nip46PairingError = this.donationErrorMessage(e);
+      }
       if (!this.nostr.hasNip07Signer() && isAndroidBrowser()) {
         try {
           await this.startAndroidSignerZap(lightningAddress, sats, since);
