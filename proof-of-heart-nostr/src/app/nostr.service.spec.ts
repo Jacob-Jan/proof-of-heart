@@ -141,6 +141,7 @@ describe('signer detection', () => {
     else delete (window as any).nostr;
     if (originalUserAgent) Object.defineProperty(Navigator.prototype, 'userAgent', originalUserAgent);
     window.localStorage.removeItem('poh_nip46_session_v1');
+    window.localStorage.removeItem('poh_last_pubkey');
   });
 
   it('reuses cached remote signer sessions on Android so zaps do not require pairing every time', async () => {
@@ -151,6 +152,23 @@ describe('signer detection', () => {
     const service = new NostrService();
 
     await expectAsync(service.hasSigner()).toBeResolvedTo(true);
+    expect(service.hasNip46Session()).toBeTrue();
+  });
+
+  it('checks whether an existing NIP-46 session responds quickly', async () => {
+    const service = new NostrService();
+    spyOn(service as any, 'nip46Request').and.resolveTo('4'.repeat(64));
+
+    await expectAsync(service.isNip46SessionResponsive(1500)).toBeResolvedTo(true);
+    expect((service as any).nip46Request).toHaveBeenCalledWith('get_public_key', [], 1500);
+    expect(window.localStorage.getItem('poh_last_pubkey')).toBe('4'.repeat(64));
+  });
+
+  it('treats a timed-out existing NIP-46 session as unresponsive without clearing it', async () => {
+    const service = new NostrService();
+    spyOn(service as any, 'nip46Request').and.rejectWith(new Error('Remote signer get_public_key timed out.'));
+
+    await expectAsync(service.isNip46SessionResponsive(1500)).toBeResolvedTo(false);
     expect(service.hasNip46Session()).toBeTrue();
   });
 });
