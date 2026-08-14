@@ -714,8 +714,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       const connectUrl = this.nostr.getCurrentNip46ConnectUrl();
       if (connectUrl) {
         this.nip46ConnectUrl = connectUrl;
-        this.donationStatus = 'Opening Nostr signer for the zap approval…';
-        this.launchExternalUri(connectUrl);
+        this.donationStatus = 'Approve the zap in your Nostr signer. If it does not appear, tap Open remote signer.';
       }
     }
 
