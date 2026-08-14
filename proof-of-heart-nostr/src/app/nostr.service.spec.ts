@@ -133,15 +133,15 @@ describe('signer detection', () => {
     window.localStorage.removeItem('poh_nip46_session_v1');
   });
 
-  it('ignores cached remote signer sessions on Android so zaps can use the native signer chooser immediately', async () => {
+  it('reuses cached remote signer sessions on Android so zaps do not require pairing every time', async () => {
     Object.defineProperty(Navigator.prototype, 'userAgent', {
       configurable: true,
       get: () => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36'
     });
     const service = new NostrService();
 
-    await expectAsync(service.hasSigner()).toBeResolvedTo(false);
-    expect(service.hasNip46Session()).toBeFalse();
+    await expectAsync(service.hasSigner()).toBeResolvedTo(true);
+    expect(service.hasNip46Session()).toBeTrue();
   });
 });
 

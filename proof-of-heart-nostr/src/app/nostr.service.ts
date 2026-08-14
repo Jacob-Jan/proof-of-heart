@@ -439,7 +439,7 @@ export class NostrService {
   }
 
   async hasSigner(): Promise<boolean> {
-    return typeof window !== 'undefined' && (!!window.nostr || (!isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey));
+    return typeof window !== 'undefined' && (!!window.nostr || this.hasNip46Session());
   }
 
   hasNip07Signer(): boolean {
@@ -447,7 +447,7 @@ export class NostrService {
   }
 
   hasNip46Session(): boolean {
-    return !isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey;
+    return typeof window !== 'undefined' && !!this.readNip46Session()?.remotePubkey;
   }
 
   private readNip46Session(): Nip46Session | null {
