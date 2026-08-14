@@ -18,4 +18,10 @@
       <span>{{ status }}</span>
     </p>
   }
+
+  @if (nip46Pairing && nip46ConnectUrl) {
+    <button mat-stroked-button type="button" (click)="openRemoteSigner()">
+      Open remote signer
+    </button>
+  }
 </section>
