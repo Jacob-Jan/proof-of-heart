@@ -9,18 +9,13 @@
     <p class="subtitle">Edit how this charity appears on Nostr and Proof of Heart.</p>
 
     @if (loadingExisting) {
-      <p class="subtitle loading-subtitle" aria-live="polite">
+      <p class="subtitle loading-subtitle">
         <mat-spinner diameter="14"></mat-spinner>
-        <span>{{ loadStatus || 'Loading existing profile data…' }}</span>
+        <span>Loading existing profile data…</span>
       </p>
     } @else if (needsSignerForLoad) {
-      <p class="subtitle" aria-live="polite">{{ loadStatus || 'Could not load existing profile data yet. Connect your signer and try again.' }}</p>
+      <p class="subtitle">Could not load existing profile data yet. Connect your signer and try again.</p>
       <button type="button" (click)="loadExisting()">Connect signer & load profile</button>
-    } @else if (loadStatus) {
-      <p class="subtitle loading-subtitle" aria-live="polite">
-        @if (!profileFreshForSave) { <mat-spinner diameter="14"></mat-spinner> }
-        <span>{{ loadStatus }}</span>
-      </p>
     }
 
     <form (ngSubmit)="save()" class="account-form">
@@ -47,12 +42,6 @@
             <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="uploadingLogo">
               {{ uploadingLogo ? 'Uploading…' : 'Upload logo' }}
             </button>
-            @if (uploadStatus) {
-              <p class="inline-status" aria-live="polite">
-                @if (uploadingLogo) { <mat-spinner diameter="14"></mat-spinner> }
-                <span>{{ uploadStatus }}</span>
-              </p>
-            }
           </div>
         </div>
 
@@ -97,20 +86,14 @@
       </section>
 
       <div class="account-buttons">
-        <button mat-flat-button type="submit" [disabled]="saving || uploadingLogo || disconnecting || !profileFreshForSave">{{ saving ? 'Publishing…' : 'Save profile' }}</button>
+        <button mat-flat-button type="submit" [disabled]="saving">{{ saving ? 'Saving…' : 'Save profile' }}</button>
         @if (ownNpub) {
           <a [routerLink]="['/charities', ownNpub]">
-            <button mat-stroked-button type="button" [disabled]="saving || disconnecting">View profile</button>
+            <button mat-stroked-button type="button">View profile</button>
           </a>
         }
-        <button mat-stroked-button type="button" (click)="disconnect()" [disabled]="saving || disconnecting">{{ disconnecting ? 'Disconnecting…' : 'Disconnect' }}</button>
+        <button mat-stroked-button type="button" (click)="disconnect()">Disconnect</button>
       </div>
-      @if (saveStatus) {
-        <p class="publish-status" aria-live="polite">
-          @if (saving || disconnecting) { <mat-spinner diameter="14"></mat-spinner> }
-          <span>{{ saveStatus }}</span>
-        </p>
-      }
     </form>
   </div>
 </section>

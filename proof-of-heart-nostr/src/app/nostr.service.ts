@@ -223,10 +223,6 @@ const NIP46_SESSION_KEY = 'poh_nip46_session_v1';
 const NIP46_DEFAULT_RELAYS = ['wss://relay.nsec.app', 'wss://relay.primal.net', 'wss://relay.damus.io'];
 const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
-function isAndroidRuntime(): boolean {
-  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
-}
-
 interface Nip46Session {
   clientSecretKey: string;
   clientPubkey: string;
@@ -439,7 +435,7 @@ export class NostrService {
   }
 
   async hasSigner(): Promise<boolean> {
-    return typeof window !== 'undefined' && (!!window.nostr || (!isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey));
+    return typeof window !== 'undefined' && (!!window.nostr || !!this.readNip46Session()?.remotePubkey);
   }
 
   hasNip07Signer(): boolean {
@@ -447,7 +443,7 @@ export class NostrService {
   }
 
   hasNip46Session(): boolean {
-    return !isAndroidRuntime() && !!this.readNip46Session()?.remotePubkey;
+    return !!this.readNip46Session()?.remotePubkey;
   }
 
   private readNip46Session(): Nip46Session | null {
@@ -607,16 +603,6 @@ export class NostrService {
     }
   }
 
-  async signEventForImmediateNip07Action(event: any, timeoutMs = 60_000): Promise<any> {
-    if (typeof window !== 'undefined' && window.nostr) {
-      const signed = await this.withTimeout(window.nostr.signEvent(event), timeoutMs, 'Signer response');
-      this.rememberSignedEventPubkey(signed);
-      return signed;
-    }
-
-    return this.signEventWithAvailableSigner(event, timeoutMs);
-  }
-
   private rememberSignedEventPubkey(signed: any): void {
     if (typeof window === 'undefined' || !signed?.pubkey) return;
     window.localStorage.setItem(LAST_PUBKEY_KEY, signed.pubkey);
@@ -651,14 +637,6 @@ export class NostrService {
     // auto mode defaults to production relays.
     // Use explicit "test" mode when running a local relay on 127.0.0.1:7777.
     return PROD_RELAYS;
-  }
-
-  private async publishToAnyRelay(relays: string[], signed: any, label = 'Relay publish acknowledgement'): Promise<void> {
-    try {
-      await this.withTimeout(Promise.any(this.pool.publish(relays, signed as any)), 15_000, label);
-    } catch (e: any) {
-      throw new Error(`Signed event, but no relay acknowledged it within 15 seconds. ${e?.message || ''}`.trim());
-    }
   }
 
   /**
@@ -932,7 +910,6 @@ export class NostrService {
     if (file.size > 2 * 1024 * 1024) throw new Error('Logo image is too large. Please use an image under 2 MB.');
 
     const normalizedServer = server.replace(/\/+$/, '');
-    const blossomHost = new URL(normalizedServer).hostname.toLowerCase();
     const bytes = new Uint8Array(await file.arrayBuffer());
     const sha256 = await this.sha256Hex(bytes);
     const expiration = Math.floor(Date.now() / 1000) + 10 * 60;
@@ -942,14 +919,14 @@ export class NostrService {
       tags: [
         ['t', 'upload'],
         ['expiration', String(expiration)],
-        ['server', blossomHost],
+        ['server', normalizedServer],
         ['x', sha256]
       ],
       content: 'Upload charity profile image'
     };
 
     const signedAuth = await this.signEventWithAvailableSigner(authEvent, 60_000);
-    const authHeader = `Nostr ${this.base64Encode(JSON.stringify(signedAuth))}`;
+    const authHeader = `Nostr ${this.base64UrlEncode(JSON.stringify(signedAuth))}`;
     const response = await this.withTimeout(fetch(`${normalizedServer}/upload`, {
       method: 'PUT',
       headers: {
@@ -984,11 +961,11 @@ export class NostrService {
     return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 
-  private base64Encode(value: string): string {
+  private base64UrlEncode(value: string): string {
     const bytes = new TextEncoder().encode(value);
     let binary = '';
     bytes.forEach((byte) => binary += String.fromCharCode(byte));
-    return btoa(binary);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
 
   private fileExtensionForMime(type: string): string {
@@ -1141,9 +1118,8 @@ export class NostrService {
   }
 
   async loadOwnCharityProfile(pubkey: string): Promise<CharityExtraFields | null> {
-    // Profile editor load should not block on NIP-65 author relay discovery.
-    // The app-defined charity profile is published to the active app relays, so query those directly.
-    const events = await this.pool.querySync(this.getActiveRelays(), {
+    const relays = await this.getAuthorAwareRelays(pubkey);
+    const events = await this.pool.querySync(relays, {
       kinds: [KIND_CHARITY_PROFILE],
       authors: [pubkey],
       '#d': ['proofofheart-charity-profile-v1'],
@@ -1194,8 +1170,8 @@ export class NostrService {
       content: note
     };
 
-    const signed = await this.signEventForImmediateNip07Action(event);
-    await this.publishToAnyRelay(relays, signed, 'Rating relay acknowledgement');
+    const signed = await this.signEventWithAvailableSigner(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
@@ -1213,8 +1189,8 @@ export class NostrService {
       content: 'Rating removed'
     };
 
-    const signed = await this.signEventForImmediateNip07Action(event);
-    await this.publishToAnyRelay(relays, signed, 'Rating removal relay acknowledgement');
+    const signed = await this.signEventWithAvailableSigner(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
@@ -1253,8 +1229,8 @@ export class NostrService {
       content: note || `Report reason: ${reason}`
     };
 
-    const signed = await this.signEventForImmediateNip07Action(event);
-    await this.publishToAnyRelay(relays, signed, 'Flag relay acknowledgement');
+    const signed = await this.signEventWithAvailableSigner(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
@@ -1272,8 +1248,8 @@ export class NostrService {
       content: 'Report withdrawn'
     };
 
-    const signed = await this.signEventForImmediateNip07Action(event);
-    await this.publishToAnyRelay(relays, signed, 'Flag removal relay acknowledgement');
+    const signed = await this.signEventWithAvailableSigner(event);
+    await Promise.any(this.pool.publish(relays, signed as any));
     return signed.id;
   }
 
@@ -1685,25 +1661,6 @@ export class NostrService {
     } catch {
       // ignore quota / storage errors
     }
-  }
-
-  getCachedEditableCharityProfile(pubkey: string): { fields: CharityExtraFields; kind0: Record<string, any> } | null {
-    const cached =
-      this.readCharityDetailCache(pubkey, Number.POSITIVE_INFINITY) ||
-      this.readStoredCharityCache(500).find((charity) => charity.pubkey === pubkey) ||
-      null;
-    if (!cached) return null;
-
-    return {
-      fields: { ...(cached.charity || {}) },
-      kind0: {
-        name: cached.name || '',
-        display_name: cached.name || '',
-        about: cached.about || '',
-        picture: cached.picture || '',
-        lud16: cached.lud16 || cached.lud06 || ''
-      }
-    };
   }
 
   refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields, kind0Metadata?: Record<string, any>): CharityProfile | null {

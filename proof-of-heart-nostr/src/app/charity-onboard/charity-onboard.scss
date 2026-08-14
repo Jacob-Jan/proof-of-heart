@@ -15,16 +15,6 @@
     margin: 16px 0 18px;
   }
 
-  .onboard-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 14px 0 0;
-    color: #6f675c;
-    font-size: 0.92rem;
-    line-height: 1.35;
-  }
-
   button[disabled] {
     opacity: 0.6;
     cursor: not-allowed;
