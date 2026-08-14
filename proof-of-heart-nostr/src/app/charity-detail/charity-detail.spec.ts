@@ -1,4 +1,10 @@
-import { buildAndroidSignerZapCallbackUrl, normalizeCharityWebsiteHref, shouldStartNip46ZapPairingBeforeAndroidFallback } from './charity-detail';
+import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute } from '@angular/router';
+import { Meta, Title } from '@angular/platform-browser';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { of } from 'rxjs';
+import { buildAndroidSignerZapCallbackUrl, CharityDetailComponent, normalizeCharityWebsiteHref, shouldStartNip46ZapPairingBeforeAndroidFallback } from './charity-detail';
+import { NostrService } from '../nostr.service';
 
 describe('buildAndroidSignerZapCallbackUrl', () => {
   const charityPubkey = 'a'.repeat(64);
@@ -27,6 +33,54 @@ describe('zap signer selection', () => {
   it('does not start pairing when NIP-07 is available or NIP-46 is already paired', () => {
     expect(shouldStartNip46ZapPairingBeforeAndroidFallback(true, false)).toBeFalse();
     expect(shouldStartNip46ZapPairingBeforeAndroidFallback(false, true)).toBeFalse();
+  });
+});
+
+describe('charity detail description rendering', () => {
+  it('renders saved safe HTML tags in the long charity description', async () => {
+    await TestBed.configureTestingModule({
+      imports: [CharityDetailComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['npub', 'npub1test']])) } },
+        { provide: NostrService, useValue: { clearCharityFeedStatus: jasmine.createSpy('clearCharityFeedStatus') } },
+        { provide: MatSnackBar, useValue: { open: jasmine.createSpy('open') } },
+        { provide: Meta, useValue: { updateTag: jasmine.createSpy('updateTag') } },
+        { provide: Title, useValue: { setTitle: jasmine.createSpy('setTitle') } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CharityDetailComponent);
+    const component = fixture.componentInstance;
+    spyOn(component, 'ngOnInit').and.stub();
+    component.loading = false;
+    component.charity = {
+      pubkey: 'a'.repeat(64),
+      npub: 'npub1test',
+      name: 'HTML Charity',
+      about: 'Short',
+      picture: '',
+      website: '',
+      followers: 0,
+      ratingAvg: 0,
+      ratingCount: 0,
+      flags: 0,
+      zappedSats: 0,
+      activityLoaded: true,
+      charity: {
+        description: '<p>Line <strong>one</strong></p><ul><li>Two</li></ul>',
+        category: 'Education',
+        country: 'NL',
+        lightningAddress: 'donate@example.org',
+        isVisible: true
+      }
+    } as any;
+
+    fixture.detectChanges();
+
+    const description = fixture.nativeElement.querySelector('.description') as HTMLElement;
+    expect(description.querySelector('strong')?.textContent).toBe('one');
+    expect(description.querySelector('li')?.textContent).toBe('Two');
+    expect(description.textContent).not.toContain('<strong>');
   });
 });
 
