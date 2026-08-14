@@ -1,4 +1,43 @@
-import { ensureEventPubkeyForNip07, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile } from './nostr.service';
+import { buildKind0ProfileMetadata, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
+
+describe('buildKind0ProfileMetadata', () => {
+  it('updates editable Nostr profile fields while preserving unknown metadata', () => {
+    const existing = {
+      name: 'Old Name',
+      display_name: 'Old Display',
+      about: 'Old about',
+      picture: 'https://example.org/old.png',
+      banner: 'https://example.org/banner.png',
+      nip05: 'charity@example.org',
+      lud16: 'donate@example.org'
+    };
+
+    const next = buildKind0ProfileMetadata(existing, {
+      name: 'My First Bitcoin',
+      about: 'Bitcoin education',
+      picture: 'https://myfirstbitcoin.org/logo.png',
+      lud16: 'hello@myfirstbitcoin.org'
+    });
+
+    expect(next).toEqual({
+      ...existing,
+      name: 'My First Bitcoin',
+      display_name: 'My First Bitcoin',
+      about: 'Bitcoin education',
+      picture: 'https://myfirstbitcoin.org/logo.png',
+      lud16: 'hello@myfirstbitcoin.org'
+    });
+  });
+
+  it('removes editable fields when the user clears them without touching unrelated fields', () => {
+    const next = buildKind0ProfileMetadata(
+      { name: 'Old Name', display_name: 'Old Display', about: 'Old about', picture: 'https://example.org/old.png', lud16: 'old@example.org', nip05: 'charity@example.org' },
+      { name: '', about: '', picture: '', lud16: '' }
+    );
+
+    expect(next).toEqual({ nip05: 'charity@example.org' });
+  });
+});
 
 describe('ensureEventPubkeyForNip07', () => {
   it('adds the signer pubkey before signEvent for Flamingo compatibility', async () => {
@@ -32,6 +71,118 @@ describe('ensureEventPubkeyForNip07', () => {
 
     expect(withPubkey).toEqual(event);
     expect(askedForPubkey).toBeFalse();
+  });
+});
+
+describe('profile editor save helpers', () => {
+  it('does not treat a cleared legacy shortDescription as an app profile change by itself', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeFalse();
+  });
+
+  it('does not treat legacy app-specific lightningAddress changes as app profile changes', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, lightningAddress: 'old@example.com' },
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true, lightningAddress: '' }
+    )).toBeFalse();
+  });
+
+  it('detects real app profile field changes', () => {
+    expect(hasCharityProfileChanges(
+      { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
+      { description: 'Updated', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeTrue();
+  });
+});
+
+describe('NIP-46 profile editing permissions', () => {
+  it('requests permissions for all profile editor signing actions', () => {
+    const permissions = getNip46ProfilePermissions();
+
+    expect(permissions).toContain('sign_event:0');
+    expect(permissions).toContain('sign_event:24242');
+    expect(permissions).toContain('sign_event:30078');
+    expect(permissions).toContain('get_public_key');
+  });
+});
+
+describe('signer detection', () => {
+  let originalNostr: any;
+  let originalUserAgent: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    originalNostr = (window as any).nostr;
+    originalUserAgent = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
+    delete (window as any).nostr;
+    window.localStorage.setItem('poh_nip46_session_v1', JSON.stringify({
+      clientSecretKey: '1'.repeat(64),
+      clientPubkey: '2'.repeat(64),
+      relays: ['wss://relay.example'],
+      remotePubkey: '3'.repeat(64),
+      userPubkey: '4'.repeat(64),
+      createdAt: Date.now()
+    }));
+  });
+
+  afterEach(() => {
+    if (originalNostr) (window as any).nostr = originalNostr;
+    else delete (window as any).nostr;
+    if (originalUserAgent) Object.defineProperty(Navigator.prototype, 'userAgent', originalUserAgent);
+    window.localStorage.removeItem('poh_nip46_session_v1');
+  });
+
+  it('ignores cached remote signer sessions on Android so zaps can use the native signer chooser immediately', async () => {
+    Object.defineProperty(Navigator.prototype, 'userAgent', {
+      configurable: true,
+      get: () => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36'
+    });
+    const service = new NostrService();
+
+    await expectAsync(service.hasSigner()).toBeResolvedTo(false);
+    expect(service.hasNip46Session()).toBeFalse();
+  });
+});
+
+describe('publishCharityProfile', () => {
+  let originalNostr: any;
+
+  beforeEach(() => {
+    originalNostr = (window as any).nostr;
+    delete (window as any).nostr;
+    window.localStorage.setItem('poh_nip46_session_v1', JSON.stringify({
+      clientSecretKey: '1'.repeat(64),
+      clientPubkey: '2'.repeat(64),
+      relays: ['wss://relay.example'],
+      remotePubkey: '3'.repeat(64),
+      userPubkey: '4'.repeat(64),
+      createdAt: Date.now()
+    }));
+    window.localStorage.setItem('poh_last_pubkey', '4'.repeat(64));
+  });
+
+  afterEach(() => {
+    if (originalNostr) (window as any).nostr = originalNostr;
+    else delete (window as any).nostr;
+    window.localStorage.removeItem('poh_nip46_session_v1');
+    window.localStorage.removeItem('poh_last_pubkey');
+  });
+
+  it('uses the shared signer abstraction so remote signers can publish app profile events', async () => {
+    const service = new NostrService();
+    const signed = { id: 'signed-charity-profile', pubkey: '4'.repeat(64), kind: 30078, tags: [], content: '{}' };
+    spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
+    spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
+    (service as any).pool = {
+      publish: () => [Promise.resolve('ok')],
+      querySync: async () => [signed]
+    };
+
+    const id = await service.publishCharityProfile({ description: 'Long description', isVisible: true });
+
+    expect(id).toBe('signed-charity-profile');
+    expect((service as any).signEventWithAvailableSigner).toHaveBeenCalled();
   });
 });
 
