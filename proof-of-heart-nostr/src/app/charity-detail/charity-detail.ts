@@ -37,22 +37,6 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
-export function normalizeCharityWebsiteHref(website?: string): string {
-  const trimmed = (website || '').trim();
-  if (!trimmed) return '';
-
-  const candidate = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
-  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(candidate) ? candidate : `https://${candidate}`;
-
-  try {
-    const parsed = new URL(withProtocol);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-    return parsed.href;
-  } catch {
-    return '';
-  }
-}
-
 @Component({
   selector: 'app-charity-detail',
   standalone: true,
@@ -171,7 +155,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   private refreshToken = 0;
 
   get donationAddress(): string {
-    return (this.charity?.lud16 || '').trim();
+    return (this.charity?.charity.lightningAddress || this.charity?.lud16 || '').trim();
   }
 
   get canDonate(): boolean {
@@ -413,10 +397,6 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
           this.loading = false;
         }
       });
-  }
-
-  charityWebsiteHref(website?: string): string {
-    return normalizeCharityWebsiteHref(website);
   }
 
   openRateDialog() {
@@ -1986,10 +1966,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const titleBits = [charity.name, category, country, 'Bitcoin Charity | Proof of Heart'].filter(Boolean);
     const title = titleBits.join(' · ');
     const description = (
-      charity.about
-      || charity.charity.description
-      || 'Nostr-native charity profile on Proof of Heart.'
-    ).slice(0, 160);
+      charity.charity.shortDescription
+      || charity.about
+      || `Support ${charity.name}${country ? ` in ${country}` : ''}${category ? ` (${category})` : ''} with Bitcoin and Lightning donations.`
+    ).slice(0, 155);
     const canonical = `https://proofofheart.org/charities/${charity.npub}`;
     const image = this.toAbsoluteAssetUrl(charity.picture) || 'https://proofofheart.org/assets/logo.png';
 
@@ -2026,16 +2006,14 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       this.jsonLdScriptElement = undefined;
     }
 
-    const websiteHref = normalizeCharityWebsiteHref(charity.website);
-
     const jsonLdObject: any = {
       '@context': 'https://schema.org',
       '@type': 'NGO',
       name: charity.name,
       url: canonical,
-      description: charity.charity.description || charity.about || '',
+      description: charity.charity.description || charity.charity.shortDescription || charity.about || '',
       image: charity.picture || undefined,
-      sameAs: [websiteHref].filter(Boolean),
+      sameAs: [charity.website].filter(Boolean),
       potentialAction: {
         '@type': 'DonateAction',
         target: canonical,

@@ -5,8 +5,8 @@
   </div>
 
   <div class="account-card">
-    <h1>Charity profile</h1>
-    <p class="subtitle">Edit how this charity appears on Nostr and Proof of Heart.</p>
+    <h1>Charity Nostr Profile</h1>
+    <p class="subtitle">Connect your Nostr signer, then publish your Proof of Heart charity profile.</p>
 
     @if (loadingExisting) {
       <p class="subtitle loading-subtitle">
@@ -19,71 +19,37 @@
     }
 
     <form (ngSubmit)="save()" class="account-form">
-      <section class="editor-section nostr-section">
-        <div class="section-heading">
-          <h2>Nostr public profile</h2>
-          <span class="section-note">Used across Nostr apps</span>
-        </div>
+      <p class="appear-in-register">
+        <mat-checkbox [(ngModel)]="model.isVisible" name="isVisible">Appear in register</mat-checkbox>
+      </p>
 
-        <label>Public name</label>
-        <input [(ngModel)]="kind0Name" name="kind0Name" placeholder="Charity name shown on Nostr" />
+      <label>Charity name (from kind 0)</label>
+      <input [value]="kind0Name || 'No kind-0 name found yet'" readonly />
 
-        <label>Profile photo</label>
-        <div class="logo-upload-row">
-          <div class="logo-preview">
-            @if (kind0Picture) {
-              <img [src]="kind0Picture" alt="Profile photo preview" />
-            } @else {
-              <span>No logo</span>
-            }
-          </div>
-          <div class="logo-actions">
-            <input #logoInput type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden (change)="uploadLogo($event)" />
-            <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="uploadingLogo">
-              {{ uploadingLogo ? 'Uploading…' : 'Upload logo' }}
-            </button>
-          </div>
-        </div>
+      <label>Short description (kind 0, overridable)</label>
+      <textarea [(ngModel)]="model.shortDescription" name="shortDescription" rows="3" placeholder="Short summary shown under your name"></textarea>
 
-        <label>Public about</label>
-        <p class="field-hint">Shown on the charity card on the home page.</p>
-        <textarea [(ngModel)]="kind0About" name="kind0About" rows="3" placeholder="Short public Nostr bio"></textarea>
+      <label>Description (long)</label>
+      <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Long description shown in the More about section"></textarea>
 
-        <label>Lightning address</label>
-        <p class="field-hint">Used for donations and saved to your Nostr profile.</p>
-        <input [(ngModel)]="kind0Lud16" name="kind0Lud16" placeholder="name@domain.com" />
-      </section>
+      <label>Country</label>
+      <select [(ngModel)]="model.country" name="country">
+        <option value="">Select country</option>
+        @for (country of countries; track country) {
+          <option [value]="country">{{ country }}</option>
+        }
+      </select>
 
-      <section class="editor-section poh-section">
-        <div class="section-heading">
-          <h2>Proof of Heart charity page</h2>
-          <span class="section-note">Only for this charity page</span>
-        </div>
+      <label>Category</label>
+      <select [(ngModel)]="model.category" name="category">
+        <option value="">Select category</option>
+        @for (category of categories; track category) {
+          <option [value]="category">{{ category }}</option>
+        }
+      </select>
 
-        <p class="appear-in-register">
-          <mat-checkbox [(ngModel)]="model.isVisible" name="isVisible">Appear in register</mat-checkbox>
-        </p>
-
-        <label>Description</label>
-        <p class="field-hint">Shown on the charity page.</p>
-        <textarea [(ngModel)]="model.description" name="description" rows="6" placeholder="Describe the charity for its profile page"></textarea>
-
-        <label>Country</label>
-        <select [(ngModel)]="model.country" name="country">
-          <option value="">Select country</option>
-          @for (country of countries; track country) {
-            <option [value]="country">{{ country }}</option>
-          }
-        </select>
-
-        <label>Category</label>
-        <select [(ngModel)]="model.category" name="category">
-          <option value="">Select category</option>
-          @for (category of categories; track category) {
-            <option [value]="category">{{ category }}</option>
-          }
-        </select>
-      </section>
+      <label>Lightning address (optional override)</label>
+      <input [(ngModel)]="model.lightningAddress" name="lightningAddress" placeholder="name@domain.com" />
 
       <div class="account-buttons">
         <button mat-flat-button type="submit" [disabled]="saving">{{ saving ? 'Saving…' : 'Save profile' }}</button>

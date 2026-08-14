@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CharityExtraFields, hasCharityProfileChanges, Kind0ProfileEdits, NostrService } from '../nostr.service';
+import { CharityExtraFields, NostrService } from '../nostr.service';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -45,20 +45,17 @@ export class ProfileEditorComponent implements OnInit {
   private dialog = inject(MatDialog);
 
   model: CharityExtraFields = {
+    shortDescription: '',
     description: '',
     isVisible: true
   };
 
   kind0Name = '';
   kind0About = '';
-  kind0Picture = '';
-  kind0Lud16 = '';
 
   private existingModel: CharityExtraFields = {};
-  private existingKind0Metadata: Record<string, any> = {};
   loadingExisting = false;
   saving = false;
-  uploadingLogo = false;
   needsSignerForLoad = false;
   ownPubkey: string | null = null;
   ownNpub: string | null = null;
@@ -96,7 +93,6 @@ export class ProfileEditorComponent implements OnInit {
         this.nostr.loadKind0Profile(pubkey)
       ]);
 
-      this.existingKind0Metadata = { ...(kind0 || {}) };
       this.kind0Name = (
         kind0?.['display_name'] ||
         kind0?.['displayName'] ||
@@ -105,18 +101,13 @@ export class ProfileEditorComponent implements OnInit {
         ''
       ).trim();
       this.kind0About = (kind0?.['about'] || '').trim();
-      this.kind0Picture = (kind0?.['picture'] || '').trim();
-      this.kind0Lud16 = (kind0?.['lud16'] || '').trim();
 
       if (existing) {
         this.existingModel = existing;
         this.model = { ...existing };
       }
 
-      if (!this.kind0Lud16 && this.model.lightningAddress) {
-        this.kind0Lud16 = this.model.lightningAddress.trim();
-      }
-
+      if (!this.model.shortDescription) this.model.shortDescription = this.kind0About;
       if (!this.model.description) this.model.description = '';
       if (this.model.isVisible === undefined) this.model.isVisible = true;
     } catch {
@@ -126,87 +117,31 @@ export class ProfileEditorComponent implements OnInit {
     }
   }
 
-  async uploadLogo(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file || this.uploadingLogo) return;
-
-    this.uploadingLogo = true;
-    try {
-      this.toast('Approve image upload in your signer…', 'info', 5000);
-      const uploaded = await this.nostr.uploadProfileImageToBlossom(file);
-      this.kind0Picture = uploaded.url;
-      this.toast('Logo uploaded. Save profile to publish it.', 'success', 4500);
-    } catch (e: any) {
-      console.error('[PoH] profile-editor:logo-upload-failed', e);
-      this.toast(e?.message || 'Logo upload failed', 'error', 5000);
-    } finally {
-      this.uploadingLogo = false;
-    }
-  }
-
   async save() {
     if (this.saving) return;
     this.saving = true;
 
     try {
-      const kind0Payload: Kind0ProfileEdits = {
-        name: this.kind0Name,
-        about: this.kind0About,
-        picture: this.kind0Picture,
-        lud16: this.kind0Lud16
-      };
       const payload: CharityExtraFields = {
         ...this.existingModel,
         ...this.model,
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
-      // Keep legacy app-specific fields cleared; Nostr bio and Lightning address now live in kind 0.
-      payload.shortDescription = '';
-      delete payload.lightningAddress;
 
-      this.toast('Waiting for signer approval… check your signer.', 'info', 5000);
-      let kind0Id = '';
-      let charityProfileId = '';
-      if (this.hasKind0Changes(kind0Payload)) {
-        const publishedKind0 = await this.nostr.publishKind0Profile(this.existingKind0Metadata, kind0Payload);
-        kind0Id = publishedKind0.id;
-        this.existingKind0Metadata = publishedKind0.metadata;
-      }
-
-      if (hasCharityProfileChanges(this.existingModel, payload)) {
-        charityProfileId = await this.nostr.publishCharityProfile(payload);
-        this.existingModel = { ...payload };
-        this.model = { ...payload };
-      }
-
+      this.toast('Waiting for signer approval… check your extension popup.', 'info', 5000);
+      const id = await this.nostr.publishCharityProfile(payload);
+      this.existingModel = { ...payload };
+      this.model = { ...payload };
       if (this.ownPubkey) {
-        this.nostr.refreshCharityProfileCache(this.ownPubkey, payload, this.existingKind0Metadata);
+        this.nostr.refreshCharityProfileCache(this.ownPubkey, payload);
       }
-      this.toast(this.saveSuccessMessage(kind0Id, charityProfileId), 'success', 4500);
+      this.toast(`Published charity profile event: ${id.slice(0, 10)}…`, 'success', 4500);
     } catch (e: any) {
       console.error('[PoH] profile-editor:save-failed', e);
       this.toast(e?.message || 'Failed to publish charity profile', 'error', 4500);
     } finally {
       this.saving = false;
     }
-  }
-
-  private hasKind0Changes(next: Kind0ProfileEdits): boolean {
-    const normalize = (value: any) => (typeof value === 'string' ? value.trim() : '');
-    const currentName = normalize(this.existingKind0Metadata['display_name'] || this.existingKind0Metadata['displayName'] || this.existingKind0Metadata['name'] || this.existingKind0Metadata['username']);
-    return normalize(next.name) !== currentName
-      || normalize(next.about) !== normalize(this.existingKind0Metadata['about'])
-      || normalize(next.picture) !== normalize(this.existingKind0Metadata['picture'])
-      || normalize(next.lud16) !== normalize(this.existingKind0Metadata['lud16']);
-  }
-
-  private saveSuccessMessage(kind0Id: string, charityProfileId: string): string {
-    if (kind0Id && charityProfileId) return 'Published Nostr profile and charity profile events.';
-    if (kind0Id) return 'Published Nostr profile.';
-    if (charityProfileId) return `Published charity profile event: ${charityProfileId.slice(0, 10)}…`;
-    return 'No profile changes to publish.';
   }
 
   async disconnect() {

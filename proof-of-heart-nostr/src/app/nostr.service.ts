@@ -42,20 +42,6 @@ export interface CharityExtraFields {
   isVisible?: boolean;
 }
 
-export interface Kind0ProfileEdits {
-  name?: string;
-  about?: string;
-  picture?: string;
-  lud16?: string;
-}
-
-export interface BlossomUploadResult {
-  url: string;
-  sha256: string;
-  size: number;
-  type: string;
-}
-
 export interface CharityLoadResult {
   charities: CharityProfile[];
   fromCache: boolean;
@@ -98,52 +84,6 @@ export interface CharityFeedStatus {
 export function ensureEventPubkeyForNip07(event: any, getPublicKey: () => Promise<string>): Promise<any> {
   if (event?.pubkey) return Promise.resolve(event);
   return getPublicKey().then((pubkey) => ({ ...event, pubkey }));
-}
-
-export function buildKind0ProfileMetadata(existing: Record<string, any> = {}, edits: Kind0ProfileEdits): Record<string, any> {
-  const next: Record<string, any> = { ...(existing || {}) };
-  const setOrDelete = (key: string, value: string | undefined) => {
-    const trimmed = (value || '').trim();
-    if (trimmed) {
-      next[key] = trimmed;
-    } else {
-      delete next[key];
-    }
-  };
-
-  setOrDelete('name', edits.name);
-  setOrDelete('display_name', edits.name);
-  delete next['displayName'];
-  delete next['username'];
-  setOrDelete('about', edits.about);
-  setOrDelete('picture', edits.picture);
-  setOrDelete('lud16', edits.lud16);
-
-  return next;
-}
-
-export function hasCharityProfileChanges(existing: CharityExtraFields = {}, next: CharityExtraFields = {}): boolean {
-  const keys: (keyof CharityExtraFields)[] = [
-    'description',
-    'country',
-    'category',
-    'donationMessage',
-    'isVisible'
-  ];
-  const normalize = (value: any) => typeof value === 'string' ? value.trim() : value;
-  return keys.some((key) => normalize(existing[key]) !== normalize(next[key]));
-}
-
-export function getNip46ProfilePermissions(): string {
-  return [
-    'sign_event:0',
-    'sign_event:24242',
-    'sign_event:30078',
-    'sign_event:30079',
-    'sign_event:1984',
-    'sign_event:9734',
-    'get_public_key'
-  ].join(',');
 }
 
 export function mergeCharityProfiles(existing: CharityProfile[], incoming: CharityProfile[]): CharityProfile[] {
@@ -221,7 +161,6 @@ const CHARITIES_CACHE_TTL_DETAIL_MS = 10 * 60 * 1000;
 const CHARITY_DETAIL_CACHE_PREFIX = 'poh_charity_detail_cache_v1:';
 const NIP46_SESSION_KEY = 'poh_nip46_session_v1';
 const NIP46_DEFAULT_RELAYS = ['wss://relay.nsec.app', 'wss://relay.primal.net', 'wss://relay.damus.io'];
-const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
 interface Nip46Session {
   clientSecretKey: string;
@@ -483,7 +422,7 @@ export class NostrService {
     const url = new URL(`nostrconnect://${clientPubkey}`);
     for (const relay of relays) url.searchParams.append('relay', relay);
     url.searchParams.set('secret', secret);
-    url.searchParams.set('perms', getNip46ProfilePermissions());
+    url.searchParams.set('perms', 'sign_event:9734,sign_event:1984,sign_event:30079,get_public_key');
     url.searchParams.set('name', 'Proof of Heart');
     url.searchParams.set('url', typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
     return { url: url.toString(), clientPubkey, relays };
@@ -853,8 +792,7 @@ export class NostrService {
     if (!events.length) return {};
 
     const sorted = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0));
-    const latest = this.safeJson((sorted[0] as any)?.content || '{}');
-    const merged: Record<string, any> = { ...latest };
+    const merged: Record<string, any> = {};
 
     for (const ev of sorted as any[]) {
       const data = this.safeJson(ev.content || '{}');
@@ -866,115 +804,6 @@ export class NostrService {
     }
 
     return merged;
-  }
-
-  async publishKind0Profile(existing: Record<string, any>, edits: Kind0ProfileEdits): Promise<{ id: string; metadata: Record<string, any> }> {
-    const localPubkey = typeof window !== 'undefined'
-      ? (window.localStorage.getItem(LAST_PUBKEY_KEY) || undefined)
-      : undefined;
-    const metadata = buildKind0ProfileMetadata(existing, edits);
-    const event = {
-      kind: 0,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [],
-      content: JSON.stringify(metadata),
-      ...(localPubkey ? { pubkey: localPubkey } : {})
-    };
-
-    let signed: any;
-    try {
-      signed = await this.signEventWithAvailableSigner(event, 60_000);
-    } catch (e: any) {
-      throw new Error(`Signer could not sign Nostr profile event. ${e?.message || ''}`.trim());
-    }
-
-    const relays = this.uniqueRelays([...this.getKind0ReadRelays(), ...(await this.loadAuthorWriteRelays(signed.pubkey).catch(() => []))]);
-    const publishResults = await this.withTimeout(
-      Promise.allSettled(this.pool.publish(relays, signed as any)),
-      15_000,
-      'Relay publish acknowledgements'
-    );
-    const acceptedRelays = publishResults
-      .map((result, index) => result.status === 'fulfilled' ? relays[index] : null)
-      .filter((relay): relay is string => !!relay);
-
-    if (!acceptedRelays.length) {
-      throw new Error('Signed Nostr profile event, but no relay accepted it. Try another relay/signer and retry.');
-    }
-
-    return { id: signed.id, metadata };
-  }
-
-  async uploadProfileImageToBlossom(file: File, server = DEFAULT_BLOSSOM_SERVER): Promise<BlossomUploadResult> {
-    if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.');
-    if (file.size > 2 * 1024 * 1024) throw new Error('Logo image is too large. Please use an image under 2 MB.');
-
-    const normalizedServer = server.replace(/\/+$/, '');
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const sha256 = await this.sha256Hex(bytes);
-    const expiration = Math.floor(Date.now() / 1000) + 10 * 60;
-    const authEvent = {
-      kind: 24242,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [
-        ['t', 'upload'],
-        ['expiration', String(expiration)],
-        ['server', normalizedServer],
-        ['x', sha256]
-      ],
-      content: 'Upload charity profile image'
-    };
-
-    const signedAuth = await this.signEventWithAvailableSigner(authEvent, 60_000);
-    const authHeader = `Nostr ${this.base64UrlEncode(JSON.stringify(signedAuth))}`;
-    const response = await this.withTimeout(fetch(`${normalizedServer}/upload`, {
-      method: 'PUT',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': file.type || 'application/octet-stream',
-        'X-SHA-256': sha256
-      },
-      body: bytes
-    }), 60_000, 'Image upload');
-
-    if (!response.ok) {
-      throw new Error(response.headers.get('X-Reason') || `Image upload failed (${response.status}).`);
-    }
-
-    let descriptor: any = {};
-    try {
-      descriptor = await response.json();
-    } catch {
-      descriptor = {};
-    }
-
-    return {
-      url: typeof descriptor?.url === 'string' && descriptor.url ? descriptor.url : `${normalizedServer}/${sha256}${this.fileExtensionForMime(file.type)}`,
-      sha256: typeof descriptor?.sha256 === 'string' ? descriptor.sha256 : sha256,
-      size: Number(descriptor?.size) || file.size,
-      type: typeof descriptor?.type === 'string' ? descriptor.type : file.type
-    };
-  }
-
-  private async sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  private base64UrlEncode(value: string): string {
-    const bytes = new TextEncoder().encode(value);
-    let binary = '';
-    bytes.forEach((byte) => binary += String.fromCharCode(byte));
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-
-  private fileExtensionForMime(type: string): string {
-    if (type === 'image/png') return '.png';
-    if (type === 'image/jpeg') return '.jpg';
-    if (type === 'image/webp') return '.webp';
-    if (type === 'image/gif') return '.gif';
-    if (type === 'image/svg+xml') return '.svg';
-    return '';
   }
 
   async getCurrentPubkey(): Promise<string> {
@@ -1033,6 +862,7 @@ export class NostrService {
   }
 
   async publishCharityProfile(fields: CharityExtraFields): Promise<string> {
+    if (!window.nostr) throw new Error('No Nostr signer found.');
     const appRelays = this.getWriteRelays();
 
     const localPubkey = typeof window !== 'undefined'
@@ -1055,7 +885,11 @@ export class NostrService {
 
     let signed: any;
     try {
-      signed = await this.signEventWithAvailableSigner(event, 60_000);
+      signed = await this.withTimeout(
+        window.nostr.signEvent(event),
+        60_000,
+        'Signer response'
+      );
       console.info('[PoH] publishCharityProfile:signed', { id: signed?.id, pubkey: signed?.pubkey });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:sign-failed', e);
@@ -1663,7 +1497,7 @@ export class NostrService {
     }
   }
 
-  refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields, kind0Metadata?: Record<string, any>): CharityProfile | null {
+  refreshCharityProfileCache(pubkey: string, fields: CharityExtraFields): CharityProfile | null {
     if (typeof window === 'undefined' || !pubkey) return null;
 
     const current =
@@ -1672,17 +1506,8 @@ export class NostrService {
       null;
     if (!current) return null;
 
-    const kind0Name = (kind0Metadata?.['display_name'] || kind0Metadata?.['displayName'] || kind0Metadata?.['name'] || kind0Metadata?.['username'] || '').trim();
-    const kind0About = (kind0Metadata?.['about'] || '').trim();
-    const kind0Picture = (kind0Metadata?.['picture'] || '').trim();
-    const kind0Lud16 = (kind0Metadata?.['lud16'] || '').trim();
-
     const updated: CharityProfile = {
       ...current,
-      ...(kind0Name ? { name: kind0Name } : {}),
-      ...(kind0About ? { about: kind0About } : {}),
-      ...(kind0Picture ? { picture: kind0Picture } : {}),
-      ...(kind0Metadata ? { lud16: kind0Lud16 || undefined } : {}),
       profileUpdatedAt: Math.max(Number(current.profileUpdatedAt) || 0, Math.floor(Date.now() / 1000)),
       charity: {
         ...current.charity,
