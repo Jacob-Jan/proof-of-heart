@@ -710,6 +710,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const hasNip07Signer = this.nostr.hasNip07Signer();
     const hasNip46Session = this.nostr.hasNip46Session();
 
+    if (!hasNip07Signer && hasNip46Session && isAndroidBrowser()) {
+      const connectUrl = this.nostr.getCurrentNip46ConnectUrl();
+      if (connectUrl) {
+        this.nip46ConnectUrl = connectUrl;
+        this.donationStatus = 'Opening Nostr signer for the zap approval…';
+        this.launchExternalUri(connectUrl);
+      }
+    }
+
     if (shouldStartNip46ZapPairingBeforeAndroidFallback(hasNip07Signer, hasNip46Session)) {
       try {
         await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
