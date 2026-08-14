@@ -37,6 +37,10 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
+export function shouldStartNip46ZapPairingBeforeAndroidFallback(hasNip07Signer: boolean, hasNip46Session: boolean): boolean {
+  return !hasNip07Signer && !hasNip46Session;
+}
+
 export function buildAndroidSignerZapCallbackUrl(origin: string, pathname: string, requestId: string): string {
   const callbackBaseUrl = `${origin}${cleanAndroidSignerZapCharityPathname(pathname)}`;
   return `${callbackBaseUrl}?androidSignerZap=${encodeURIComponent(`${requestId}:`)}`;
@@ -703,19 +707,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const lightningAddress = this.donationAddress;
     const since = Math.floor(Date.now() / 1000) - 10;
 
-    if (isAndroidBrowser() && !window.nostr) {
-      try {
-        await this.startAndroidSignerZap(lightningAddress, sats, since);
-        return;
-      } catch (androidErr: any) {
-        if (!this.isCurrentDonationAttempt(token)) return;
-        this.donationStatus = this.donationErrorMessage(androidErr);
-        this.donating = false;
-        return;
-      }
-    }
+    const hasNip07Signer = this.nostr.hasNip07Signer();
+    const hasNip46Session = this.nostr.hasNip46Session();
 
-    if (!window.nostr && !this.nostr.hasNip46Session()) {
+    if (shouldStartNip46ZapPairingBeforeAndroidFallback(hasNip07Signer, hasNip46Session)) {
       try {
         await this.startNip46ZapPairingAndContinue(token, lightningAddress, sats, since);
         return;
