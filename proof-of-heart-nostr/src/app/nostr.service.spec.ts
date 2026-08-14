@@ -1,4 +1,4 @@
-import { buildKind0ProfileMetadata, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
+import { buildKind0ProfileMetadata, buildNip46ConnectUrl, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
 
 describe('buildKind0ProfileMetadata', () => {
   it('updates editable Nostr profile fields while preserving unknown metadata', () => {
@@ -106,6 +106,15 @@ describe('NIP-46 profile editing permissions', () => {
     expect(permissions).toContain('sign_event:30078');
     expect(permissions).toContain('get_public_key');
   });
+
+  it('builds a reusable Nostr Connect launch URL from an existing session', () => {
+    const url = buildNip46ConnectUrl('2'.repeat(64), ['wss://relay.example'], 'pairing-secret', 'https://proofofheart.org');
+
+    expect(url).toContain(`nostrconnect://${'2'.repeat(64)}`);
+    expect(url).toContain('relay=wss%3A%2F%2Frelay.example');
+    expect(url).toContain('secret=pairing-secret');
+    expect(url).toContain('sign_event%3A9734');
+  });
 });
 
 describe('signer detection', () => {
@@ -120,6 +129,7 @@ describe('signer detection', () => {
       clientSecretKey: '1'.repeat(64),
       clientPubkey: '2'.repeat(64),
       relays: ['wss://relay.example'],
+      secret: 'pairing-secret',
       remotePubkey: '3'.repeat(64),
       userPubkey: '4'.repeat(64),
       createdAt: Date.now()
@@ -155,6 +165,7 @@ describe('publishCharityProfile', () => {
       clientSecretKey: '1'.repeat(64),
       clientPubkey: '2'.repeat(64),
       relays: ['wss://relay.example'],
+      secret: 'pairing-secret',
       remotePubkey: '3'.repeat(64),
       userPubkey: '4'.repeat(64),
       createdAt: Date.now()

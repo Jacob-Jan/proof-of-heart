@@ -146,6 +146,16 @@ export function getNip46ProfilePermissions(): string {
   ].join(',');
 }
 
+export function buildNip46ConnectUrl(clientPubkey: string, relays: string[], secret: string, origin = 'https://proofofheart.org'): string {
+  const url = new URL(`nostrconnect://${clientPubkey}`);
+  for (const relay of relays) url.searchParams.append('relay', relay);
+  url.searchParams.set('secret', secret);
+  url.searchParams.set('perms', getNip46ProfilePermissions());
+  url.searchParams.set('name', 'Proof of Heart');
+  url.searchParams.set('url', origin);
+  return url.toString();
+}
+
 export function mergeCharityProfiles(existing: CharityProfile[], incoming: CharityProfile[]): CharityProfile[] {
   const existingByPubkey = new Map(existing.map((charity) => [charity.pubkey, charity] as const));
 
@@ -484,13 +494,14 @@ export class NostrService {
     const session: Nip46Session = { clientSecretKey, clientPubkey, relays, secret, createdAt: Date.now() };
     this.writeNip46Session(session);
 
-    const url = new URL(`nostrconnect://${clientPubkey}`);
-    for (const relay of relays) url.searchParams.append('relay', relay);
-    url.searchParams.set('secret', secret);
-    url.searchParams.set('perms', getNip46ProfilePermissions());
-    url.searchParams.set('name', 'Proof of Heart');
-    url.searchParams.set('url', typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
-    return { url: url.toString(), clientPubkey, relays };
+    const url = buildNip46ConnectUrl(clientPubkey, relays, secret, typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
+    return { url, clientPubkey, relays };
+  }
+
+  getCurrentNip46ConnectUrl(): string {
+    const session = this.readNip46Session();
+    if (!session?.clientPubkey || !session?.relays?.length || !session?.secret) return '';
+    return buildNip46ConnectUrl(session.clientPubkey, session.relays, session.secret, typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
   }
 
   async waitForNip46Pairing(timeoutMs = 120_000): Promise<{ pubkey: string; npub: string }> {
