@@ -1,4 +1,4 @@
-import { buildAndroidSignerZapCallbackUrl, normalizeCharityWebsiteHref } from './charity-detail';
+import { buildAndroidSignerZapCallbackUrl, normalizeCharityWebsiteHref, shouldStartNip46ZapPairingBeforeAndroidFallback } from './charity-detail';
 
 describe('buildAndroidSignerZapCallbackUrl', () => {
   const charityPubkey = 'a'.repeat(64);
@@ -16,6 +16,17 @@ describe('buildAndroidSignerZapCallbackUrl', () => {
   it('removes directly appended signed-event JSON before creating a new Android signer callback URL', () => {
     expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey}%7B%22kind%22%3A9734%7D`, 'zap-789'))
       .toBe(`https://proofofheart.org/charities/${charityPubkey}?androidSignerZap=zap-789%3A`);
+  });
+});
+
+describe('zap signer selection', () => {
+  it('starts NIP-46 pairing when no extension signer and no remote session exist', () => {
+    expect(shouldStartNip46ZapPairingBeforeAndroidFallback(false, false)).toBeTrue();
+  });
+
+  it('does not start pairing when NIP-07 is available or NIP-46 is already paired', () => {
+    expect(shouldStartNip46ZapPairingBeforeAndroidFallback(true, false)).toBeFalse();
+    expect(shouldStartNip46ZapPairingBeforeAndroidFallback(false, true)).toBeFalse();
   });
 });
 
