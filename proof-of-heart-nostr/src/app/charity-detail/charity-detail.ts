@@ -37,6 +37,18 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
+export function buildAndroidSignerZapCallbackUrl(origin: string, pathname: string): string {
+  return `${origin}${cleanAndroidSignerZapCharityPathname(pathname)}`;
+}
+
+function cleanAndroidSignerZapCharityPathname(pathname: string): string {
+  const directAppendedMatch = pathname.match(/^(\/charities\/)([0-9a-f]{64})(?:\{|%7B|%7b).*/);
+  if (directAppendedMatch) return `${directAppendedMatch[1]}${directAppendedMatch[2]}`;
+
+  const markerIndex = pathname.indexOf(';androidSignerZap=');
+  return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
+}
+
 export function normalizeCharityWebsiteHref(website?: string): string {
   const trimmed = (website || '').trim();
   if (!trimmed) return '';
@@ -1151,7 +1163,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
       handoffState: this.currentNip55HandoffState()
     });
     this.donating = true;
-    this.donationStatus = 'Opening Android signer again… If Amber does not appear, return here and tap Open signer again.';
+    this.donationStatus = 'Opening signer again… If no signer opens, return here and tap Open signer again.';
     this.armAndroidSignerLaunchFallback();
     const launched = this.launchExternalUri(this.lastAndroidSignerUrl, method);
     this.debugNip55('manual signer launch attempted', {
@@ -1161,7 +1173,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     });
     if (!launched) {
       this.donating = false;
-      this.donationStatus = 'Could not trigger Amber from this browser. Tap Open signer again or try Chrome/Firefox on Android.';
+      this.donationStatus = 'Could not open a signer from this browser. Tap Open signer again or try another Android browser.';
     }
   }
 
@@ -1203,11 +1215,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private launchExternalUri(uri: string, method: 'default' | 'anchor' | 'location' = 'default'): boolean {
-    if (uri.startsWith('nostrsigner:') && method !== 'anchor') {
+    if (uri.startsWith('nostrsigner:') && method === 'location') {
       try {
-        // Android browsers are more reliable when custom signer schemes are assigned
-        // directly from the tap handler. A synthetic hidden-anchor click can return
-        // without actually foregrounding Amber.
         window.location.href = uri;
         return true;
       } catch {
@@ -1401,11 +1410,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const { payParams, amountMsat, zapRequest } = await this.prepareNip57ZapRequest(lightningAddress, sats);
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    // NIP-55 web callbacks append the result to callbackUrl, so the callback URL must
-    // end with a receiving key/prefix. Keep the requestId in that prefix so we can match
-    // the returned signed event to the pending standard NIP-57 zap request.
-    const callbackBaseUrl = `${window.location.origin}${this.cleanCharityPathname(window.location.pathname)}`;
-    const callbackUrl = `${callbackBaseUrl}?androidSignerZap=${encodeURIComponent(`${requestId}:`)}`;
+    // NIP-55 web callbacks append the signed event directly to callbackUrl.
+    // Use the clean charity page path and recover the request ID from pending local state
+    // so donors do not need any pre-existing Proof of Heart account/session context.
+    const callbackUrl = buildAndroidSignerZapCallbackUrl(window.location.origin, window.location.pathname);
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -1637,18 +1645,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private cleanCharityIdParam(idParam: string): string {
-    // Amber can reopen Edge as /charities/<64hex><encoded-signed-event-json> when it
-    // appends the signed event directly to a query-stripped callbackUrl. Keep the route
+    // Some Android signer/browser combinations reopen as /charities/<64hex><encoded-signed-event-json>
+    // when they append the signed event directly to a clean callbackUrl. Keep the route
     // resolvable by treating the first 64 hex chars as the actual charity pubkey.
     const hexMatch = idParam.match(/^([0-9a-f]{64})(?:\{|%7B|%7b).*/);
     return hexMatch ? hexMatch[1] : idParam;
   }
 
   private cleanCharityPathname(pathname: string): string {
-    const match = pathname.match(/^(\/charities\/)([0-9a-f]{64})(?:\{|%7B|%7b).*/);
-    if (match) return `${match[1]}${match[2]}`;
-    const markerIndex = pathname.indexOf(';androidSignerZap=');
-    return markerIndex >= 0 ? pathname.slice(0, markerIndex) : pathname;
+    return cleanAndroidSignerZapCharityPathname(pathname);
   }
 
   private readDirectAppendedAndroidSignerZapCallback(pathname: string): { requestId: string; signedZapRaw: string } | null {
@@ -1924,7 +1929,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
         this.androidSignerLaunchFallbackTimer = undefined;
       }
       const token = ++this.donationAttemptToken;
-      this.donationStatus = 'Signed zap request received from Amber. Creating invoice…';
+      this.donationStatus = 'Signed zap request received. Creating invoice…';
       this.debugNip55('requesting invoice', {
         callbackHost: this.safeHost(pending.callback),
         amountMsat: pending.amountMsat
