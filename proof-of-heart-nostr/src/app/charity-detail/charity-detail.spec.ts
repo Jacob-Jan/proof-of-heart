@@ -3,19 +3,19 @@ import { buildAndroidSignerZapCallbackUrl, normalizeCharityWebsiteHref } from '.
 describe('buildAndroidSignerZapCallbackUrl', () => {
   const charityPubkey = 'a'.repeat(64);
 
-  it('uses the clean charity page URL without request-id query state for donor signer callbacks', () => {
-    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey}`))
-      .toBe(`https://proofofheart.org/charities/${charityPubkey}`);
+  it('uses the July-compatible request-id query callback prefix for Android signer callbacks', () => {
+    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey}`, 'zap-123'))
+      .toBe(`https://proofofheart.org/charities/${charityPubkey}?androidSignerZap=zap-123%3A`);
   });
 
   it('removes legacy path callback markers before creating a new Android signer callback URL', () => {
-    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey};androidSignerZap=old:%7B%7D`))
-      .toBe(`https://proofofheart.org/charities/${charityPubkey}`);
+    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey};androidSignerZap=old:%7B%7D`, 'zap-456'))
+      .toBe(`https://proofofheart.org/charities/${charityPubkey}?androidSignerZap=zap-456%3A`);
   });
 
   it('removes directly appended signed-event JSON before creating a new Android signer callback URL', () => {
-    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey}%7B%22kind%22%3A9734%7D`))
-      .toBe(`https://proofofheart.org/charities/${charityPubkey}`);
+    expect(buildAndroidSignerZapCallbackUrl('https://proofofheart.org', `/charities/${charityPubkey}%7B%22kind%22%3A9734%7D`, 'zap-789'))
+      .toBe(`https://proofofheart.org/charities/${charityPubkey}?androidSignerZap=zap-789%3A`);
   });
 });
 

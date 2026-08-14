@@ -37,8 +37,9 @@ function isAndroidBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 }
 
-export function buildAndroidSignerZapCallbackUrl(origin: string, pathname: string): string {
-  return `${origin}${cleanAndroidSignerZapCharityPathname(pathname)}`;
+export function buildAndroidSignerZapCallbackUrl(origin: string, pathname: string, requestId: string): string {
+  const callbackBaseUrl = `${origin}${cleanAndroidSignerZapCharityPathname(pathname)}`;
+  return `${callbackBaseUrl}?androidSignerZap=${encodeURIComponent(`${requestId}:`)}`;
 }
 
 function cleanAndroidSignerZapCharityPathname(pathname: string): string {
@@ -1215,8 +1216,11 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   private launchExternalUri(uri: string, method: 'default' | 'anchor' | 'location' = 'default'): boolean {
-    if (uri.startsWith('nostrsigner:') && method === 'location') {
+    if (uri.startsWith('nostrsigner:') && method !== 'anchor') {
       try {
+        // Android browsers are more reliable when custom signer schemes are assigned
+        // directly from the tap handler. A synthetic hidden-anchor click can return
+        // without actually foregrounding the signing app.
         window.location.href = uri;
         return true;
       } catch {
@@ -1411,9 +1415,9 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     // NIP-55 web callbacks append the signed event directly to callbackUrl.
-    // Use the clean charity page path and recover the request ID from pending local state
-    // so donors do not need any pre-existing Proof of Heart account/session context.
-    const callbackUrl = buildAndroidSignerZapCallbackUrl(window.location.origin, window.location.pathname);
+    // Keep the request ID in the query prefix, matching the known-good July Android zap flow,
+    // so the returned signed event can be matched to the pending standard NIP-57 zap request.
+    const callbackUrl = buildAndroidSignerZapCallbackUrl(window.location.origin, window.location.pathname, requestId);
 
     const signerUrl = `nostrsigner:${encodeURIComponent(JSON.stringify(zapRequest))}`
       + `?compressionType=none&returnType=event&type=sign_event&callbackUrl=${encodeURIComponent(callbackUrl)}`;
