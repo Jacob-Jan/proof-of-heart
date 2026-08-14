@@ -504,6 +504,17 @@ export class NostrService {
     return buildNip46ConnectUrl(session.clientPubkey, session.relays, session.secret, typeof window !== 'undefined' ? window.location.origin : 'https://proofofheart.org');
   }
 
+  async isNip46SessionResponsive(timeoutMs = 1_500): Promise<boolean> {
+    if (!this.hasNip46Session()) return false;
+    try {
+      const userPubkey = await this.nip46Request('get_public_key', [], timeoutMs);
+      if (userPubkey && typeof window !== 'undefined') window.localStorage.setItem(LAST_PUBKEY_KEY, userPubkey);
+      return !!userPubkey;
+    } catch {
+      return false;
+    }
+  }
+
   async waitForNip46Pairing(timeoutMs = 120_000): Promise<{ pubkey: string; npub: string }> {
     const session = this.readNip46Session();
     if (!session) throw new Error('No NIP-46 pairing request is active.');
