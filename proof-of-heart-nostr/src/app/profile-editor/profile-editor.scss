@@ -146,32 +146,6 @@
       background: #fff;
     }
 
-    .description-mode-toggle {
-      display: inline-flex;
-      width: fit-content;
-      gap: 4px;
-      padding: 4px;
-      border: 1px solid #ded7c9;
-      border-radius: 999px;
-      background: #fff;
-
-      button {
-        border: 0;
-        border-radius: 999px;
-        padding: 6px 12px;
-        background: transparent;
-        color: #6f675c;
-        font: inherit;
-        font-size: 0.86rem;
-        cursor: pointer;
-
-        &.active {
-          background: #2f2a22;
-          color: #fff;
-        }
-      }
-    }
-
     .description-editor-shell {
       border: 1px solid #d7d1c4;
       border-radius: 14px;

@@ -61,20 +61,25 @@ describe('ProfileEditorComponent rich description editor', () => {
     return { fixture, component: fixture.componentInstance, nostr, router, snack, dialog };
   }
 
-  it('shows the rich HTML editor and formatting toolbar for charity descriptions', async () => {
+  it('shows only the rich HTML editor and compact formatting toolbar for charity descriptions', async () => {
     const { fixture } = await setup();
 
     const toolbar = fixture.nativeElement.querySelector('.description-toolbar') as HTMLElement;
     const editor = fixture.nativeElement.querySelector('.rich-description-editor') as HTMLElement;
     const textarea = fixture.nativeElement.querySelector('textarea[name="description"]') as HTMLTextAreaElement | null;
+    const modeToggle = fixture.nativeElement.querySelector('.description-mode-toggle') as HTMLElement | null;
 
+    expect(modeToggle).withContext('plain text mode toggle should be removed').toBeNull();
     expect(toolbar).withContext('description formatting toolbar should be visible').toBeTruthy();
     expect(toolbar.textContent).toContain('Heading');
+    expect(toolbar.textContent).toContain('Paragraph');
     expect(toolbar.textContent).toContain('• List');
+    expect(toolbar.textContent).not.toContain('Text');
+    expect(toolbar.textContent).not.toContain('Clear');
     expect(editor).withContext('contenteditable rich description editor should be visible').toBeTruthy();
     expect(editor.getAttribute('contenteditable')).toBe('true');
     expect(editor.querySelector('strong')?.textContent).toBe('HTML');
-    expect(textarea).withContext('plain textarea should be hidden while rich mode is active').toBeNull();
+    expect(textarea).withContext('plain textarea should not exist for descriptions').toBeNull();
   });
 
   it('sanitizes rich editor input into the saved description model', async () => {
@@ -91,17 +96,19 @@ describe('ProfileEditorComponent rich description editor', () => {
     expect(component.model.description).toContain('href="https://example.org/"');
   });
 
-  it('can switch to the plain text fallback editor', async () => {
-    const { fixture, component } = await setup('<p>Line <strong>one</strong></p><ul><li>Two</li></ul>');
+  it('signs out immediately without a confirmation dialog', async () => {
+    const { fixture, component, nostr, router, dialog } = await setup();
 
-    component.setDescriptionMode('text');
-    fixture.detectChanges();
-    await fixture.whenStable();
+    const signOutButton = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((button) => button.textContent?.trim() === 'Sign out');
+    expect(signOutButton).withContext('sign-out button should use familiar copy').toBeTruthy();
+
+    await component.disconnect();
     fixture.detectChanges();
 
-    const textarea = fixture.nativeElement.querySelector('textarea[name="description"]') as HTMLTextAreaElement;
-    expect(textarea).toBeTruthy();
-    expect(component.model.description).toContain('Line one');
-    expect(component.model.description).toContain('Two');
+    expect(dialog.open).not.toHaveBeenCalled();
+    expect(nostr.getCurrentPubkey).toHaveBeenCalled();
+    expect(nostr.disconnectCurrentSession).toHaveBeenCalledWith('a'.repeat(64));
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
 });
