@@ -6,27 +6,8 @@ import { CharityExtraFields, hasCharityProfileChanges, Kind0ProfileEdits, NostrS
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatButtonModule, MatAnchor } from '@angular/material/button';
+import { MatAnchor } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { firstValueFrom } from 'rxjs';
-
-@Component({
-  selector: 'app-disconnect-confirm-dialog',
-  standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule],
-  template: `
-    <h2 mat-dialog-title>Disconnect charity account?</h2>
-    <mat-dialog-content>
-      This disconnects this charity on this device. You can reconnect anytime from onboarding.
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button [mat-dialog-close]="false">Cancel</button>
-      <button mat-flat-button color="warn" [mat-dialog-close]="true">Disconnect</button>
-    </mat-dialog-actions>
-  `
-})
-export class DisconnectConfirmDialogComponent {}
 
 @Component({
   selector: 'app-profile-editor',
@@ -42,7 +23,6 @@ export class ProfileEditorComponent implements OnInit {
   private nostr = inject(NostrService);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
-  private dialog = inject(MatDialog);
 
   model: CharityExtraFields = {
     description: '',
@@ -70,7 +50,6 @@ export class ProfileEditorComponent implements OnInit {
   readonly categories = CHARITY_CATEGORIES;
   readonly countries = COUNTRIES;
   @ViewChild('descriptionEditor') descriptionEditor?: ElementRef<HTMLElement>;
-  descriptionMode: 'rich' | 'text' = 'rich';
   descriptionEditorHtml = '';
 
   async ngOnInit() {
@@ -176,23 +155,7 @@ export class ProfileEditorComponent implements OnInit {
 
   private syncDescriptionEditorFromModel() {
     const description = this.model.description || '';
-    this.descriptionMode = this.looksLikeHtml(description) ? 'rich' : this.descriptionMode;
-    this.descriptionEditorHtml = this.descriptionMode === 'rich'
-      ? this.descriptionToEditorHtml(description)
-      : '';
-  }
-
-  setDescriptionMode(mode: 'rich' | 'text') {
-    if (this.descriptionMode === mode) return;
-    if (mode === 'text') {
-      this.model.description = this.descriptionAsPlainText(this.model.description || '');
-      this.descriptionEditorHtml = '';
-    } else {
-      this.model.description = this.plainTextToHtml(this.model.description || '');
-      this.descriptionEditorHtml = this.model.description || '';
-      setTimeout(() => this.focusDescriptionEditor(), 0);
-    }
-    this.descriptionMode = mode;
+    this.descriptionEditorHtml = this.descriptionToEditorHtml(description);
   }
 
   onDescriptionEditorInput(event: Event) {
@@ -201,8 +164,7 @@ export class ProfileEditorComponent implements OnInit {
     this.model.description = this.emptyHtmlToBlank(html);
   }
 
-  formatDescription(command: 'bold' | 'italic' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock' | 'removeFormat', value?: string) {
-    if (this.descriptionMode !== 'rich') return;
+  formatDescription(command: 'bold' | 'italic' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock', value?: string) {
     this.focusDescriptionEditor();
     document.execCommand(command, false, value);
     const editor = this.descriptionEditor?.nativeElement;
@@ -215,7 +177,6 @@ export class ProfileEditorComponent implements OnInit {
   }
 
   addDescriptionLink() {
-    if (this.descriptionMode !== 'rich') return;
     this.focusDescriptionEditor();
     const url = window.prompt('Paste a link URL');
     if (!url) return;
@@ -254,13 +215,6 @@ export class ProfileEditorComponent implements OnInit {
       .split(/\n{2,}/)
       .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
       .join('');
-  }
-
-  private descriptionAsPlainText(value: string): string {
-    if (!this.looksLikeHtml(value)) return value;
-    const doc = new DOMParser().parseFromString(value, 'text/html');
-    doc.querySelectorAll('p, h2, h3, blockquote, li').forEach((el) => el.append('\n'));
-    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   private sanitizeDescriptionHtml(value: string): string {
@@ -348,10 +302,8 @@ export class ProfileEditorComponent implements OnInit {
     this.saveStatus = 'Preparing profile changes…';
 
     try {
-      if (this.descriptionMode === 'rich') {
-        const editorHtml = this.descriptionEditor?.nativeElement.innerHTML || this.descriptionEditorHtml || '';
-        this.model.description = this.emptyHtmlToBlank(this.sanitizeDescriptionHtml(editorHtml));
-      }
+      const editorHtml = this.descriptionEditor?.nativeElement.innerHTML || this.descriptionEditorHtml || '';
+      this.model.description = this.emptyHtmlToBlank(this.sanitizeDescriptionHtml(editorHtml));
 
       const kind0Payload: Kind0ProfileEdits = {
         name: this.kind0Name,
@@ -417,21 +369,13 @@ export class ProfileEditorComponent implements OnInit {
 
   async disconnect() {
     if (this.disconnecting) return;
-    const dialogRef = this.dialog.open(DisconnectConfirmDialogComponent, {
-      width: '420px',
-      maxWidth: '92vw',
-      autoFocus: false
-    });
-
-    const confirmed = await firstValueFrom(dialogRef.afterClosed());
-    if (!confirmed) return;
 
     this.disconnecting = true;
-    this.saveStatus = 'Disconnecting this charity account on this device…';
+    this.saveStatus = 'Signing out…';
     try {
       const pubkey = await this.nostr.getCurrentPubkey();
       this.nostr.disconnectCurrentSession(pubkey);
-      this.toast('Disconnected. You can connect a different signer anytime.', 'info', 3500);
+      this.toast('Signed out.', 'info', 3500);
       await this.router.navigate(['/']);
     } finally {
       this.disconnecting = false;
