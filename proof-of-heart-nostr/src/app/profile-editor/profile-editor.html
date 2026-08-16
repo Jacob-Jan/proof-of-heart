@@ -96,6 +96,7 @@
             data-placeholder="Tell donors what the charity does, who it helps, and why donations matter."
             [innerHTML]="descriptionEditorHtml"
             (input)="onDescriptionEditorInput($event)"
+            (paste)="onDescriptionEditorPaste($event)"
             (blur)="onDescriptionEditorInput($event)"></div>
         </div>
 

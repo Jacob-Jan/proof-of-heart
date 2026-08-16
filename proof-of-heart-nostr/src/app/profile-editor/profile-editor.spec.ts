@@ -86,12 +86,17 @@ describe('ProfileEditorComponent rich description editor', () => {
     const { fixture, component } = await setup('Plain starting text');
     const editor = fixture.nativeElement.querySelector('.rich-description-editor') as HTMLElement;
 
-    editor.innerHTML = '<p>Hello <strong>donors</strong><script>alert(1)</script></p><a href="javascript:alert(1)">bad</a><a href="example.org">good</a>';
+    editor.innerHTML = '<h1 onclick="alert(1)">Hello</h1><p style="color:red">Hello <strong>donors</strong><script>alert(1)</script><img alt="bad image"></p><a href="javascript:alert(1)">bad</a><a href="example.org">good</a><svg><circle></circle></svg>';
     editor.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     expect(component.model.description).toContain('<strong>donors</strong>');
-    expect(component.model.description).not.toContain('<script>');
+    expect(component.model.description).not.toContain('<h1');
+    expect(component.model.description).not.toContain('<img');
+    expect(component.model.description).not.toContain('<script');
+    expect(component.model.description).not.toContain('<svg');
+    expect(component.model.description).not.toContain('onclick');
+    expect(component.model.description).not.toContain('style=');
     expect(component.model.description).not.toContain('javascript:');
     expect(component.model.description).toContain('href="https://example.org/"');
   });

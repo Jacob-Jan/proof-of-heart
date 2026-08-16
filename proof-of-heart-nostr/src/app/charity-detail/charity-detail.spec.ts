@@ -82,6 +82,58 @@ describe('charity detail description rendering', () => {
     expect(description.querySelector('li')?.textContent).toBe('Two');
     expect(description.textContent).not.toContain('<strong>');
   });
+
+  it('strips unsafe and unsupported HTML from relay-supplied long descriptions', async () => {
+    await TestBed.configureTestingModule({
+      imports: [CharityDetailComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['npub', 'npub1test']])) } },
+        { provide: NostrService, useValue: { clearCharityFeedStatus: jasmine.createSpy('clearCharityFeedStatus') } },
+        { provide: MatSnackBar, useValue: { open: jasmine.createSpy('open') } },
+        { provide: Meta, useValue: { updateTag: jasmine.createSpy('updateTag') } },
+        { provide: Title, useValue: { setTitle: jasmine.createSpy('setTitle') } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CharityDetailComponent);
+    const component = fixture.componentInstance;
+    spyOn(component, 'ngOnInit').and.stub();
+    component.loading = false;
+    component.charity = {
+      pubkey: 'a'.repeat(64),
+      npub: 'npub1test',
+      name: 'HTML Charity',
+      about: 'Short',
+      picture: '',
+      website: '',
+      followers: 0,
+      ratingAvg: 0,
+      ratingCount: 0,
+      flags: 0,
+      zappedSats: 0,
+      activityLoaded: true,
+      charity: {
+        description: '<h1 onclick="alert(1)">Big</h1><p style="color:red">Safe <strong>bold</strong><img src=x onerror="alert(1)"></p><script>alert(1)</script><a href="javascript:alert(2)">bad</a><a href="example.org">good</a><svg><circle></circle></svg>',
+        category: 'Education',
+        country: 'NL',
+        lightningAddress: 'donate@example.org',
+        isVisible: true
+      }
+    } as any;
+
+    fixture.detectChanges();
+
+    const description = fixture.nativeElement.querySelector('.description') as HTMLElement;
+    expect(description.querySelector('h1')).withContext('unsupported heading tags should not render').toBeNull();
+    expect(description.querySelector('img')).withContext('images should not render from descriptions').toBeNull();
+    expect(description.querySelector('script')).toBeNull();
+    expect(description.querySelector('svg')).toBeNull();
+    expect(description.innerHTML).not.toContain('onclick');
+    expect(description.innerHTML).not.toContain('style=');
+    expect(description.innerHTML).not.toContain('javascript:');
+    expect(description.querySelector('strong')?.textContent).toBe('bold');
+    expect(description.querySelector('a')?.getAttribute('href')).toBe('https://example.org/');
+  });
 });
 
 describe('normalizeCharityWebsiteHref', () => {

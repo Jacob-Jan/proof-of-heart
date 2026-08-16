@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CharityExtraFields, hasCharityProfileChanges, Kind0ProfileEdits, NostrService } from '../nostr.service';
+import { descriptionToEditorHtml, emptyDescriptionHtmlToBlank, normalizeDescriptionLinkUrl, sanitizeDescriptionHtml } from '../safe-description-html';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -155,13 +156,28 @@ export class ProfileEditorComponent implements OnInit {
 
   private syncDescriptionEditorFromModel() {
     const description = this.model.description || '';
-    this.descriptionEditorHtml = this.descriptionToEditorHtml(description);
+    this.descriptionEditorHtml = descriptionToEditorHtml(description);
   }
 
   onDescriptionEditorInput(event: Event) {
     const editor = event.target as HTMLElement;
-    const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
-    this.model.description = this.emptyHtmlToBlank(html);
+    const html = sanitizeDescriptionHtml(editor.innerHTML || '');
+    this.model.description = emptyDescriptionHtmlToBlank(html);
+  }
+
+  onDescriptionEditorPaste(event: ClipboardEvent) {
+    event.preventDefault();
+    const html = event.clipboardData?.getData('text/html') || '';
+    const text = event.clipboardData?.getData('text/plain') || '';
+    const safeHtml = html ? sanitizeDescriptionHtml(html) : descriptionToEditorHtml(text);
+    document.execCommand('insertHTML', false, safeHtml);
+    const editor = this.descriptionEditor?.nativeElement;
+    if (editor) {
+      const sanitized = sanitizeDescriptionHtml(editor.innerHTML || '');
+      editor.innerHTML = sanitized;
+      this.descriptionEditorHtml = sanitized;
+      this.model.description = emptyDescriptionHtmlToBlank(sanitized);
+    }
   }
 
   formatDescription(command: 'bold' | 'italic' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock', value?: string) {
@@ -169,10 +185,10 @@ export class ProfileEditorComponent implements OnInit {
     document.execCommand(command, false, value);
     const editor = this.descriptionEditor?.nativeElement;
     if (editor) {
-      const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
+      const html = sanitizeDescriptionHtml(editor.innerHTML || '');
       editor.innerHTML = html;
       this.descriptionEditorHtml = html;
-      this.model.description = this.emptyHtmlToBlank(html);
+      this.model.description = emptyDescriptionHtmlToBlank(html);
     }
   }
 
@@ -180,7 +196,7 @@ export class ProfileEditorComponent implements OnInit {
     this.focusDescriptionEditor();
     const url = window.prompt('Paste a link URL');
     if (!url) return;
-    const safeUrl = this.safeUrl(url);
+    const safeUrl = normalizeDescriptionLinkUrl(url);
     if (!safeUrl) {
       this.toast('Use an http or https link.', 'error', 3500);
       return;
@@ -188,83 +204,15 @@ export class ProfileEditorComponent implements OnInit {
     document.execCommand('createLink', false, safeUrl);
     const editor = this.descriptionEditor?.nativeElement;
     if (editor) {
-      const html = this.sanitizeDescriptionHtml(editor.innerHTML || '');
+      const html = sanitizeDescriptionHtml(editor.innerHTML || '');
       editor.innerHTML = html;
       this.descriptionEditorHtml = html;
-      this.model.description = this.emptyHtmlToBlank(html);
+      this.model.description = emptyDescriptionHtmlToBlank(html);
     }
   }
 
   private focusDescriptionEditor() {
     this.descriptionEditor?.nativeElement.focus();
-  }
-
-  private looksLikeHtml(value: string): boolean {
-    return /<\/?(p|br|strong|b|em|i|ul|ol|li|h2|h3|blockquote|a)\b/i.test(value || '');
-  }
-
-  private descriptionToEditorHtml(value: string): string {
-    if (!value) return '';
-    return this.looksLikeHtml(value) ? this.sanitizeDescriptionHtml(value) : this.plainTextToHtml(value);
-  }
-
-  private plainTextToHtml(value: string): string {
-    const escaped = this.escapeHtml(value.trim());
-    if (!escaped) return '';
-    return escaped
-      .split(/\n{2,}/)
-      .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
-      .join('');
-  }
-
-  private sanitizeDescriptionHtml(value: string): string {
-    const allowedTags = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'H2', 'H3', 'BLOCKQUOTE', 'A']);
-    const doc = new DOMParser().parseFromString(value || '', 'text/html');
-    doc.body.querySelectorAll('*').forEach((el) => {
-      if (!allowedTags.has(el.tagName)) {
-        el.replaceWith(...Array.from(el.childNodes));
-        return;
-      }
-      const originalHref = el.getAttribute('href') || '';
-      Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
-      if (el.tagName === 'A') {
-        const href = this.safeUrl(originalHref);
-        if (href) {
-          el.setAttribute('href', href);
-          el.setAttribute('target', '_blank');
-          el.setAttribute('rel', 'noopener noreferrer');
-        } else {
-          el.replaceWith(...Array.from(el.childNodes));
-        }
-      }
-    });
-    return this.emptyHtmlToBlank(doc.body.innerHTML);
-  }
-
-  private emptyHtmlToBlank(value: string): string {
-    const normalized = (value || '').replace(/<p><br><\/p>/gi, '').replace(/&nbsp;/gi, ' ').trim();
-    return normalized && normalized !== '<br>' ? normalized : '';
-  }
-
-  private safeUrl(value: string): string {
-    const trimmed = (value || '').trim();
-    if (!trimmed) return '';
-    const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    try {
-      const parsed = new URL(candidate);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
-    } catch {
-      return '';
-    }
-  }
-
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 
   async uploadLogo(event: Event) {
@@ -303,7 +251,7 @@ export class ProfileEditorComponent implements OnInit {
 
     try {
       const editorHtml = this.descriptionEditor?.nativeElement.innerHTML || this.descriptionEditorHtml || '';
-      this.model.description = this.emptyHtmlToBlank(this.sanitizeDescriptionHtml(editorHtml));
+      this.model.description = emptyDescriptionHtmlToBlank(sanitizeDescriptionHtml(editorHtml));
 
       const kind0Payload: Kind0ProfileEdits = {
         name: this.kind0Name,
