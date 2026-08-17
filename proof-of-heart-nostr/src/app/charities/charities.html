@@ -78,7 +78,7 @@
           </div>
         </div>
         <div class="middle">
-          <p>{{ charity.about || charity.charity.description || 'No charity description yet.' }}</p>
+          <p>{{ cardSummary(charity) }}</p>
         </div>
         <div class="bottom">
           <button class="primary" mat-stroked-button>

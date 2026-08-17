@@ -83,6 +83,51 @@ describe('charity detail description rendering', () => {
     expect(description.textContent).not.toContain('<strong>');
   });
 
+  it('does not add a redundant heading before the long charity description', async () => {
+    await TestBed.configureTestingModule({
+      imports: [CharityDetailComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['npub', 'npub1test']])) } },
+        { provide: NostrService, useValue: { clearCharityFeedStatus: jasmine.createSpy('clearCharityFeedStatus') } },
+        { provide: MatSnackBar, useValue: { open: jasmine.createSpy('open') } },
+        { provide: Meta, useValue: { updateTag: jasmine.createSpy('updateTag') } },
+        { provide: Title, useValue: { setTitle: jasmine.createSpy('setTitle') } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CharityDetailComponent);
+    const component = fixture.componentInstance;
+    spyOn(component, 'ngOnInit').and.stub();
+    component.loading = false;
+    component.charity = {
+      pubkey: 'a'.repeat(64),
+      npub: 'npub1test',
+      name: 'HTML Charity',
+      about: 'Short',
+      picture: '',
+      website: '',
+      followers: 0,
+      ratingAvg: 0,
+      ratingCount: 0,
+      flags: 0,
+      zappedSats: 0,
+      activityLoaded: true,
+      charity: {
+        description: '<p>Line <strong>one</strong></p>',
+        category: 'Education',
+        country: 'NL',
+        lightningAddress: 'donate@example.org',
+        isVisible: true
+      }
+    } as any;
+
+    fixture.detectChanges();
+
+    const descriptionColumn = fixture.nativeElement.querySelector('.middle .left') as HTMLElement;
+    expect(descriptionColumn.textContent).not.toContain('More about HTML Charity');
+    expect(descriptionColumn.querySelector('.description')?.textContent).toContain('Line one');
+  });
+
   it('strips unsafe and unsupported HTML from relay-supplied long descriptions', async () => {
     await TestBed.configureTestingModule({
       imports: [CharityDetailComponent],
