@@ -7,6 +7,18 @@ import { MatButtonModule } from '@angular/material/button';
 import { CharityProfile, NostrService } from '../nostr.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
+const CARD_DESCRIPTION_PLACEHOLDER = 'Short summary not available yet.';
+
+export function selectCharityCardSummary(charity: Pick<CharityProfile, 'about' | 'charity'> | null | undefined): string {
+  const nostrBio = charity?.about?.trim();
+  if (nostrBio) return nostrBio;
+
+  const shortDescription = charity?.charity?.shortDescription?.trim();
+  if (shortDescription) return shortDescription;
+
+  return CARD_DESCRIPTION_PLACEHOLDER;
+}
+
 @Component({
   selector: 'app-charities',
   standalone: true,
@@ -145,6 +157,10 @@ export class CharitiesComponent implements OnInit, OnDestroy {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
+  cardSummary(charity: CharityProfile): string {
+    return selectCharityCardSummary(charity);
+  }
+
   search(term: string) {
     this.filter_name = term;
     this.applyFilters();
@@ -226,7 +242,7 @@ export class CharitiesComponent implements OnInit, OnDestroy {
             '@type': 'NGO',
             name: c.name,
             url: `https://proofofheart.org/charities/${c.npub}`,
-            description: c.about || c.charity.description || '',
+            description: selectCharityCardSummary(c),
             image: c.picture || 'https://proofofheart.org/assets/logo.png',
             areaServed: c.charity.country ? { '@type': 'Country', name: c.charity.country } : undefined,
             sameAs: c.website ? [c.website] : undefined
