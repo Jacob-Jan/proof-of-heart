@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Meta, Title } from '@angular/platform-browser';
+import { sanitizeDescriptionHtml } from '../safe-description-html';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { bech32 } from '@scure/base';
@@ -435,6 +436,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
 
   charityWebsiteHref(website?: string): string {
     return normalizeCharityWebsiteHref(website);
+  }
+
+  charityDescriptionHtml(): string {
+    return sanitizeDescriptionHtml(this.charity?.charity.description || 'No charity description yet.');
   }
 
   openRateDialog() {
