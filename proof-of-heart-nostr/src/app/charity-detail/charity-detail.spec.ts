@@ -36,6 +36,34 @@ describe('zap signer selection', () => {
   });
 });
 
+describe('charity detail loading state', () => {
+  it('spaces the loading spinner and text like the home page loading state', async () => {
+    await TestBed.configureTestingModule({
+      imports: [CharityDetailComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['npub', 'npub1test']])) } },
+        { provide: NostrService, useValue: { clearCharityFeedStatus: jasmine.createSpy('clearCharityFeedStatus') } },
+        { provide: MatSnackBar, useValue: { open: jasmine.createSpy('open') } },
+        { provide: Meta, useValue: { updateTag: jasmine.createSpy('updateTag') } },
+        { provide: Title, useValue: { setTitle: jasmine.createSpy('setTitle') } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CharityDetailComponent);
+    const component = fixture.componentInstance;
+    spyOn(component, 'ngOnInit').and.stub();
+    component.loading = true;
+
+    fixture.detectChanges();
+
+    const loadingState = fixture.nativeElement.querySelector('.loadingcharity') as HTMLElement;
+    const styles = getComputedStyle(loadingState);
+    expect(styles.flexDirection).toBe('column');
+    expect(styles.alignItems).toBe('center');
+    expect(styles.gap).toBe('12px');
+  });
+});
+
 describe('charity detail description rendering', () => {
   it('renders saved safe HTML tags in the long charity description', async () => {
     await TestBed.configureTestingModule({
