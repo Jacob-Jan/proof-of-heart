@@ -37,21 +37,6 @@
       }
     }
 
-    .top-actions {
-      .edit-profile-btn {
-        min-height: 34px;
-        border-radius: 999px;
-        padding: 0 12px;
-        font-size: 0.83rem;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: #f7f1e6;
-        color: #7a4a09;
-      }
-    }
-
     @media (max-width: 700px) {
       flex-direction: column;
       align-items: stretch;
@@ -103,13 +88,6 @@
         }
       }
     }
-  }
-
-  .load-status {
-    margin: 12px 0 0;
-    color: #6a6255;
-    font-size: 0.95rem;
-    font-style: italic;
   }
 
   .middle {
@@ -388,10 +366,21 @@
 }
 
 .loadingcharity {
-  margin-top: 100px;
+  margin: 28px 0 20px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  color: #6a6255;
   text-align: center;
+
+  .loadingtext {
+    margin: 0;
+    font-size: 0.98rem;
+    color: #7a746a;
+  }
 }
 
 .dialog-overlay {
