@@ -239,8 +239,11 @@
       align-items: center;
 
       .title {
+        min-width: 0;
+
         h2 {
           margin: 0;
+          overflow-wrap: anywhere;
         }
 
         .charity-meta {
@@ -266,6 +269,11 @@
     .middle {
       flex: 1;
       line-height: 1.3;
+
+      p {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
     }
 
     .bottom {

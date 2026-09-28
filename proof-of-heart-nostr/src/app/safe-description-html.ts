@@ -47,8 +47,17 @@ export function normalizeDescriptionLinkUrl(value: string): string {
 }
 
 export function emptyDescriptionHtmlToBlank(value: string): string {
-  const normalized = (value || '').replace(/<p><br><\/p>/gi, '').replace(/&nbsp;/gi, ' ').trim();
-  return normalized && normalized !== '<br>' ? normalized : '';
+  const normalized = (value || '').replace(/&nbsp;/gi, ' ').trim();
+  if (!normalized) return '';
+
+  // Keep intentional empty paragraphs/soft breaks when the description also contains text.
+  // Formatting commands re-run sanitization, so removing every <p><br></p> would silently
+  // collapse the author's line breaks elsewhere in the editor.
+  const textOnly = normalized
+    .replace(/<br\s*\/?\s*>/gi, '')
+    .replace(/<\/?p\b[^>]*>/gi, '')
+    .replace(/\s/g, '');
+  return textOnly ? normalized : '';
 }
 
 function plainDescriptionTextToHtml(value: string): string {
