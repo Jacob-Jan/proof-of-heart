@@ -120,7 +120,7 @@
       <div class="account-buttons">
         <button mat-flat-button type="submit" [disabled]="saving || uploadingLogo || disconnecting || !profileFreshForSave">{{ saving ? 'Publishing…' : 'Save profile' }}</button>
         @if (ownNpub) {
-          <a [routerLink]="['/charities', ownNpub]">
+          <a [routerLink]="['/charities', ownNpub]" target="_blank" rel="noopener">
             <button mat-stroked-button type="button" [disabled]="saving || disconnecting">View profile</button>
           </a>
         }

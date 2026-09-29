@@ -37,8 +37,8 @@ export async function seedLocalRelayCharity(): Promise<{ pubkey: string; npubHin
     created_at: now,
     tags: [['d', 'proofofheart-charity-profile-v1']],
     content: JSON.stringify({
-      shortDescription: 'Seeded for e2e',
-      description: 'Local test charity profile used by Playwright E2E',
+      shortDescription: 'Seeded for e2e. https://proofofheart.org/charities/npub1thisisadeliberatelylongunbrokenurlusedtotestmobiletextwrappingwithoutcausinghorizontalscrolling',
+      description: 'Local test charity profile used by Playwright E2E. https://proofofheart.org/charities/npub1thisisadeliberatelylongunbrokenurlusedtotestmobiletextwrappingwithoutcausinghorizontalscrolling',
       country: 'Testland',
       category: 'Education',
       donationMessage: 'Thanks for testing',

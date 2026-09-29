@@ -39,6 +39,15 @@ test.describe('Main user flows', () => {
     await expect(home.charities.first().locator('h2')).toContainText(firstName, { timeout: 10_000 });
   });
 
+  test('long profile URLs do not cause horizontal scrolling', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const home = new HomePage(page);
+    await home.open();
+    await home.waitForCharitiesToRender();
+
+    await expect.poll(() => page.locator('.charity .middle p').first().evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  });
+
   test('open charity detail', async ({ page }) => {
     const home = new HomePage(page);
     await home.open();

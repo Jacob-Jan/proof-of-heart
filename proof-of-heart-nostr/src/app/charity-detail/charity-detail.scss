@@ -19,14 +19,19 @@
       }
 
       .title-wrap {
+        min-width: 0;
+
         h1 {
           margin: 0;
+          overflow-wrap: anywhere;
         }
 
         .short-description {
           margin: 8px 0 0;
           color: #4a4a4a;
           line-height: 1.45;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .website {
@@ -102,10 +107,8 @@
 
       .description {
         line-height: 1.5;
-      }
-
-      .edit-wrap {
-        margin-top: 16px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .meta-block {
