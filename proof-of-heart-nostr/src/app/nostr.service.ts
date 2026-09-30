@@ -1111,6 +1111,7 @@ export class NostrService {
     // The app relays remain the rendezvous set used for directory discovery.
     const relays = this.uniqueRelays([...appRelays, ...(await this.loadAuthorWriteRelays(signed.pubkey).catch(() => []))]);
 
+    const requiredReplicas = Math.min(3, relays.length);
     let acceptedRelays: string[] = [];
     try {
       const publishResults = await this.withTimeout(
@@ -1122,44 +1123,49 @@ export class NostrService {
         .map((result, index) => result.status === 'fulfilled' ? relays[index] : null)
         .filter((relay): relay is string => !!relay);
 
-      if (!acceptedRelays.length) {
-        throw new Error('No relay accepted the event.');
+      if (acceptedRelays.length < requiredReplicas) {
+        throw new Error(`Only ${acceptedRelays.length} of ${requiredReplicas} independent relays acknowledged the profile event.`);
       }
 
       console.info('[PoH] publishCharityProfile:publish-accepted', {
         id: signed.id,
+        requiredReplicas,
         acceptedRelays,
         rejectedRelays: relays.filter((relay) => !acceptedRelays.includes(relay))
       });
     } catch (e: any) {
       console.error('[PoH] publishCharityProfile:publish-failed', e);
-      throw new Error('Signed profile event, but app relays did not accept it. Try another relay/signer and retry.');
+      throw new Error(`Signed profile event, but fewer than ${requiredReplicas} independent relays acknowledged it. Please retry; the profile was not reported as durably saved.`);
     }
 
-    // Read-after-write verification to surface signer/relay issues explicitly.
+    // A relay acknowledgement alone does not prove retention. Verify that the exact
+    // signed event can be read back from the same independent replicas.
     const verifyStart = Date.now();
     while (Date.now() - verifyStart < 10_000) {
-      try {
-        const found = await this.pool.querySync(relays, {
+      const readBack = await Promise.allSettled(acceptedRelays.map(async (relay) => {
+        const found = await this.pool.querySync([relay], {
+          ids: [signed.id],
           kinds: [KIND_CHARITY_PROFILE],
           authors: [signed.pubkey],
           '#d': ['proofofheart-charity-profile-v1'],
           limit: 1
         });
+        return (found as any[]).some((event) => event?.id === signed.id) ? relay : null;
+      }));
+      const verifiedRelays = readBack
+        .map((result) => result.status === 'fulfilled' ? result.value : null)
+        .filter((relay): relay is string => !!relay);
 
-        if (found.length > 0) {
-          console.info('[PoH] publishCharityProfile:verified', { id: signed.id });
-          return signed.id;
-        }
-      } catch (e) {
-        console.warn('[PoH] publishCharityProfile:verify-query-failed', e);
+      if (verifiedRelays.length >= requiredReplicas) {
+        console.info('[PoH] publishCharityProfile:verified', { id: signed.id, requiredReplicas, verifiedRelays });
+        return signed.id;
       }
 
       await new Promise(resolve => setTimeout(resolve, 700));
     }
 
-    console.error('[PoH] publishCharityProfile:not-visible-after-timeout', { id: signed.id, relays });
-    throw new Error('Profile was signed, but not visible on app relays yet. Please retry in a few seconds or switch signer.');
+    console.error('[PoH] publishCharityProfile:not-visible-after-timeout', { id: signed.id, acceptedRelays, requiredReplicas });
+    throw new Error(`Profile event was acknowledged, but could not be read back from ${requiredReplicas} independent relays. Please retry; it was not reported as durably saved.`);
   }
 
   async loadOwnCharityProfile(pubkey: string): Promise<CharityExtraFields | null> {

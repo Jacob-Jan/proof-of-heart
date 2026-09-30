@@ -204,7 +204,7 @@ describe('publishCharityProfile', () => {
     spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
     spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
     (service as any).pool = {
-      publish: () => [Promise.resolve('ok')],
+      publish: (relays: string[]) => relays.map(() => Promise.resolve('ok')),
       querySync: async () => [signed]
     };
 
@@ -213,6 +213,35 @@ describe('publishCharityProfile', () => {
     expect(id).toBe('signed-charity-profile');
     expect((service as any).signEventWithAvailableSigner).toHaveBeenCalled();
   });
+
+  it('rejects a save when fewer than three independent production relays acknowledge it', async () => {
+    const service = new NostrService();
+    const signed = { id: 'signed-charity-profile', pubkey: '4'.repeat(64), kind: 30078, tags: [], content: '{}' };
+    spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
+    spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
+    (service as any).pool = {
+      publish: (relays: string[]) => relays.map((_, index) => index < 2 ? Promise.resolve('ok') : Promise.reject(new Error('rejected'))),
+      querySync: async () => [signed]
+    };
+
+    await expectAsync(service.publishCharityProfile({ description: 'Long description', isVisible: true }))
+      .toBeRejectedWithError(/3 independent relays/);
+  });
+
+  it('requires the exact profile event to be readable from the acknowledgement quorum', async () => {
+    const service = new NostrService();
+    const signed = { id: 'new-profile-event', pubkey: '4'.repeat(64), kind: 30078, tags: [], content: '{}' };
+    const old = { ...signed, id: 'old-profile-event' };
+    spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
+    spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
+    (service as any).pool = {
+      publish: (relays: string[]) => relays.map(() => Promise.resolve('ok')),
+      querySync: async () => [old]
+    };
+
+    await expectAsync(service.publishCharityProfile({ description: 'Long description', isVisible: true }))
+      .toBeRejectedWithError(/could not be read back from 3 independent relays/);
+  }, 15_000);
 });
 
 describe('mergeCharityProfiles', () => {
