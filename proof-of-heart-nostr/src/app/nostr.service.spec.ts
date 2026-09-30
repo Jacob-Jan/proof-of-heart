@@ -203,14 +203,16 @@ describe('publishCharityProfile', () => {
     const signed = { id: 'signed-charity-profile', pubkey: '4'.repeat(64), kind: 30078, tags: [], content: '{}' };
     spyOn(service as any, 'signEventWithAvailableSigner').and.resolveTo(signed);
     spyOn(service as any, 'loadAuthorWriteRelays').and.resolveTo([]);
+    const publish = jasmine.createSpy('publish').and.callFake((relays: string[]) => relays.map(() => Promise.resolve('ok')));
     (service as any).pool = {
-      publish: (relays: string[]) => relays.map(() => Promise.resolve('ok')),
+      publish,
       querySync: async () => [signed]
     };
 
     const id = await service.publishCharityProfile({ description: 'Long description', isVisible: true });
 
     expect(id).toBe('signed-charity-profile');
+    expect((publish.calls.mostRecent().args[0] as string[])).toContain('wss://offchain.pub');
     expect((service as any).signEventWithAvailableSigner).toHaveBeenCalled();
   });
 

@@ -23,7 +23,8 @@ const RELAYS = (process.env.SITEMAP_RELAYS
       'wss://nostr.wine',
       'wss://relay.snort.social',
       'wss://nos.lol',
-      'wss://nostr.mom'
+      'wss://nostr.mom',
+      'wss://offchain.pub'
     ]);
 
 const STATIC_ROUTES = [
