@@ -60,6 +60,13 @@ test.describe('Main user flows', () => {
     await expect(page.locator('.charity, .loadingcharity')).toBeVisible();
   });
 
+  test('open the hardcoded Bitcoin voor Serious Request slug directly', async ({ page }) => {
+    await page.goto('/charity/bitcoin-voor-serious-request');
+
+    await expect(page).toHaveURL(/\/charity\/bitcoin-voor-serious-request$/);
+    await expect(page.locator('.charity, .loadingcharity')).toBeVisible();
+  });
+
   test('navigate static pages (mission + paper)', async ({ page }) => {
     await page.goto('/');
 

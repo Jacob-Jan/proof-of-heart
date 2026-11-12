@@ -1,6 +1,6 @@
 import { Component, DOCUMENT, Inject, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, ActivatedRouteSnapshot, RouterModule } from '@angular/router';
 import { CharityProfile, Nip57ZapReceipt, NostrService, RecentFlagRecord, RecentRatingRecord } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
@@ -40,6 +40,10 @@ function isAndroidBrowser(): boolean {
 
 export function shouldStartNip46ZapPairingBeforeAndroidFallback(hasNip07Signer: boolean, hasNip46Session: boolean): boolean {
   return !hasNip07Signer && !hasNip46Session;
+}
+
+export function charityIdFromRouteSnapshot(snapshot: ActivatedRouteSnapshot): string {
+  return snapshot.data?.['charityId'] || snapshot.paramMap.get('pubkey') || '';
 }
 
 export function buildAndroidSignerZapCallbackUrl(origin: string, pathname: string, requestId: string): string {
@@ -270,7 +274,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
-    this.currentIdParam = this.cleanCharityIdParam(this.route.snapshot.paramMap.get('pubkey') || '');
+    this.currentIdParam = this.cleanCharityIdParam(charityIdFromRouteSnapshot(this.route.snapshot));
 
     this.initNip55DebugMode();
     this.installAndroidSignerResumeListeners();

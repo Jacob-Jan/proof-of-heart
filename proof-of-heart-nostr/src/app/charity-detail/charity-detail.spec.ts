@@ -3,8 +3,28 @@ import { ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
-import { buildAndroidSignerZapCallbackUrl, CharityDetailComponent, normalizeCharityWebsiteHref, shouldStartNip46ZapPairingBeforeAndroidFallback } from './charity-detail';
+import { buildAndroidSignerZapCallbackUrl, charityIdFromRouteSnapshot, CharityDetailComponent, normalizeCharityWebsiteHref, shouldStartNip46ZapPairingBeforeAndroidFallback } from './charity-detail';
 import { NostrService } from '../nostr.service';
+
+describe('charityIdFromRouteSnapshot', () => {
+  it('uses a hardcoded charity identity supplied by route data', () => {
+    const snapshot = {
+      data: { charityId: 'npub1hardcoded' },
+      paramMap: { get: () => null }
+    } as any;
+
+    expect(charityIdFromRouteSnapshot(snapshot)).toBe('npub1hardcoded');
+  });
+
+  it('keeps supporting legacy pubkey route parameters', () => {
+    const snapshot = {
+      data: {},
+      paramMap: { get: (name: string) => name === 'pubkey' ? 'npub1legacy' : null }
+    } as any;
+
+    expect(charityIdFromRouteSnapshot(snapshot)).toBe('npub1legacy');
+  });
+});
 
 describe('buildAndroidSignerZapCallbackUrl', () => {
   const charityPubkey = 'a'.repeat(64);
