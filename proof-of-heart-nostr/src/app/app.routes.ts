@@ -39,6 +39,14 @@ export const routes: Routes = [
     }
   },
   {
+    path: 'charity/bitcoin-voor-serious-request',
+    loadComponent: () => import('./charity-detail/charity-detail').then(m => m.CharityDetailComponent),
+    title: 'Bitcoin voor Serious Request | Proof of Heart',
+    data: {
+      charityId: 'npub17m4ytjcufua637q43386d8zmzhlgemh36vg56ga5fwy3qxavfm4sfllkff'
+    }
+  },
+  {
     path: 'onboard',
     loadComponent: () => import('./charity-onboard/charity-onboard').then(m => m.CharityOnboardComponent),
     title: 'For charities | Proof of Heart'
