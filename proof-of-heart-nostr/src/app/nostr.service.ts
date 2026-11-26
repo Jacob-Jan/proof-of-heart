@@ -28,6 +28,8 @@ export interface CharityProfile {
     category?: string;
     donationMessage?: string;
     lightningAddress?: string;
+    suggestedDonationsEnabled?: boolean;
+    suggestedDonationAmounts?: number[];
     isVisible?: boolean;
   };
 }
@@ -39,7 +41,29 @@ export interface CharityExtraFields {
   category?: string;
   donationMessage?: string;
   lightningAddress?: string;
+  suggestedDonationsEnabled?: boolean;
+  suggestedDonationAmounts?: number[];
   isVisible?: boolean;
+}
+
+export const DEFAULT_SUGGESTED_DONATION_AMOUNTS = [10, 20, 50, 100] as const;
+
+export function areValidSuggestedDonationAmounts(value: unknown): value is number[] {
+  return Array.isArray(value)
+    && value.length === 4
+    && value.every((amount) => typeof amount === 'number'
+      && Number.isFinite(amount)
+      && amount >= 0.01
+      && amount <= 1_000_000);
+}
+
+export function normalizeSuggestedDonationAmounts(value: unknown): number[] {
+  if (!areValidSuggestedDonationAmounts(value)) return [...DEFAULT_SUGGESTED_DONATION_AMOUNTS];
+  return value.map((amount) => Math.round(amount * 100) / 100);
+}
+
+export function normalizeSuggestedDonationsEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : true;
 }
 
 export interface Kind0ProfileEdits {
@@ -128,9 +152,15 @@ export function hasCharityProfileChanges(existing: CharityExtraFields = {}, next
     'country',
     'category',
     'donationMessage',
+    'suggestedDonationsEnabled',
+    'suggestedDonationAmounts',
     'isVisible'
   ];
-  const normalize = (value: any) => typeof value === 'string' ? value.trim() : value;
+  const normalize = (value: any) => {
+    if (typeof value === 'string') return value.trim();
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return value;
+  };
   return keys.some((key) => normalize(existing[key]) !== normalize(next[key]));
 }
 
@@ -194,6 +224,10 @@ export function mergeCharityProfiles(existing: CharityProfile[], incoming: Chari
         category: fresh.charity?.category ?? cached.charity.category,
         donationMessage: fresh.charity?.donationMessage ?? cached.charity.donationMessage,
         lightningAddress: fresh.charity?.lightningAddress ?? cached.charity.lightningAddress,
+        suggestedDonationsEnabled: typeof fresh.charity?.suggestedDonationsEnabled === 'boolean'
+          ? fresh.charity.suggestedDonationsEnabled
+          : cached.charity.suggestedDonationsEnabled,
+        suggestedDonationAmounts: fresh.charity?.suggestedDonationAmounts ?? cached.charity.suggestedDonationAmounts,
         isVisible: typeof fresh.charity?.isVisible === 'boolean' ? fresh.charity.isVisible : cached.charity.isVisible
       }
     };
@@ -1182,7 +1216,12 @@ export class NostrService {
     if (!events.length) return null;
 
     const latest = [...events].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0))[0] as any;
-    return this.safeJson(latest.content || '{}') as CharityExtraFields;
+    const fields = this.safeJson(latest.content || '{}') as CharityExtraFields;
+    return {
+      ...fields,
+      suggestedDonationsEnabled: normalizeSuggestedDonationsEnabled(fields?.suggestedDonationsEnabled),
+      suggestedDonationAmounts: normalizeSuggestedDonationAmounts(fields?.suggestedDonationAmounts)
+    };
   }
 
   async ensureCharityProfile(pubkey: string): Promise<void> {
@@ -1203,6 +1242,8 @@ export class NostrService {
       category: '',
       donationMessage: '',
       lightningAddress: '',
+      suggestedDonationsEnabled: true,
+      suggestedDonationAmounts: [...DEFAULT_SUGGESTED_DONATION_AMOUNTS],
       isVisible: true
     });
   }
@@ -1684,6 +1725,8 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
+          suggestedDonationsEnabled: normalizeSuggestedDonationsEnabled(extra?.suggestedDonationsEnabled),
+          suggestedDonationAmounts: normalizeSuggestedDonationAmounts(extra?.suggestedDonationAmounts),
           isVisible: extra?.isVisible ?? true,
 
         }
@@ -1764,6 +1807,12 @@ export class NostrService {
         category: fields.category ?? current.charity.category,
         donationMessage: fields.donationMessage ?? current.charity.donationMessage,
         lightningAddress: fields.lightningAddress ?? current.charity.lightningAddress,
+        suggestedDonationsEnabled: typeof fields.suggestedDonationsEnabled === 'boolean'
+          ? fields.suggestedDonationsEnabled
+          : current.charity.suggestedDonationsEnabled,
+        suggestedDonationAmounts: fields.suggestedDonationAmounts
+          ? normalizeSuggestedDonationAmounts(fields.suggestedDonationAmounts)
+          : current.charity.suggestedDonationAmounts,
         isVisible: typeof fields.isVisible === 'boolean' ? fields.isVisible : current.charity.isVisible
       }
     };
@@ -1877,6 +1926,8 @@ export class NostrService {
         category: typeof record.charity?.category === 'string' ? record.charity.category : undefined,
         donationMessage: typeof record.charity?.donationMessage === 'string' ? record.charity.donationMessage : undefined,
         lightningAddress: typeof record.charity?.lightningAddress === 'string' ? record.charity.lightningAddress : undefined,
+        suggestedDonationsEnabled: normalizeSuggestedDonationsEnabled(record.charity?.suggestedDonationsEnabled),
+        suggestedDonationAmounts: normalizeSuggestedDonationAmounts(record.charity?.suggestedDonationAmounts),
         isVisible: typeof record.charity?.isVisible === 'boolean' ? record.charity.isVisible : undefined
       }
     };
@@ -2147,6 +2198,8 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
+          suggestedDonationsEnabled: normalizeSuggestedDonationsEnabled(extra?.suggestedDonationsEnabled),
+          suggestedDonationAmounts: normalizeSuggestedDonationAmounts(extra?.suggestedDonationAmounts),
           isVisible: extra?.isVisible ?? true,
 
         }
@@ -2312,6 +2365,8 @@ export class NostrService {
           category: extra?.category,
           donationMessage: extra?.donationMessage,
           lightningAddress: extra?.lightningAddress,
+          suggestedDonationsEnabled: normalizeSuggestedDonationsEnabled(extra?.suggestedDonationsEnabled),
+          suggestedDonationAmounts: normalizeSuggestedDonationAmounts(extra?.suggestedDonationAmounts),
           isVisible: extra?.isVisible ?? true,
 
         }

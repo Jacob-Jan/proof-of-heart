@@ -106,6 +106,50 @@
       background: #fbfaf6;
     }
 
+    .donation-suggestions-setting {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+      padding-top: 14px;
+      border-top: 1px solid #e4dfd2;
+    }
+
+    .suggested-amount-editor {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 0.82rem;
+      }
+
+      .amount-input-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        > span {
+          color: #6f675c;
+          white-space: nowrap;
+        }
+
+        input {
+          width: 100%;
+          min-width: 0;
+        }
+      }
+    }
+
+    @media (max-width: 520px) {
+      .suggested-amount-editor {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .section-heading {
       display: flex;
       align-items: baseline;

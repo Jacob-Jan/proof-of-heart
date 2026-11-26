@@ -245,3 +245,98 @@ describe('normalizeCharityWebsiteHref', () => {
     expect(normalizeCharityWebsiteHref('mailto:hello@example.org')).toBe('');
   });
 });
+
+describe('charity donation amount suggestions', () => {
+  async function setupDonationCard(charitySettings: Record<string, unknown> = {}) {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [CharityDetailComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['npub', 'npub1test']])) } },
+        { provide: NostrService, useValue: { clearCharityFeedStatus: jasmine.createSpy('clearCharityFeedStatus') } },
+        { provide: MatSnackBar, useValue: { open: jasmine.createSpy('open') } },
+        { provide: Meta, useValue: { updateTag: jasmine.createSpy('updateTag') } },
+        { provide: Title, useValue: { setTitle: jasmine.createSpy('setTitle') } }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CharityDetailComponent);
+    const component = fixture.componentInstance;
+    spyOn(component, 'ngOnInit').and.stub();
+    component.loading = false;
+    component.charity = {
+      pubkey: 'a'.repeat(64), npub: 'npub1test', name: 'Donation Charity', about: '',
+      picture: '', website: '', lud16: 'donate@example.org', followers: 0,
+      ratingAvg: 0, ratingCount: 0, flags: 0, zappedSats: 0, activityLoaded: true,
+      charity: { isVisible: true, ...charitySettings }
+    } as any;
+    fixture.detectChanges();
+    return { fixture, component };
+  }
+
+  it('starts in EUR with an empty custom amount and the default 10, 20, 50 and 100 suggestions', async () => {
+    const { fixture, component } = await setupDonationCard();
+
+    expect(component.donationCurrency).toBe('eur');
+    expect(component.donationInput).toBeNull();
+    expect(component.suggestedDonationAmounts).toEqual([10, 20, 50, 100]);
+    expect(Array.from(fixture.nativeElement.querySelectorAll('.suggested-amount'))
+      .map((button: any) => button.textContent.trim())).toEqual(['€10', '€20', '€50', '€100']);
+    expect(fixture.nativeElement.querySelector('.suggested-amount.selected')).toBeNull();
+    expect((fixture.nativeElement.querySelector('input[name="donationInput"]') as HTMLInputElement).value).toBe('');
+  });
+
+  it('lets the donor select a suggestion and switch the same donation UI to USD', async () => {
+    const { fixture, component } = await setupDonationCard();
+    const amountButtons = fixture.nativeElement.querySelectorAll('.suggested-amount') as NodeListOf<HTMLButtonElement>;
+
+    amountButtons[1].click();
+    fixture.detectChanges();
+    expect(component.donationInput).toBe(20);
+    expect(amountButtons[1].classList).toContain('selected');
+    component.toggleDonationCurrency();
+    fixture.detectChanges();
+    expect(component.donationCurrency).toBe('usd');
+    expect(amountButtons[1].textContent?.trim()).toBe('$20');
+  });
+
+  it('uses customized suggestions and lets a charity turn suggestions off', async () => {
+    const custom = await setupDonationCard({ suggestedDonationAmounts: [5, 25, 75, 150] });
+    expect(custom.component.suggestedDonationAmounts).toEqual([5, 25, 75, 150]);
+    expect(custom.fixture.nativeElement.querySelectorAll('.suggested-amount').length).toBe(4);
+
+    const disabled = await setupDonationCard({ suggestedDonationsEnabled: false, suggestedDonationAmounts: [5, 25] });
+    expect(disabled.component.suggestedDonationAmounts).toEqual([]);
+    expect(disabled.fixture.nativeElement.querySelector('.suggested-amounts')).toBeNull();
+  });
+
+  it('converts EUR and USD donor amounts to sats with their respective exchange rate', async () => {
+    const { component } = await setupDonationCard();
+    component.btcRates = { eur: 50_000, usd: 60_000 };
+    component.donationInput = 10;
+
+    expect(component.donationSats).toBe(20_000);
+    expect(component.convertedHint).toBe('≈ 20,000 sats');
+    component.toggleDonationCurrency();
+    expect(component.donationSats).toBe(16_667);
+    expect(component.convertedHint).toBe('≈ 16,667 sats');
+  });
+
+  it('rejects non-finite, unsafe and excessively large custom amounts', async () => {
+    const { component } = await setupDonationCard();
+    component.btcRates = { eur: 50_000, usd: 60_000 };
+
+    component.donationInput = Number.POSITIVE_INFINITY;
+    expect(component.donationSats).toBe(0);
+    expect(component.canDonate).toBeFalse();
+
+    component.donationInput = 1_000_001;
+    expect(component.donationSats).toBe(0);
+    expect(component.canDonate).toBeFalse();
+
+    component.donationInput = 10;
+    component.btcRates.eur = Number.POSITIVE_INFINITY;
+    expect(component.donationSats).toBe(0);
+    expect(component.canDonate).toBeFalse();
+  });
+});

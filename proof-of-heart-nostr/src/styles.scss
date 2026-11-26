@@ -214,6 +214,64 @@ button:not(.mdc-button) {
   --toast-color: #1d4ed8;
 }
 
+.charity .donate .amount-box {
+  .currency-switch {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+
+    button {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #f3f0e9;
+    }
+
+    button.active {
+      border-color: #9a630e;
+      background: #fff4dd;
+      font-weight: 700;
+    }
+  }
+
+  .suggested-amounts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+    margin-bottom: 14px;
+  }
+
+  .suggested-amount {
+    padding: 8px 4px;
+    border: 1px solid #d8d0c3;
+    border-radius: 10px;
+    background: #fff;
+    font-weight: 700;
+  }
+
+  .suggested-amount.selected {
+    border-color: #9a630e;
+    background: #fff4dd;
+  }
+
+  .other-amount-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .currency-symbol {
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 560px) {
+  .charity .donate .amount-box .suggested-amounts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* Ensure Font Awesome webfonts resolve from /assets */
 @font-face {
   font-family: "Font Awesome 7 Free";

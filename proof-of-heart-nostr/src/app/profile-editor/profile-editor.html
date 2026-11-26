@@ -115,6 +115,36 @@
             <option [value]="category">{{ category }}</option>
           }
         </select>
+
+        <div class="donation-suggestions-setting">
+          <mat-checkbox
+            [(ngModel)]="model.suggestedDonationsEnabled"
+            name="suggestedDonationsEnabled">
+            Show suggested donation amounts
+          </mat-checkbox>
+          <p class="field-hint">Donors see these amounts in EUR by default and can switch to USD themselves.</p>
+          @if (model.suggestedDonationsEnabled !== false) {
+            <div class="suggested-amount-editor" aria-label="Suggested donation amounts">
+              @for (amount of suggestedDonationAmounts; track $index) {
+                <label>
+                  <span>Option {{ $index + 1 }}</span>
+                  <div class="amount-input-wrap">
+                    <span>€ / $</span>
+                    <input
+                      class="suggested-amount-input"
+                      type="number"
+                      min="0.01"
+                      max="1000000"
+                      step="0.01"
+                      required
+                      [(ngModel)]="suggestedDonationAmounts[$index]"
+                      [name]="'suggestedDonationAmount' + $index" />
+                  </div>
+                </label>
+              }
+            </div>
+          }
+        </div>
       </section>
 
       <div class="account-buttons">
