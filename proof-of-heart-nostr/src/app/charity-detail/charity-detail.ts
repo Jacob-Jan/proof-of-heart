@@ -1,7 +1,7 @@
 import { Component, DOCUMENT, Inject, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, ActivatedRouteSnapshot, RouterModule } from '@angular/router';
-import { CharityProfile, Nip57ZapReceipt, NostrService, RecentFlagRecord, RecentRatingRecord } from '../nostr.service';
+import { CharityProfile, Nip57ZapReceipt, normalizeSuggestedDonationAmounts, NostrService, RecentFlagRecord, RecentRatingRecord } from '../nostr.service';
 import { FormsModule } from '@angular/forms';
 import { nip19 } from 'nostr-tools';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -131,9 +131,10 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   localCharitySignedIn = false;
   canEdit = false;
 
-  donationMode: 'sats' | 'usd' = 'sats';
-  donationInput = 1000;
-  btcUsdRate = 0;
+  donationCurrency: 'eur' | 'usd' = 'eur';
+  donationInput: number | null = null;
+  selectedSuggestedAmount: number | null = null;
+  btcRates = { eur: 0, usd: 0 };
   donating = false;
   donationStatus = '';
   donationFlow: 'lightning' | 'zap' = 'lightning';
@@ -197,6 +198,25 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return (this.charity?.lud16 || '').trim();
   }
 
+  get suggestedDonationAmounts(): number[] {
+    if (this.charity?.charity?.suggestedDonationsEnabled === false) return [];
+    return normalizeSuggestedDonationAmounts(this.charity?.charity?.suggestedDonationAmounts);
+  }
+
+  get donationCurrencySymbol(): string {
+    return this.donationCurrency === 'eur' ? '€' : '$';
+  }
+
+  selectSuggestedAmount(amount: number): void {
+    this.selectedSuggestedAmount = amount;
+    this.donationInput = amount;
+  }
+
+  onDonationInput(value: number | null): void {
+    this.donationInput = value;
+    this.selectedSuggestedAmount = null;
+  }
+
   get canDonate(): boolean {
     return !!this.donationAddress && this.donationAddress.includes('@') && this.donationSats > 0 && !this.donating;
   }
@@ -250,27 +270,15 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
   // donation flows intentionally separate plain Lightning from verified NIP-57 zaps
 
   get donationSats(): number {
-    if (!this.donationInput || this.donationInput <= 0) return 0;
-    if (this.donationMode === 'sats') return Math.round(this.donationInput);
-    if (!this.btcUsdRate || this.btcUsdRate <= 0) return 0;
-    const btc = this.donationInput / this.btcUsdRate;
-    return Math.round(btc * 100_000_000);
+    if (!Number.isFinite(this.donationInput) || !this.donationInput || this.donationInput <= 0 || this.donationInput > 1_000_000) return 0;
+    const rate = this.btcRates[this.donationCurrency];
+    if (!Number.isFinite(rate) || rate <= 0) return 0;
+    const sats = Math.round((this.donationInput / rate) * 100_000_000);
+    return Number.isSafeInteger(sats) && sats > 0 ? sats : 0;
   }
 
   get convertedHint(): string {
-    if (!this.btcUsdRate || !this.donationInput || this.donationInput <= 0) {
-      return this.donationMode === 'sats' ? '≈ $0.00' : '≈ 0 sats';
-    }
-
-    if (this.donationMode === 'sats') {
-      const btc = this.donationInput / 100_000_000;
-      const usd = btc * this.btcUsdRate;
-      return `≈ $${usd.toFixed(2)}`;
-    }
-
-    const btc = this.donationInput / this.btcUsdRate;
-    const sats = Math.round(btc * 100_000_000);
-    return `≈ ${sats.toLocaleString()} sats`;
+    return `≈ ${this.donationSats.toLocaleString('en-US')} sats`;
   }
 
   async ngOnInit() {
@@ -291,7 +299,7 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     await this.resumeAndroidSignerZapIfPresent();
 
     // Non-blocking: rate fetch should never delay profile rendering.
-    this.loadBtcUsdRate();
+    this.loadBtcRates();
   }
 
   ngOnDestroy(): void {
@@ -594,8 +602,8 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleDonationMode() {
-    this.donationMode = this.donationMode === 'sats' ? 'usd' : 'sats';
+  toggleDonationCurrency() {
+    this.donationCurrency = this.donationCurrency === 'eur' ? 'usd' : 'eur';
   }
 
   private loadRecentZapReceipts(pubkey: string, isCurrent: () => boolean) {
@@ -2113,13 +2121,16 @@ export class CharityDetailComponent implements OnInit, OnDestroy {
     return `https://proofofheart.org/${url}`;
   }
 
-  private async loadBtcUsdRate() {
+  private async loadBtcRates() {
     try {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur,usd');
       const data = await res.json();
-      this.btcUsdRate = Number(data?.bitcoin?.usd) || 0;
+      this.btcRates = {
+        eur: Number(data?.bitcoin?.eur) || 0,
+        usd: Number(data?.bitcoin?.usd) || 0
+      };
     } catch {
-      this.btcUsdRate = 0;
+      this.btcRates = { eur: 0, usd: 0 };
     }
   }
 }

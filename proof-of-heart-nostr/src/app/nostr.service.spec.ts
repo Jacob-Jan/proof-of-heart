@@ -1,4 +1,4 @@
-import { buildKind0ProfileMetadata, buildNip46ConnectUrl, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
+import { buildKind0ProfileMetadata, buildNip46ConnectUrl, ensureEventPubkeyForNip07, getNip46ProfilePermissions, hasCharityProfileChanges, mergeCharityProfiles, normalizeSuggestedDonationAmounts, normalizeSuggestedDonationsEnabled, parseNip57ZapReceipt, ratingStatsByRecipient, sortCharityProfiles, totalZapSatsByRecipient, zapReceiptSats, CharityProfile, NostrService } from './nostr.service';
 
 describe('buildKind0ProfileMetadata', () => {
   it('updates editable Nostr profile fields while preserving unknown metadata', () => {
@@ -75,6 +75,34 @@ describe('ensureEventPubkeyForNip07', () => {
 });
 
 describe('profile editor save helpers', () => {
+  it('accepts only four valid suggested amounts and a real boolean enablement value', () => {
+    expect(normalizeSuggestedDonationAmounts([5, 15, 30, 60])).toEqual([5, 15, 30, 60]);
+    expect(normalizeSuggestedDonationAmounts([5, 15, 30])).toEqual([10, 20, 50, 100]);
+    expect(normalizeSuggestedDonationAmounts([5, '', 30, 60])).toEqual([10, 20, 50, 100]);
+    expect(normalizeSuggestedDonationAmounts([0.001, 15, 30, 60])).toEqual([10, 20, 50, 100]);
+    expect(normalizeSuggestedDonationAmounts([5, 15, Number.POSITIVE_INFINITY, 60])).toEqual([10, 20, 50, 100]);
+    expect(normalizeSuggestedDonationsEnabled(false)).toBeFalse();
+    expect(normalizeSuggestedDonationsEnabled('false')).toBeTrue();
+    expect(normalizeSuggestedDonationsEnabled(0)).toBeTrue();
+  });
+
+  it('preserves normalized suggested donation settings through cached charity deserialization', () => {
+    const service = new NostrService();
+    const cached = (service as any).coerceCachedCharity({
+      pubkey: 'a'.repeat(64),
+      npub: 'npub1cached',
+      name: 'Cached charity',
+      charity: {
+        suggestedDonationsEnabled: false,
+        suggestedDonationAmounts: [5, 15, 30, 60],
+        isVisible: true
+      }
+    });
+
+    expect(cached.charity.suggestedDonationsEnabled).toBeFalse();
+    expect(cached.charity.suggestedDonationAmounts).toEqual([5, 15, 30, 60]);
+  });
+
   it('does not treat a cleared legacy shortDescription as an app profile change by itself', () => {
     expect(hasCharityProfileChanges(
       { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
@@ -93,6 +121,21 @@ describe('profile editor save helpers', () => {
     expect(hasCharityProfileChanges(
       { description: 'Long', country: 'El Salvador', category: 'Education', isVisible: true },
       { description: 'Updated', country: 'El Salvador', category: 'Education', isVisible: true, shortDescription: '' }
+    )).toBeTrue();
+  });
+
+  it('detects suggested donation setting changes but not equal amount arrays', () => {
+    expect(hasCharityProfileChanges(
+      { suggestedDonationsEnabled: true, suggestedDonationAmounts: [10, 20, 50, 100] },
+      { suggestedDonationsEnabled: true, suggestedDonationAmounts: [10, 20, 50, 100] }
+    )).toBeFalse();
+    expect(hasCharityProfileChanges(
+      { suggestedDonationsEnabled: true, suggestedDonationAmounts: [10, 20, 50, 100] },
+      { suggestedDonationsEnabled: false, suggestedDonationAmounts: [10, 20, 50, 100] }
+    )).toBeTrue();
+    expect(hasCharityProfileChanges(
+      { suggestedDonationsEnabled: true, suggestedDonationAmounts: [10, 20, 50, 100] },
+      { suggestedDonationsEnabled: true, suggestedDonationAmounts: [5, 25, 75] }
     )).toBeTrue();
   });
 });

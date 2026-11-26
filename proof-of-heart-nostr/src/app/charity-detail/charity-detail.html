@@ -122,17 +122,37 @@
           </p>
 
           <div class="amount-box">
+            <div class="currency-switch" role="group" aria-label="Donation currency">
+              <button type="button" [class.active]="donationCurrency === 'eur'" (click)="donationCurrency = 'eur'">EUR</button>
+              <button type="button" [class.active]="donationCurrency === 'usd'" (click)="donationCurrency = 'usd'">USD</button>
+            </div>
+            @if (suggestedDonationAmounts.length) {
+              <div class="suggested-amounts" aria-label="Suggested donation amounts">
+                @for (amount of suggestedDonationAmounts; track $index) {
+                  <button
+                    type="button"
+                    class="suggested-amount"
+                    [class.selected]="selectedSuggestedAmount === amount"
+                    [attr.aria-pressed]="selectedSuggestedAmount === amount"
+                    (click)="selectSuggestedAmount(amount)">
+                    {{ donationCurrencySymbol }}{{ amount | number:'1.0-2' }}
+                  </button>
+                }
+              </div>
+            }
+            <label class="other-amount-label" for="donation-amount">Other amount</label>
             <div class="amount-row">
+              <span class="currency-symbol" aria-hidden="true">{{ donationCurrencySymbol }}</span>
               <input
+                id="donation-amount"
                 type="number"
-                min="1"
-                [(ngModel)]="donationInput"
+                min="0.01"
+                step="0.01"
+                [ngModel]="donationInput"
+                (ngModelChange)="onDonationInput($event)"
                 name="donationInput"
-                [placeholder]="donationMode === 'sats' ? 'Amount in sats' : 'Amount in USD'" />
-              <span class="unit">{{ donationMode === 'sats' ? 'sats' : 'USD' }}</span>
-              <button type="button" class="switch-btn" (click)="toggleDonationMode()" title="Switch sats/USD">
-                <i class="fa-solid fa-right-left"></i>
-              </button>
+                placeholder="Enter amount" />
+              <span class="unit">{{ donationCurrency | uppercase }}</span>
             </div>
             <p class="converted">{{ convertedHint }}</p>
             <div class="donate-buttons">

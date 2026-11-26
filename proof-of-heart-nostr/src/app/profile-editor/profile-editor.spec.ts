@@ -116,4 +116,37 @@ describe('ProfileEditorComponent rich description editor', () => {
     expect(nostr.disconnectCurrentSession).toHaveBeenCalledWith('a'.repeat(64));
     expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
+
+  it('defaults suggested donations to enabled amounts of 10, 20, 50 and 100', async () => {
+    const { fixture, component } = await setup();
+
+    expect(component.model.suggestedDonationsEnabled).toBeTrue();
+    expect(component.suggestedDonationAmounts).toEqual([10, 20, 50, 100]);
+    expect(fixture.nativeElement.querySelector('input[name="suggestedDonationsEnabled"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('.suggested-amount-input').length).toBe(4);
+  });
+
+  it('publishes customized or disabled suggestions in the charity profile event', async () => {
+    const { fixture, component, nostr } = await setup();
+    component.suggestedDonationAmounts = [5, 15, 30, 60];
+    component.model.suggestedDonationsEnabled = false;
+
+    await component.save();
+    fixture.detectChanges();
+
+    expect(nostr.publishCharityProfile).toHaveBeenCalledWith(jasmine.objectContaining({
+      suggestedDonationsEnabled: false,
+      suggestedDonationAmounts: [5, 15, 30, 60]
+    }));
+  });
+
+  it('does not publish when an enabled suggestion is blank or invalid', async () => {
+    const { component, nostr } = await setup();
+    component.suggestedDonationAmounts = [10, 0.001, 50, 100];
+
+    await component.save();
+
+    expect(nostr.publishCharityProfile).not.toHaveBeenCalled();
+    expect(component.saving).toBeFalse();
+  });
 });

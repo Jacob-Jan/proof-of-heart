@@ -2,7 +2,7 @@ import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core'
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CharityExtraFields, hasCharityProfileChanges, Kind0ProfileEdits, NostrService } from '../nostr.service';
+import { areValidSuggestedDonationAmounts, CharityExtraFields, DEFAULT_SUGGESTED_DONATION_AMOUNTS, hasCharityProfileChanges, Kind0ProfileEdits, normalizeSuggestedDonationAmounts, NostrService } from '../nostr.service';
 import { descriptionToEditorHtml, emptyDescriptionHtmlToBlank, normalizeDescriptionLinkUrl, sanitizeDescriptionHtml } from '../safe-description-html';
 import { CHARITY_CATEGORIES, COUNTRIES } from './reference-data';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -27,8 +27,11 @@ export class ProfileEditorComponent implements OnInit {
 
   model: CharityExtraFields = {
     description: '',
+    suggestedDonationsEnabled: true,
+    suggestedDonationAmounts: [...DEFAULT_SUGGESTED_DONATION_AMOUNTS],
     isVisible: true
   };
+  suggestedDonationAmounts: number[] = [...DEFAULT_SUGGESTED_DONATION_AMOUNTS];
 
   kind0Name = '';
   kind0About = '';
@@ -151,6 +154,8 @@ export class ProfileEditorComponent implements OnInit {
 
     if (!this.model.description) this.model.description = '';
     if (this.model.isVisible === undefined) this.model.isVisible = true;
+    if (this.model.suggestedDonationsEnabled === undefined) this.model.suggestedDonationsEnabled = true;
+    this.suggestedDonationAmounts = normalizeSuggestedDonationAmounts(this.model.suggestedDonationAmounts);
     this.syncDescriptionEditorFromModel();
   }
 
@@ -241,6 +246,10 @@ export class ProfileEditorComponent implements OnInit {
 
   async save() {
     if (this.saving) return;
+    if (this.model.suggestedDonationsEnabled !== false && !areValidSuggestedDonationAmounts(this.suggestedDonationAmounts)) {
+      this.toast('Enter four valid suggested amounts between 0.01 and 1,000,000.', 'error', 4500);
+      return;
+    }
     if (!this.profileFreshForSave) {
       this.toast('Still refreshing latest relay profile. Please wait before saving so newer changes are not overwritten.', 'info', 4500);
       this.saveStatus = 'Waiting for latest relay profile before saving…';
@@ -262,6 +271,8 @@ export class ProfileEditorComponent implements OnInit {
       const payload: CharityExtraFields = {
         ...this.existingModel,
         ...this.model,
+        suggestedDonationsEnabled: this.model.suggestedDonationsEnabled !== false,
+        suggestedDonationAmounts: normalizeSuggestedDonationAmounts(this.suggestedDonationAmounts),
         isVisible: this.model.isVisible ?? this.existingModel.isVisible ?? true
       };
       // Keep legacy app-specific fields cleared; Nostr bio and Lightning address now live in kind 0.

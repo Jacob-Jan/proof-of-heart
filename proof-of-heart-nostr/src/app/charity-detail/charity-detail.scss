@@ -178,7 +178,7 @@
         .amount-box {
           border: 1px solid #ddd;
           border-radius: 12px;
-          padding: 10px;
+          padding: 14px;
           background: #fff;
 
           .amount-row {
@@ -186,6 +186,7 @@
             align-items: center;
             gap: 8px;
             min-width: 0;
+
 
             input {
               flex: 1 1 auto;
@@ -204,15 +205,6 @@
               flex-shrink: 0;
             }
 
-            .switch-btn {
-              border: 1px solid #ddd;
-              background: #f7f7f7;
-              border-radius: 999px;
-              width: 38px;
-              height: 38px;
-              padding: 0;
-              flex-shrink: 0;
-            }
           }
 
           .converted {
@@ -363,6 +355,7 @@
     @media (max-width: 560px) {
       .right .donate {
         padding: 16px;
+
       }
     }
   }
