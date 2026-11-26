@@ -284,6 +284,9 @@ describe('charity donation amount suggestions', () => {
       .map((button: any) => button.textContent.trim())).toEqual(['€10', '€20', '€50', '€100']);
     expect(fixture.nativeElement.querySelector('.suggested-amount.selected')).toBeNull();
     expect((fixture.nativeElement.querySelector('input[name="donationInput"]') as HTMLInputElement).value).toBe('');
+    expect(fixture.nativeElement.querySelector('.other-amount-label')?.textContent.trim()).toBe('Custom amount');
+    expect(fixture.nativeElement.querySelector('.donation-help')?.textContent.trim())
+      .toBe('Pay directly with Lightning, or use a Nostr zap for a publicly verified donation.');
   });
 
   it('lets the donor select a suggestion and switch the same donation UI to USD', async () => {
