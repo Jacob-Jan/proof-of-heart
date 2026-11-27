@@ -122,24 +122,28 @@
           </p>
 
           <div class="amount-box">
-            <div class="currency-switch" role="group" aria-label="Donation currency">
-              <button type="button" [class.active]="donationCurrency === 'eur'" (click)="donationCurrency = 'eur'">EUR</button>
-              <button type="button" [class.active]="donationCurrency === 'usd'" (click)="donationCurrency = 'usd'">USD</button>
+            <div class="donation-options-row" aria-label="Suggested donation amounts">
+              <button
+                type="button"
+                class="currency-toggle"
+                (click)="toggleDonationCurrency()"
+                [attr.aria-label]="donationCurrency === 'eur' ? 'Switch amounts to US dollars' : 'Switch amounts to euros'"
+                [title]="donationCurrency === 'eur' ? 'Switch to US dollars' : 'Switch to euros'">
+                <span [class.active]="donationCurrency === 'eur'">€</span>
+                <span [class.active]="donationCurrency === 'usd'">$</span>
+              </button>
+              @for (amount of suggestedDonationAmounts; track $index) {
+                <button
+                  type="button"
+                  class="suggested-amount"
+                  [class.selected]="selectedSuggestedAmount === amount"
+                  [attr.aria-pressed]="selectedSuggestedAmount === amount"
+                  [attr.aria-label]="(amount | number:'1.0-2') + (donationCurrency === 'eur' ? ' euros' : ' US dollars')"
+                  (click)="selectSuggestedAmount(amount)">
+                  {{ amount | number:'1.0-2' }}
+                </button>
+              }
             </div>
-            @if (suggestedDonationAmounts.length) {
-              <div class="suggested-amounts" aria-label="Suggested donation amounts">
-                @for (amount of suggestedDonationAmounts; track $index) {
-                  <button
-                    type="button"
-                    class="suggested-amount"
-                    [class.selected]="selectedSuggestedAmount === amount"
-                    [attr.aria-pressed]="selectedSuggestedAmount === amount"
-                    (click)="selectSuggestedAmount(amount)">
-                    {{ donationCurrencySymbol }}{{ amount | number:'1.0-2' }}
-                  </button>
-                }
-              </div>
-            }
             <label class="other-amount-label" for="donation-amount">Custom amount</label>
             <div class="amount-row">
               <span class="currency-symbol" aria-hidden="true">{{ donationCurrencySymbol }}</span>

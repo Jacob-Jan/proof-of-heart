@@ -281,7 +281,15 @@ describe('charity donation amount suggestions', () => {
     expect(component.donationInput).toBeNull();
     expect(component.suggestedDonationAmounts).toEqual([10, 20, 50, 100]);
     expect(Array.from(fixture.nativeElement.querySelectorAll('.suggested-amount'))
-      .map((button: any) => button.textContent.trim())).toEqual(['€10', '€20', '€50', '€100']);
+      .map((button: any) => button.textContent.trim())).toEqual(['10', '20', '50', '100']);
+    expect(Array.from(fixture.nativeElement.querySelectorAll('.suggested-amount'))
+      .map((button: any) => button.getAttribute('aria-label'))).toEqual(['10 euros', '20 euros', '50 euros', '100 euros']);
+    const optionsRow = fixture.nativeElement.querySelector('.donation-options-row') as HTMLElement;
+    expect(Array.from(optionsRow.children).map((element) => element.classList.contains('currency-toggle') ? 'currency' : element.textContent?.trim()))
+      .toEqual(['currency', '10', '20', '50', '100']);
+    const currencyToggle = optionsRow.firstElementChild as HTMLElement;
+    expect(currencyToggle.textContent?.replace(/\s/g, '')).toBe('€$');
+    expect(currencyToggle.querySelector('span.active')?.textContent?.trim()).toBe('€');
     expect(fixture.nativeElement.querySelector('.suggested-amount.selected')).toBeNull();
     expect((fixture.nativeElement.querySelector('input[name="donationInput"]') as HTMLInputElement).value).toBe('');
     expect(fixture.nativeElement.querySelector('.other-amount-label')?.textContent.trim()).toBe('Custom amount');
@@ -297,10 +305,14 @@ describe('charity donation amount suggestions', () => {
     fixture.detectChanges();
     expect(component.donationInput).toBe(20);
     expect(amountButtons[1].classList).toContain('selected');
-    component.toggleDonationCurrency();
+    const currencyToggle = fixture.nativeElement.querySelector('.currency-toggle') as HTMLButtonElement;
+    currencyToggle.click();
     fixture.detectChanges();
     expect(component.donationCurrency).toBe('usd');
-    expect(amountButtons[1].textContent?.trim()).toBe('$20');
+    expect(currencyToggle.textContent?.replace(/\s/g, '')).toBe('€$');
+    expect(currencyToggle.querySelector('span.active')?.textContent?.trim()).toBe('$');
+    expect(amountButtons[1].textContent?.trim()).toBe('20');
+    expect(amountButtons[1].getAttribute('aria-label')).toBe('20 US dollars');
   });
 
   it('uses customized suggestions and lets a charity turn suggestions off', async () => {
@@ -310,16 +322,19 @@ describe('charity donation amount suggestions', () => {
 
     const disabled = await setupDonationCard({ suggestedDonationsEnabled: false, suggestedDonationAmounts: [5, 25] });
     expect(disabled.component.suggestedDonationAmounts).toEqual([]);
-    expect(disabled.fixture.nativeElement.querySelector('.suggested-amounts')).toBeNull();
+    expect(disabled.fixture.nativeElement.querySelector('.suggested-amount')).toBeNull();
   });
 
   it('converts EUR and USD donor amounts to sats with their respective exchange rate', async () => {
-    const { component } = await setupDonationCard();
+    const { fixture, component } = await setupDonationCard();
     component.btcRates = { eur: 50_000, usd: 60_000 };
     component.donationInput = 10;
 
     expect(component.donationSats).toBe(20_000);
     expect(component.convertedHint).toBe('≈ 20,000 sats');
+    const converted = fixture.nativeElement.querySelector('.converted') as HTMLElement;
+    expect(Number.parseFloat(getComputedStyle(converted).fontSize)).toBeGreaterThanOrEqual(14);
+    expect(getComputedStyle(converted).color).toBe('rgb(68, 68, 68)');
     component.toggleDonationCurrency();
     expect(component.donationSats).toBe(16_667);
     expect(component.convertedHint).toBe('≈ 16,667 sats');
